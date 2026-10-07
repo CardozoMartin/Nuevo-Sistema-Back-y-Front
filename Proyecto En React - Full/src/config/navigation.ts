@@ -1,0 +1,94 @@
+// Definición del menú lateral. Para agregar, quitar o reordenar opciones se edita SOLO este archivo.
+import type { NavItem, NavSection } from '@/types/navigation'
+import { ROUTES } from './routes'
+
+export const NAVIGATION: NavSection[] = [
+  {
+    key: 'principal',
+    items: [{ key: 'dashboard', label: 'Dashboard', icon: 'dashboard', path: ROUTES.dashboard }],
+  },
+  {
+    key: 'oficinas',
+    title: 'Oficinas',
+    items: [
+      {
+        key: 'catastro',
+        label: 'Catastro',
+        icon: 'domain',
+        path: ROUTES.catastro.root,
+        roles: ['catastro', 'administrador'],
+        children: [
+          { key: 'catastro-bandeja', label: 'Bandeja', icon: 'inbox', path: ROUTES.catastro.bandeja, bandejaDe: 'catastro' },
+          { key: 'catastro-tramites', label: 'Trámites', icon: 'post_add', path: ROUTES.catastro.tramites },
+          { key: 'catastro-pendientes', label: 'Seguimiento', icon: 'assignment_late', path: ROUTES.catastro.pendientes },
+          { key: 'catastro-busqueda', label: 'Búsqueda', icon: 'manage_search', path: ROUTES.catastro.busqueda },
+        ],
+      },
+      {
+        key: 'recaudacion',
+        label: 'Recaudación',
+        icon: 'payments',
+        path: ROUTES.recaudacion,
+        roles: ['recaudacion', 'administrador'],
+        bandejaDe: 'recaudacion',
+      },
+      {
+        key: 'distrito',
+        label: 'Distrito',
+        icon: 'location_city',
+        path: ROUTES.distrito,
+        roles: ['distrito', 'administrador'],
+        bandejaDe: 'distrito',
+      },
+      {
+        key: 'juridico',
+        label: 'Jurídico',
+        icon: 'gavel',
+        path: ROUTES.juridico,
+        roles: ['juridico', 'administrador'],
+        bandejaDe: 'juridico',
+      },
+      {
+        key: 'secretaria-general',
+        label: 'Secretaría General',
+        icon: 'approval',
+        path: ROUTES.secretariaGeneral,
+        roles: ['secretaria_general', 'administrador'],
+        bandejaDe: 'secretaria_general',
+      },
+    ],
+  },
+  {
+    key: 'modulos',
+    title: 'Módulos',
+    items: [
+      {
+        key: 'pozo',
+        label: 'Pozos',
+        icon: 'water_pump',
+        path: ROUTES.pozo.root,
+        children: [
+          { key: 'pozo-autorizacion', label: 'Autorización de pozo', icon: 'domain_verification', path: ROUTES.pozo.autorizacion },
+          { key: 'pozo-registro', label: 'Registro de pozo', icon: 'water_drop', path: ROUTES.pozo.registro },
+          { key: 'pozo-empresas', label: 'Empresas perforadoras', icon: 'engineering', path: ROUTES.pozo.empresas },
+          { key: 'pozo-autorizaciones', label: 'Autorizaciones', icon: 'verified_user', path: ROUTES.pozo.autorizaciones },
+          { key: 'pozo-consulta', label: 'Consulta general', icon: 'travel_explore', path: ROUTES.pozo.consulta },
+          { key: 'pozo-bajas', label: 'Baja de pozo', icon: 'do_not_disturb_on', path: ROUTES.pozo.bajas },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'herramientas',
+    title: 'Herramientas',
+    items: [
+      { key: 'busqueda', label: 'Búsqueda', icon: 'manage_search', path: ROUTES.busqueda },
+      { key: 'visor', label: 'Visor cartográfico', icon: 'map', path: ROUTES.visor },
+    ],
+  },
+]
+
+/** Ítems fijos al pie del sidebar. */
+export const NAVIGATION_FOOTER: NavItem[] = [
+  { key: 'configuracion', label: 'Configuración', icon: 'settings', path: ROUTES.configuracion },
+]

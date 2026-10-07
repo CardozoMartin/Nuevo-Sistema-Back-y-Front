@@ -1,0 +1,12 @@
+{
+  "caracter": "PERMANENTE",
+  "codigoServicio": 1,
+  "periodoInicio": "2026-01-01",
+  "periodoFin": "2030-12-31",
+  "desague": { "x": 3650066.23, "y": 7093870.87 },
+  "items": [
+    { "uso": "agricola-riego", "magnitud": 10 },
+    { "uso": "pecuario", "magnitud": 120 }
+  ],
+  "puntoEntrega": { "x": 3649988.15, "y": 7094004.88, "referencia": "Bebedero junto al corral norte" }
+}

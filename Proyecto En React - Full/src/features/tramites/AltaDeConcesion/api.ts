@@ -1,0 +1,66 @@
+// Peticiones del Alta de Concesión al BACKEND REAL (NestJS + PostgreSQL/PostGIS).
+// Solo hablan con la API; el cacheo lo hacen los hooks (./hooks.ts).
+//
+// Quién actúa viaja en el encabezado X-Usuario-Id (lo agrega el cliente `backend`).
+// El backend valida todo (etapa, oficina, que el expediente esté tomado, duplicados…) y
+// devuelve el mensaje de error listo para mostrar.
+import { backend } from '@/services/api/backend'
+import type {
+  AltaBackend,
+  AltaEnCarga,
+  DeudaBackend,
+  EntradaHistorial,
+  ExpedienteEnBandeja,
+  OficinaBackend,
+  SituacionLegalBackend,
+} from './backend.types'
+
+const ALTA = '/tramites/alta-concesion'
+
+export interface IniciarAltaDto {
+  expediente: { numero: string; reparticion: string; anio: number }
+  situacionLegal: string
+  documentacionPresentada: number[]
+}
+
+export type ResultadoDictamen = 'APTO' | 'OBSERVADO' | 'NO_APTO'
+
+const datos = <T>(p: Promise<{ data: T }>) => p.then((r) => r.data)
+
+export const altaConcesionApi = {
+  // --- Catálogos y consultas ---------------------------------------------------
+  situacionesLegales: () => datos(backend.get<SituacionLegalBackend[]>('/catalogos/situaciones-legales')),
+  listarEnCarga: () => datos(backend.get<AltaEnCarga[]>(ALTA)),
+  obtener: (id: string) => datos(backend.get<AltaBackend>(`${ALTA}/${id}`)),
+
+  // --- Catastro: carga (una sección por PUT) -------------------------------------
+  iniciar: (dto: IniciarAltaDto) => datos(backend.post<AltaBackend>(ALTA, dto)),
+  guardarTitulares: (id: string, dto: unknown) => datos(backend.put<AltaBackend>(`${ALTA}/${id}/titulares`, dto)),
+  guardarUbicacion: (id: string, formulario: FormData) =>
+    datos(backend.put<AltaBackend & { avisos: string[] }>(`${ALTA}/${id}/ubicacion`, formulario, { headers: { 'Content-Type': 'multipart/form-data' } })),
+  guardarInmueble: (id: string, dto: unknown) => datos(backend.put<AltaBackend>(`${ALTA}/${id}/inmueble`, dto)),
+  guardarUsos: (id: string, dto: unknown) => datos(backend.put<AltaBackend>(`${ALTA}/${id}/usos`, dto)),
+  guardarSuministro: (id: string, dto: unknown) => datos(backend.put<AltaBackend>(`${ALTA}/${id}/suministro`, dto)),
+
+  // --- Circuito ------------------------------------------------------------------
+  enviar: (id: string, observaciones?: string) => datos(backend.post<AltaBackend>(`${ALTA}/${id}/enviar`, { observaciones })),
+  reenviar: (id: string, observaciones?: string) => datos(backend.post<AltaBackend>(`${ALTA}/${id}/reenviar`, { observaciones })),
+  recaudacion: (id: string, dto: { resultado: 'SIN_DEUDA' | 'CON_DEUDA'; deudas?: { personaId: string; detalle: string; monto?: number }[]; observaciones?: string }) =>
+    datos(backend.post<AltaBackend>(`${ALTA}/${id}/recaudacion`, dto)),
+  dictaminar: (id: string, oficina: 'distrito' | 'juridico', dto: { resultado: ResultadoDictamen; observaciones?: string }) =>
+    datos(backend.post<AltaBackend>(`${ALTA}/${id}/${oficina}`, dto)),
+  numeroConcesion: (id: string) => datos(backend.post<AltaBackend>(`${ALTA}/${id}/numero-concesion`)),
+  resolucion: (id: string, dto: { numero: string; anio: number; fecha: string; observaciones?: string }) =>
+    datos(backend.post<AltaBackend>(`${ALTA}/${id}/resolucion`, dto)),
+  verificacionFinal: (id: string, observaciones?: string) => datos(backend.post<AltaBackend>(`${ALTA}/${id}/verificacion-final`, { observaciones })),
+  padron: (id: string, dto: { padron: string; observaciones?: string }) => datos(backend.post<AltaBackend>(`${ALTA}/${id}/padron`, dto)),
+
+  // --- Expediente (común a todos los trámites) ---------------------------------------
+  tomar: (id: string) => datos(backend.post(`/expedientes/${id}/tomar`)),
+  historial: (id: string) => datos(backend.get<EntradaHistorial[]>(`/expedientes/${id}/historial`)),
+  bandeja: (oficina: OficinaBackend) => datos(backend.get<ExpedienteEnBandeja[]>(`/expedientes/bandeja/${oficina}`)),
+
+  // --- Deudas (Recaudación) -----------------------------------------------------------
+  deudas: (personaId: string) => datos(backend.get<DeudaBackend[]>('/deudas', { params: { personaId } })),
+  cancelarDeuda: (deudaId: string, comprobante?: string) => datos(backend.post(`/deudas/${deudaId}/cancelar`, { comprobante })),
+}

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Finca El Gastona - parcela riego</name>
+    <!-- Coordenadas en POSGAR 2007 / Argentina faja 3 (EPSG:5345): X, Y en metros. -->
+    <Placemark>
+      <name>Parcela Río Gastona</name>
+      <description>Parcela de riego de ~40 ha a la vera del Río Gastona (Chicligasta). Prueba del flujo completo.</description>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>
+        3553695.68,6970276.75
+        3553945.66,6970282.93
+        3554194.96,6970304.09
+        3554235.49,6969510.11
+        3553731.44,6969477.55
+        3553695.68,6970276.75
+      </coordinates></LinearRing></outerBoundaryIs></Polygon>
+    </Placemark>
+  </Document>
+</kml>

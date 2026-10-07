@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Finca Los Tarcos - parcela riego</name>
+    <!-- Coordenadas en POSGAR 2007 / Argentina faja 3 (EPSG:5345): X, Y en metros. -->
+    <Placemark>
+      <name>Parcela Los Tarcos</name>
+      <description>Parcela de riego de ~36 ha a la vera del Río Gastona (Chicligasta), para probar el alta a mano.</description>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>
+        3557112.89,6968028.19
+        3557411.42,6967996.95
+        3557706.53,6967940.95
+        3557799.42,6968538.86
+        3557495.09,6968601.19
+        3557193.81,6968612.62
+        3557112.89,6968028.19
+      </coordinates></LinearRing></outerBoundaryIs></Polygon>
+    </Placemark>
+  </Document>
+</kml>

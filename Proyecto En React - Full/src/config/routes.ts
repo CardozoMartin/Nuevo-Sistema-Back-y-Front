@@ -1,0 +1,102 @@
+// Única fuente de verdad para las URLs. No escribir paths a mano en los componentes.
+import type { Oficina } from '@/types/domain'
+
+export const ROUTES = {
+  dashboard: '/',
+
+  catastro: {
+    root: '/catastro',
+    bandeja: '/catastro/bandeja',
+    tramites: '/catastro/tramites',
+    pendientes: '/catastro/pendientes',
+    busqueda: '/catastro/busqueda',
+    /** Historial completo de una concesión (titulares y trámites a lo largo del tiempo). */
+    concesion: (concesionId: string) => `/catastro/busqueda/concesion/${concesionId}`,
+    /** Consulta de un expediente (solo lectura, con su historial). */
+    expediente: (expedienteId: string) => `/catastro/busqueda/expediente/${expedienteId}`,
+  },
+
+  recaudacion: '/recaudacion',
+  distrito: '/distrito',
+  juridico: '/juridico',
+  secretariaGeneral: '/secretaria-general',
+
+  tramites: {
+    altaConcesion: {
+      inicio: '/tramites/alta-concesion',
+      /** Carga y corrección de datos en Catastro (backend real; el id es el del expediente). */
+      datos: (expedienteId: string) => `/tramites/alta-concesion/${expedienteId}/datos`,
+      /** El expediente en el circuito de oficinas (backend real): tomar, actuar, historial. */
+      circuito: (expedienteId: string) => `/tramites/alta-concesion/circuito/${expedienteId}`,
+      /** Altas viejas de json-server (datos de demo anteriores al backend real). */
+      gestion: (expedienteId: string) => `/tramites/alta-concesion/expediente/${expedienteId}`,
+    },
+    cambioTitularidad: {
+      /** Búsqueda de la concesión; al elegirla se asigna el expediente. */
+      inicio: '/tramites/cambio-titularidad',
+      datos: (borradorId: string) => `/tramites/cambio-titularidad/${borradorId}/datos`,
+      gestion: (expedienteId: string) => `/tramites/cambio-titularidad/expediente/${expedienteId}`,
+    },
+    anulacion: {
+      /** Búsqueda de la concesión; al elegirla se asigna el expediente. */
+      inicio: '/tramites/anulacion',
+      verificacion: (concesionId: string, numeroExpediente: string) =>
+        `/tramites/anulacion/verificacion?${new URLSearchParams({ concesion: concesionId, expediente: numeroExpediente })}`,
+      gestion: (expedienteId: string) => `/tramites/anulacion/expediente/${expedienteId}`,
+    },
+    reduccionAmpliacion: {
+      /** Búsqueda de la concesión; al elegirla se asigna el expediente. */
+      inicio: '/tramites/reduccion-ampliacion',
+      superficie: (concesionId: string, numeroExpediente: string) =>
+        `/tramites/reduccion-ampliacion/superficie?${new URLSearchParams({ concesion: concesionId, expediente: numeroExpediente })}`,
+      gestion: (expedienteId: string) => `/tramites/reduccion-ampliacion/expediente/${expedienteId}`,
+    },
+    subdivision: {
+      /** Búsqueda de la concesión; al elegirla se asigna el expediente. */
+      inicio: '/tramites/subdivision',
+      /** Editor de fracciones sobre el polígono de la concesión madre. */
+      fracciones: (borradorId: string) => `/tramites/subdivision/${borradorId}/fracciones`,
+      /** Datos de cada nueva concesión (los mismos del Alta). */
+      datos: (borradorId: string) => `/tramites/subdivision/${borradorId}/datos`,
+      gestion: (expedienteId: string) => `/tramites/subdivision/expediente/${expedienteId}`,
+    },
+    reubicacion: '/tramites/reubicacion',
+    permisos: '/tramites/permisos',
+  },
+
+  pozo: {
+    root: '/pozo',
+    autorizacion: '/pozo/autorizacion',
+    registro: '/pozo/registro',
+    /** Padrón de empresas perforadoras. */
+    empresas: '/pozo/empresas',
+    empresaNueva: '/pozo/empresas/nueva',
+    /** Ficha de la empresa: datos (modificación), máquinas e historial. */
+    empresa: (empresaId: string) => `/pozo/empresas/${empresaId}`,
+    /** Revisión de la oficina donde está la empresa (Jurídico o Secretaría General). */
+    empresaRevision: (empresaId: string) => `/pozo/empresas/${empresaId}/revision`,
+    autorizaciones: '/pozo/autorizaciones',
+    consulta: '/pozo/consulta',
+    /** Baja de pozo (backend real): bajas en trámite, inicio y el expediente en el circuito. */
+    /** Buscador de pozos: el punto de entrada de la baja. */
+    bajas: '/pozo/bajas',
+    /** Bajas en trámite (y las terminadas). */
+    bajasEnTramite: '/pozo/bajas/tramites',
+    /** Vista del pozo: se elige la baja (a solicitud o de oficio) y se carga el expediente. */
+    bajaPozo: (pozoId: string) => `/pozo/bajas/pozo/${pozoId}`,
+    baja: (expedienteId: string) => `/pozo/bajas/${expedienteId}`,
+  },
+
+  busqueda: '/busqueda',
+  visor: '/visor',
+  configuracion: '/configuracion',
+} as const
+
+/** Bandeja de expedientes de cada oficina (la usan notificaciones y sidebar). */
+export const RUTA_BANDEJA: Record<Oficina, string> = {
+  catastro: ROUTES.catastro.bandeja,
+  recaudacion: ROUTES.recaudacion,
+  distrito: ROUTES.distrito,
+  juridico: ROUTES.juridico,
+  secretaria_general: ROUTES.secretariaGeneral,
+}

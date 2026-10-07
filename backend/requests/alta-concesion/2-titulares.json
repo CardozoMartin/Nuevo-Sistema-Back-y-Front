@@ -1,0 +1,23 @@
+{
+  "titulares": [
+    {
+      "tipoPersona": "FISICA", "tipoDocumento": "DNI", "documento": "23456789",
+      "apellido": "Medina", "nombre": "Juan Carlos", "fechaNacimiento": "1960-01-10",
+      "email": "jmedina@ejemplo.com.ar", "telefono": "(0381) 15-4000000",
+      "razonSocial": "", "fechaConstitucion": ""
+    },
+    {
+      "tipoPersona": "FISICA", "tipoDocumento": "CUIL", "documento": "27301112225",
+      "apellido": "Medina", "nombre": "Ana María", "fechaNacimiento": "1965-06-02",
+      "email": "", "telefono": ""
+    },
+    {
+      "tipoPersona": "JURIDICA", "tipoDocumento": "CUIT", "documento": "30712345671",
+      "razonSocial": "Agropecuaria Los Medina SRL", "fechaConstitucion": "2004-03-15",
+      "email": "administracion@losmedina.com.ar"
+    }
+  ],
+  "domicilios": [
+    { "calle": "Av. San Martín", "numero": "100", "departamento": "BURRUYACU", "localidad": "7 DE ABRIL", "distrito": "II" }
+  ]
+}

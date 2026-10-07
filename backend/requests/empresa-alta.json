@@ -1,0 +1,13 @@
+{
+  "personaJuridica": true,
+  "cuit": "30-71234567-8",
+  "razonSocial": "Perforaciones del Norte SRL",
+  "ingresosBrutos": "901-123456-7",
+  "domicilioFiscal": "Av. Mate de Luna 1234, San Miguel de Tucumán",
+  "telefono": "381-4123456",
+  "email": "contacto@perfnorte.com.ar",
+  "maquinas": [
+    { "codigo": "eqp-001-a", "modelo": "Prakla RB-50", "capacidadDiametro": "12 1/4\"", "capacidadProfundidad": 350, "alturaTorre": 12.5, "vehiculoPatente": "AB123CD" },
+    { "codigo": "EQP-001-B", "modelo": "Rotativa liviana", "capacidadProfundidad": 120 }
+  ]
+}

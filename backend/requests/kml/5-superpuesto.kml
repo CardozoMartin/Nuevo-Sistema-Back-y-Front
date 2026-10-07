@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+<Document>
+  <name>Lote vecino</name>
+  <Style id="s"><PolyStyle><color>7f00ff00</color></PolyStyle></Style>
+  <Placemark>
+    <name>Lote vecino</name>
+    <styleUrl>#s</styleUrl>
+    <Polygon><tessellate>1</tessellate><outerBoundaryIs><LinearRing><coordinates>
+      -64.4985,-26.2740,0 -64.4960,-26.2740,0 -64.4960,-26.2715,0 -64.4985,-26.2715,0 -64.4985,-26.2740,0
+    </coordinates></LinearRing></outerBoundaryIs></Polygon>
+  </Placemark>
+</Document>
+</kml>

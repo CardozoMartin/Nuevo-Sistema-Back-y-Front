@@ -1,0 +1,9 @@
+{
+  "fuentes": ["RIO CALERA", "ARR. EL TIMBO"],
+  "sistemaDistribucion": "DIQUE CALERA",
+  "canalPrincipal": "MATRIZ",
+  "canalSecundario": "COSSIO",
+  "canalesAdicionales": ["PROPIO"],
+  "desague": "MISMA PROPIEDAD",
+  "observacion": ""
+}

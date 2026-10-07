@@ -1,0 +1,10 @@
+node_modules
+dist
+*.local
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+
+# Base de la demo (se regenera con npm run mock:reset)
+mock-server/db.json

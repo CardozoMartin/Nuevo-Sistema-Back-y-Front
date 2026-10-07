@@ -1,0 +1,26 @@
+# Base de datos de desarrollo del backend DRH: PostgreSQL 17 + PostGIS 3.6.
+# Uso: docker compose up -d   (detener: docker compose down; borrar datos: docker compose down -v)
+# Con el volumen vacío, la imagen crea la extensión postgis en DB_NAME (script 10_postgis.sh).
+services:
+  db:
+    image: postgis/postgis:17-3.6-alpine
+    container_name: drh-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-drh_sistema}
+      POSTGRES_USER: ${DB_USER:-drh}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-drh_dev}
+      TZ: America/Argentina/Tucuman
+    # 5433 en la PC porque el 5432 ya lo usa un PostgreSQL instalado localmente.
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - drh_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  drh_pgdata:

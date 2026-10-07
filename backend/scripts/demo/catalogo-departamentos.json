@@ -1,0 +1,1086 @@
+{
+ "BURRUYACU": {
+  "peso": 350,
+  "distrito": "DISTRITO II",
+  "localidades": [
+   "LA RAMADA DE ABAJO",
+   "EL NARANJO",
+   "ALTA GRACIA",
+   "TIMBO VIEJO",
+   "TIMBO NUEVO",
+   "MACOMITAS",
+   "EL TAJAMAR",
+   "EL CHAÑAR"
+  ],
+  "cuencas": [
+   "CUENCA RIO CALERA",
+   "CUENCA RIO TAJAMAR",
+   "CUENCA RIO SALI"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO CALERA",
+    "sistema": "DIQUE CALERA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. COSSIO",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL SEC."
+   },
+   {
+    "fuente": "RIO TAJAMAR",
+    "sistema": "DIQUE TAJAMAR",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. NORTE",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO CALERA",
+    "sistema": "TOMA PROPIA",
+    "canalPrincipal": "PROPIO POR BOMBEO",
+    "canalSecundario": null,
+    "canalTerciario": "LOS RALOS",
+    "desague": "MISMA PROPIEDAD"
+   },
+   {
+    "fuente": "RIO CALERA",
+    "sistema": "DIQUE CALERA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. NORTE",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO CALERA",
+    "sistema": "DIQUE CALERA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "PROPIO",
+    "canalTerciario": "LOS RALOS",
+    "desague": "MISMA PROPIEDAD"
+   }
+  ],
+  "usos": {
+   "RIEGO": 256,
+   "PECUARIO": 88,
+   "FMOTRIZ": 2,
+   "INDUSTRIAL": 2,
+   "PULVERIZACION": 1,
+   "RECREATIVO": 1
+  },
+  "cantidadMediana": 5
+ },
+ "CAPITAL": {
+  "peso": 29,
+  "distrito": "DISTRITO III",
+  "localidades": [
+   "SAN MIGUEL DE TUCUMAN",
+   "SANTA BARBARA",
+   "EL DURAZNITO",
+   "EL COLMENAR",
+   "LOS AGUIRRE"
+  ],
+  "cuencas": [
+   "CUENCA ARROYO MISTA"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO SALI",
+    "sistema": "AC. DEL OESTE",
+    "canalPrincipal": "AC. DEL OESTE",
+    "canalSecundario": "PROPIO",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": " ",
+    "sistema": null,
+    "canalPrincipal": " ",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "AC. DEL OESTE",
+    "canalPrincipal": "AC. DEL OESTE",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "ARR. MANANTIAL",
+    "sistema": "ARR. MANANTIAL",
+    "canalPrincipal": "PROPIO",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "AC. DEL OESTE",
+    "canalPrincipal": "AC. DEL OESTE",
+    "canalSecundario": null,
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   }
+  ],
+  "usos": {
+   "RIEGO": 26,
+   "INDUSTRIAL": 2,
+   "PECUARIO": 1
+  },
+  "cantidadMediana": 12
+ },
+ "CHICLIGASTA": {
+  "peso": 566,
+  "distrito": "DISTRITO V",
+  "localidades": [
+   "ALTO VERDE",
+   "LA CALERA",
+   "CARRETA QUEMADA",
+   "ALPACHIRI",
+   "EL MOLINO",
+   "ILTICO",
+   "PIEDRA GRANDE",
+   "MONTE RICO"
+  ],
+  "cuencas": [
+   "CUENCA RIO MEDINA",
+   "CUENCA RIO GASTONA",
+   "CUENCA ARROYO MISTA"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO MEDINA",
+    "sistema": "DIQUE MEDINA",
+    "canalPrincipal": "SAN MARTIN NORTE",
+    "canalSecundario": "AC. MURGA",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO MEDINA",
+    "sistema": "DIQUE MEDINA",
+    "canalPrincipal": "SAN MARTIN NORTE",
+    "canalSecundario": "MICHEL Y ZELARAYAN",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO MEDINA",
+    "sistema": "DIQUE MEDINA",
+    "canalPrincipal": "SAN MARTIN NORTE",
+    "canalSecundario": "LOS GONZALEZ",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO MEDINA",
+    "sistema": "DIQUE MEDINA",
+    "canalPrincipal": "SAN MARTIN NORTE",
+    "canalSecundario": "ZOILA DE GUILLEN",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO CONVENTILLO",
+    "sistema": "AC. HAIMES HNOS.",
+    "canalPrincipal": "AC. HAIMES HNOS.",
+    "canalSecundario": "PROPIO",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   }
+  ],
+  "usos": {
+   "RIEGO": 558,
+   "INDUSTRIAL": 3,
+   "PECUARIO": 3
+  },
+  "cantidadMediana": 6
+ },
+ "CRUZ ALTA": {
+  "peso": 772,
+  "distrito": "DISTRITO III",
+  "localidades": [
+   "RANCHILLOS",
+   "LOS GUTIERREZ",
+   "ALDERETES",
+   "LA FLORIDA",
+   "RANCHILLOS VIEJOS",
+   "SAN MIGUEL",
+   "LAS PIEDRITAS",
+   "LOS RALOS"
+  ],
+  "cuencas": [
+   "CUENCA RIO SALI",
+   "CUENCA RIO CALERA"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO SALI",
+    "sistema": "DIQUE LA AGUADITA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "EL ALTO 4 SECC",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "DIQUE LA AGUADITA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "EL ALTO 4 SECC",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL COMUNERO"
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "DIQUE LA AGUADITA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "EL ALTO 1 SECC",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "DIQUE LA AGUADITA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "EL ALTO 3 SECC",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "DIQUE LA AGUADITA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "EL ALTO 3 SECC",
+    "canalTerciario": "LOS RALOS",
+    "desague": "MISMA PROPIEDAD"
+   }
+  ],
+  "usos": {
+   "RIEGO": 743,
+   "PECUARIO": 22,
+   "INDUSTRIAL": 5
+  },
+  "cantidadMediana": 9
+ },
+ "FAMAILLA": {
+  "peso": 110,
+  "distrito": "DISTRITO IV",
+  "localidades": [
+   "NUEVA BAVIERA",
+   "MONTE GRANDE",
+   "SAUCE HUASCHO",
+   "FAMAILLA",
+   "LA FRONTERITA",
+   "AGUA BLANCA",
+   "LOS LAURELES",
+   "MONTAÑITA"
+  ],
+  "cuencas": [
+   "CUENCA RIO COLORADO",
+   "CUENCA RIO FAMAILLA",
+   "CUENCA RIO CASPICHANGO"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO CASPINCHANGO",
+    "sistema": "RIO CASPINCHANGO - TOMA 2",
+    "canalPrincipal": "DESAGUE ING. LA FRONTERITA",
+    "canalSecundario": "COMUNERO",
+    "canalTerciario": "LOS RALOS",
+    "desague": "ARR. MARAVILLA"
+   },
+   {
+    "fuente": "RIO CASPINCHANGO",
+    "sistema": "RIO CASPINCHANGO - TOMA 1",
+    "canalPrincipal": "NUEVA BAVIERA",
+    "canalSecundario": "COMUNERO",
+    "canalTerciario": "LOS RALOS",
+    "desague": "ARR. MARAVILLA"
+   },
+   {
+    "fuente": "ARR. SAUCE HUACHO",
+    "sistema": "ARR. SAUCE HUACHO",
+    "canalPrincipal": "SAUCE HUACHO",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO COLORADO",
+    "sistema": "LA MONTAÑITA",
+    "canalPrincipal": "PRINCIPAL LA MONTAÑITA",
+    "canalSecundario": "DERIVADO SUR LA MONTAÑITA",
+    "canalTerciario": null,
+    "desague": "MISMA PROPIEDAD"
+   },
+   {
+    "fuente": "RIO CASPINCHANGO",
+    "sistema": "RIO CASPINCHANGO - TOMA 2",
+    "canalPrincipal": "DESAGUE ING. LA FRONTERITA",
+    "canalSecundario": "COMUNERO",
+    "canalTerciario": "LOS RALOS",
+    "desague": "ZANJON"
+   }
+  ],
+  "usos": {
+   "RIEGO": 97,
+   "FMOTRIZ": 7,
+   "INDUSTRIAL": 3,
+   "PECUARIO": 2
+  },
+  "cantidadMediana": 11
+ },
+ "GRANEROS": {
+  "peso": 43,
+  "distrito": "DISTRITO VI",
+  "localidades": [
+   "GRANEROS",
+   "LA CAÑADA",
+   "CAMPO BELLO",
+   "CASAS VIEJAS",
+   "HUASA PAMPA NORTE"
+  ],
+  "cuencas": [
+   "CUENCA RIO MARAPA"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO MARAPA",
+    "sistema": "DIQUE MARAPA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "AC. GRANEROS",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO MARAPA",
+    "sistema": "DIQUE ESCABA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. NORTE",
+    "canalTerciario": "LOS RALOS",
+    "desague": "MISMA PROPIEDAD"
+   },
+   {
+    "fuente": "RIO MARAPA",
+    "sistema": "DIQUE MARAPA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "AC. GRANEROS",
+    "canalTerciario": "LOS RALOS",
+    "desague": "RIO GRANEROS"
+   },
+   {
+    "fuente": "RIO MARAPA",
+    "sistema": "DIQUE MARAPA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "AC. GRANEROS",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL PRONCIPAL"
+   },
+   {
+    "fuente": "RIO SAN IGNACIO",
+    "sistema": "DIQUE SAN IGNACIO",
+    "canalPrincipal": "MATRIZ SAN IGNACIO",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   }
+  ],
+  "usos": {
+   "RIEGO": 43
+  },
+  "cantidadMediana": 20
+ },
+ "JUAN B. ALBERDI": {
+  "peso": 345,
+  "distrito": "DISTRITO VI",
+  "localidades": [
+   "MARAPA",
+   "JUAN B ALBERDI",
+   "TALAMUYO",
+   "LOS ARROYOS",
+   "CAMPO BELLO",
+   "DONATO ALVAREZ",
+   "LOS ALAMITOS",
+   "LOS GUAYACANES"
+  ],
+  "cuencas": [
+   "CUENCA RIO MARAPA",
+   "CUENCA ARROYO MATAZAMBI",
+   "CUENCA RIO MEDINA"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO MARAPA",
+    "sistema": "DIQUE MARAPA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "AC. GRANEROS",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO MARAPA",
+    "sistema": "DIQUE MARAPA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. NORTE",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO MARAPA",
+    "sistema": "DIQUE MARAPA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. SUR",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO MARAPA",
+    "sistema": "DIQUE MARAPA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. NORTE",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL TERC."
+   },
+   {
+    "fuente": "RIO MARAPA",
+    "sistema": "DIQUE MARAPA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "AC. GRANEROS",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL SEC."
+   }
+  ],
+  "usos": {
+   "RIEGO": 343,
+   "INDUSTRIAL": 1,
+   "PECUARIO": 1
+  },
+  "cantidadMediana": 9
+ },
+ "LA COCHA": {
+  "peso": 390,
+  "distrito": "DISTRITO VI",
+  "localidades": [
+   "SAN JOSE",
+   "LA INVERNADA",
+   "EL SACRIFICIO",
+   "LA COCHA",
+   "SAN IGNACIO",
+   "MONTE GRANDE",
+   "YANIMAS",
+   "EL PORVENIR"
+  ],
+  "cuencas": [
+   "CUENCA RIO MARAPA",
+   "CUENCA RIO SAN IGNACIO"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO SAN IGNACIO",
+    "sistema": "DIQUE SAN IGNACIO",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. NORTE",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO SAN IGNACIO",
+    "sistema": "DIQUE SAN IGNACIO",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. SUR",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO HUACRA",
+    "sistema": "DIQUE HUACRA",
+    "canalPrincipal": "RUMI PUNCO",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO SAN IGNACIO",
+    "sistema": "DIQUE SAN IGNACIO",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. NORTE",
+    "canalTerciario": "LOS RALOS",
+    "desague": "MISMA PROPIEDAD"
+   },
+   {
+    "fuente": "RIO MARAPA",
+    "sistema": "DIQUE ESCABA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. SUR ESCABA",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   }
+  ],
+  "usos": {
+   "RIEGO": 388,
+   "FMOTRIZ": 1,
+   "PECUARIO": 1
+  },
+  "cantidadMediana": 7
+ },
+ "LEALES": {
+  "peso": 29,
+  "distrito": "DISTRITO III",
+  "localidades": [
+   "AGUA DULCE",
+   "CONDOR HUASI",
+   "LEALES",
+   "INGENIO LEALES",
+   "ENTRE RIOS",
+   "ESQUINA"
+  ],
+  "cuencas": [
+   "CUENCA RIO SALI"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO SALI",
+    "sistema": "DIQUE LA AGUADITA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "EL ALTO 4 SECC",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL COMUNERO"
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": null,
+    "canalPrincipal": " ",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "DIQUE LA AGUADITA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "EL ALTO 4 SECC",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "DIQUE LA AGUADITA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "EL ALTO 4 SECC",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL ARR. MISTA"
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "DIQUE LA AGUADITA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "EL ALTO 4 SECC",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL ARR. MIXTA"
+   }
+  ],
+  "usos": {
+   "RIEGO": 29
+  },
+  "cantidadMediana": 8
+ },
+ "LULES": {
+  "peso": 309,
+  "distrito": "DISTRITO IV",
+  "localidades": [
+   "LULES",
+   "EL MANANTIAL",
+   "LA REDUCCION",
+   "LA BOLSA",
+   "LAS TIPAS",
+   "SAN PABLO",
+   "SAN RAFAEL",
+   "YERBA HUASI"
+  ],
+  "cuencas": [
+   "CUENCA RIO LULES",
+   "CUENCA RIO COLORADO"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO LULES",
+    "sistema": "RIO LULES - TOMA 1",
+    "canalPrincipal": "NOUGUES HNOS.",
+    "canalSecundario": "AC. SAN PABLO",
+    "canalTerciario": "LOS RALOS",
+    "desague": "ARR. EL MANANTIAL"
+   },
+   {
+    "fuente": "RIO LULES",
+    "sistema": "RIO LULES - TOMA 2",
+    "canalPrincipal": "PADILLA",
+    "canalSecundario": "LA REDUCCION",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO LULES",
+    "sistema": "RIO LULES - TOMA 2",
+    "canalPrincipal": "PADILLA",
+    "canalSecundario": "CARMEN MARQUEZ DE PAEZ",
+    "canalTerciario": "LOS RALOS",
+    "desague": "CARMEN MARQUEZ DE PAEZ"
+   },
+   {
+    "fuente": "RIO LULES",
+    "sistema": "RIO LULES - TOMA 2",
+    "canalPrincipal": "PADILLA",
+    "canalSecundario": "PEDRO F. MARQUEZ",
+    "canalTerciario": "LOS RALOS",
+    "desague": "RIO LULES"
+   },
+   {
+    "fuente": "RIO LULES",
+    "sistema": "RIO LULES - TOMA 2",
+    "canalPrincipal": "PADILLA",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   }
+  ],
+  "usos": {
+   "RIEGO": 289,
+   "PECUARIO": 11,
+   "INDUSTRIAL": 5,
+   "FMOTRIZ": 4
+  },
+  "cantidadMediana": 3
+ },
+ "MONTEROS": {
+  "peso": 48,
+  "distrito": "DISTRITO IV",
+  "localidades": [
+   "SANTA LUCIA",
+   "LOS SOSA",
+   "VILLA QUINTEROS",
+   "YACUCHINA",
+   "CASPICHANGO",
+   "LA FLORIDA",
+   "RIO SECO",
+   "LEON ROUGES"
+  ],
+  "cuencas": [
+   "CUENCA RIOS PUEBLO VIEJO - BALDERRAMA"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO PUEBLO VIEJO",
+    "sistema": "RIO PUEBLO VIEJO - TOMA 4",
+    "canalPrincipal": "ACHERITA",
+    "canalSecundario": "SAN RAMON",
+    "canalTerciario": "LOS RALOS",
+    "desague": "SAN RAMON"
+   },
+   {
+    "fuente": "RIO LOS SOSAS",
+    "sistema": "RIO LOS SOSAS",
+    "canalPrincipal": "PROPIO",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": "RIO LOS SOSAS"
+   },
+   {
+    "fuente": "RIO PUEBLO VIEJO",
+    "sistema": "RIO PUEBLO VIEJO - TOMA 1",
+    "canalPrincipal": "AC. ING. PROVIDENCIA",
+    "canalSecundario": "PROPIO",
+    "canalTerciario": "LOS RALOS",
+    "desague": "RIO SECO"
+   },
+   {
+    "fuente": "ARROYO AGUILAR",
+    "sistema": "TOMA PROPIA",
+    "canalPrincipal": "PROPIO",
+    "canalSecundario": null,
+    "canalTerciario": "LOS RALOS",
+    "desague": "MISMA PROPIEDAD"
+   },
+   {
+    "fuente": "RIO ZERDA",
+    "sistema": "RIO ZERDA",
+    "canalPrincipal": "CAUCE VIAÑA",
+    "canalSecundario": "PROPIO",
+    "canalTerciario": "LOS RALOS",
+    "desague": "LAGUNA"
+   }
+  ],
+  "usos": {
+   "RIEGO": 41,
+   "INDUSTRIAL": 4,
+   "PECUARIO": 2,
+   "FMOTRIZ": 1
+  },
+  "cantidadMediana": 30
+ },
+ "RIO CHICO": {
+  "peso": 325,
+  "distrito": "DISTRITO V",
+  "localidades": [
+   "AGUILARES",
+   "LOS SARMIENTOS",
+   "MONTE BELLO",
+   "LA TIPA",
+   "SANTA ROSA",
+   "SANTA BARBARA",
+   "MONTE REDONDO",
+   "SANTA ANA"
+  ],
+  "cuencas": [
+   "CUENCA RIO MEDINA",
+   "CUENCA RIO MARAPA"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO MEDINA - A. BARRIENTO",
+    "sistema": "DIQUE EL RINCON",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. SUR",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO MEDINA - A. BARRIENTO",
+    "sistema": "DIQUE EL RINCON",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. NORTE",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO MEDINA - A. BARRIENTO",
+    "sistema": "DIQUE EL RINCON",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. NORTE",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL RIO MEDINA"
+   },
+   {
+    "fuente": "RIO MEDINA - A. BARRIENTO",
+    "sistema": "DIQUE EL RINCON",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. NORTE",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL ARR. BARRIENTO"
+   },
+   {
+    "fuente": "RIO MEDINA - A. BARRIENTO",
+    "sistema": "DIQUE EL RINCON",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "DVDO. SUR",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL RIO CHICO"
+   }
+  ],
+  "usos": {
+   "RIEGO": 312,
+   "INDUSTRIAL": 7,
+   "PECUARIO": 5,
+   "FMOTRIZ": 1
+  },
+  "cantidadMediana": 6
+ },
+ "SIMOCA": {
+  "peso": 32,
+  "distrito": "DISTRITO V",
+  "localidades": [
+   "CIUDACITA",
+   "MONTEAGUDO"
+  ],
+  "cuencas": [
+   "CUENCA RIO GASTONA"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO GASTONA",
+    "sistema": "DIQUE SANTA ISABEL",
+    "canalPrincipal": "MONTEAGUDO",
+    "canalSecundario": "AC. CACERES",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO GASTONA",
+    "sistema": "AC. MENDEZ",
+    "canalPrincipal": "AC. MENDEZ",
+    "canalSecundario": "AC. ALLARIA",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL SEC."
+   },
+   {
+    "fuente": "RIO GASTONA",
+    "sistema": "AC. MENDEZ",
+    "canalPrincipal": "AC. MENDEZ",
+    "canalSecundario": "AC. ALLARIA",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO GASTONA",
+    "sistema": "AC. MENDEZ",
+    "canalPrincipal": "AC. MENDEZ",
+    "canalSecundario": "AC. ALLARIA",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AC. EMETERIO DEL RIO"
+   },
+   {
+    "fuente": "RIO GASTONA",
+    "sistema": "AC. MENDEZ",
+    "canalPrincipal": "AC. MENDEZ",
+    "canalSecundario": "AC. ALLARIA",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL RIO GASTONA"
+   }
+  ],
+  "usos": {
+   "RIEGO": 32
+  },
+  "cantidadMediana": 7
+ },
+ "TAFI DEL VALLE": {
+  "peso": 371,
+  "distrito": "DISTRITO VII",
+  "localidades": [
+   "RODEO GRANDE",
+   "AMAICHA DEL VALLE",
+   "LOS ZAZOS",
+   "LAS CARRERAS",
+   "EL BAÑADO",
+   "TAFI DEL VALLE",
+   "SANTA CRUZ",
+   "COLALAO DEL VALLE"
+  ],
+  "cuencas": [
+   "CUENCA RIO MUÑOZ",
+   "CUENCA RIO MOLLE SOLO",
+   "CUENCA RIO SANTA MARIA"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO MOLLE SOLO",
+    "sistema": "RIO MOLLE SOLO - TOMA 1",
+    "canalPrincipal": "MOLLE SOLO POR CAÑERIA",
+    "canalSecundario": "CAÑERIA DE TOMA N° 1",
+    "canalTerciario": "PROPIO",
+    "desague": "MISMA PROPIEDAD"
+   },
+   {
+    "fuente": "RIO MUÑOZ",
+    "sistema": "RIO MUÑOZ - TOMA 1",
+    "canalPrincipal": "DVDO. 1",
+    "canalSecundario": "COMUNERO",
+    "canalTerciario": "PROPIO",
+    "desague": "MISMA PROPIEDAD"
+   },
+   {
+    "fuente": "RIO LOS ALISOS",
+    "sistema": "RIO LOS ALISOS - TOMA 1",
+    "canalPrincipal": "AC. LOS ALISOS",
+    "canalSecundario": "AC. COMUNERA",
+    "canalTerciario": "PROPIO",
+    "desague": "MISMA PROPIEDAD"
+   },
+   {
+    "fuente": "RIO MUÑOZ",
+    "sistema": "RIO MUÑOZ - TOMA 1",
+    "canalPrincipal": "DVDO. 1",
+    "canalSecundario": "PROPIO",
+    "canalTerciario": null,
+    "desague": "MISMA PROPIEDAD"
+   },
+   {
+    "fuente": "RIO AMAICHA",
+    "sistema": "DIQUE EL REMATE",
+    "canalPrincipal": "MATRIZ - REPRESA 1",
+    "canalSecundario": "AMAICHA",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   }
+  ],
+  "usos": {
+   "RIEGO": 367,
+   "PECUARIO": 3,
+   "INDUSTRIAL": 1
+  },
+  "cantidadMediana": 1
+ },
+ "TAFI VIEJO": {
+  "peso": 57,
+  "distrito": "DISTRITO VII",
+  "localidades": [
+   "RACO",
+   "LOS NOGALES",
+   "LA AGUADITA",
+   "LAS CAÑITAS",
+   "LAS TALITAS",
+   "LAS TIPAS",
+   "NUEVA BAVIERA",
+   "TAFICILLO"
+  ],
+  "cuencas": [
+   "CUENCA RIO SALI",
+   "CUENCA RIO LOS PINOS",
+   "CUENCA ARROYO MISTA"
+  ],
+  "suministros": [
+   {
+    "fuente": " ",
+    "sistema": null,
+    "canalPrincipal": " ",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "PROPIO POR BOMBEO",
+    "canalPrincipal": "PROPIO POR BOMBEO",
+    "canalSecundario": null,
+    "canalTerciario": "LOS RALOS",
+    "desague": "MISMA PROPIEDAD"
+   },
+   {
+    "fuente": "RIO RASTROJO",
+    "sistema": "PROPIO",
+    "canalPrincipal": "PROPIO",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL RIO RASTROJO"
+   },
+   {
+    "fuente": "ARR. EL AFATAL",
+    "sistema": "ARR. EL AFATAL",
+    "canalPrincipal": "PROPIO",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL ARR. EL AFATAL"
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "TOMA DIRECTA",
+    "canalPrincipal": "PROPIO ",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL RIO SALI"
+   }
+  ],
+  "usos": {
+   "RIEGO": 43,
+   "PECUARIO": 11,
+   "INDUSTRIAL": 3
+  },
+  "cantidadMediana": 10
+ },
+ "TRANCAS": {
+  "peso": 774,
+  "distrito": "DISTRITO I",
+  "localidades": [
+   "BENJAMIN PAZ",
+   "SAN PEDRO DE COLALAO",
+   "CHOROMORO",
+   "ZARATE",
+   "TRANCAS",
+   "LEOCADIO PAZ",
+   "LAS ARCAS",
+   "VIPOS"
+  ],
+  "cuencas": [
+   "CUENCA RIO SALI",
+   "CUENCA RIO CHOROMORO",
+   "CUENCA RIO TALA"
+  ],
+  "suministros": [
+   {
+    "fuente": "RIO TALA",
+    "sistema": "DIQUE EL TALA",
+    "canalPrincipal": "MATRIZ",
+    "canalSecundario": "TALA VIEJO",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "SAN JOSE - TOMA 3",
+    "canalPrincipal": "SAN JOSE",
+    "canalSecundario": "COMUNERO",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "SAN JOSE - TOMA 3",
+    "canalPrincipal": "SAN JOSE",
+    "canalSecundario": "COMUNERO",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL RIO SALI"
+   },
+   {
+    "fuente": "RIO TALA",
+    "sistema": "EL BRETE - TOMA 2",
+    "canalPrincipal": "COMUNERO",
+    "canalSecundario": "PROPIO",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL RIO TALA"
+   },
+   {
+    "fuente": "RIO SALI",
+    "sistema": "CASAS VIEJAS - TOMA 1",
+    "canalPrincipal": "CASAS VIEJAS",
+    "canalSecundario": "COMUNERO",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   }
+  ],
+  "usos": {
+   "RIEGO": 702,
+   "PECUARIO": 67,
+   "INDUSTRIAL": 2,
+   "RECREATIVO": 1
+  },
+  "cantidadMediana": 10
+ },
+ "YERBA BUENA": {
+  "peso": 3,
+  "distrito": "DISTRITO VII",
+  "localidades": [
+   "YERBA BUENA"
+  ],
+  "cuencas": [],
+  "suministros": [
+   {
+    "fuente": " ",
+    "sistema": null,
+    "canalPrincipal": " ",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "ARR. LAS LOMITAS",
+    "sistema": "ARR. LAS LOMITAS",
+    "canalPrincipal": "COMUNERO",
+    "canalSecundario": "PROPIO",
+    "canalTerciario": "LOS RALOS",
+    "desague": " "
+   },
+   {
+    "fuente": "RIO MUERTO",
+    "sistema": "RIO MUERTO",
+    "canalPrincipal": "PROPIO",
+    "canalSecundario": " ",
+    "canalTerciario": "LOS RALOS",
+    "desague": "AL RIO MUERTO"
+   }
+  ],
+  "usos": {
+   "RIEGO": 3
+  },
+  "cantidadMediana": 11
+ }
+}

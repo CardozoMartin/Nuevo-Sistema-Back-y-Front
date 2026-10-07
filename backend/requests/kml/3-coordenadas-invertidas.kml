@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+<Document>
+  <name>Invertido</name>
+  <Style id="s"><PolyStyle><color>7f00ff00</color></PolyStyle></Style>
+  <Placemark>
+    <name>Invertido</name>
+    <styleUrl>#s</styleUrl>
+    <Polygon><tessellate>1</tessellate><outerBoundaryIs><LinearRing><coordinates>
+      -26.274301,-64.497703,0 -26.272913,-64.497002,0 -26.272037,-64.499158,0 -26.273426,-64.499859,0 -26.274301,-64.497703,0
+    </coordinates></LinearRing></outerBoundaryIs></Polygon>
+  </Placemark>
+</Document>
+</kml>

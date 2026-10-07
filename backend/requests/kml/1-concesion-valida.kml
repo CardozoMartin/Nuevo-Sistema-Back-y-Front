@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+<Document>
+  <name>Concesion 240150 - Medina</name>
+  <Style id="s"><PolyStyle><color>7f00ff00</color></PolyStyle></Style>
+  <Placemark>
+    <name>Concesion 240150 - Medina</name>
+    <styleUrl>#s</styleUrl>
+    <Polygon><tessellate>1</tessellate><outerBoundaryIs><LinearRing><coordinates>
+      -64.497703,-26.274301,0 -64.497002,-26.272913,0 -64.499158,-26.272037,0 -64.499859,-26.273426,0 -64.497703,-26.274301,0
+    </coordinates></LinearRing></outerBoundaryIs></Polygon>
+  </Placemark>
+  <Placemark><name>Toma de agua</name><Point><coordinates>-64.4980,-26.2735,0</coordinates></Point></Placemark>
+</Document>
+</kml>

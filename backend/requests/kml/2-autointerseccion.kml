@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+<Document>
+  <name>Corbata</name>
+  <Style id="s"><PolyStyle><color>7f00ff00</color></PolyStyle></Style>
+  <Placemark>
+    <name>Corbata</name>
+    <styleUrl>#s</styleUrl>
+    <Polygon><tessellate>1</tessellate><outerBoundaryIs><LinearRing><coordinates>
+      -64.4970,-26.2740,0 -64.4990,-26.2720,0 -64.4970,-26.2720,0 -64.4990,-26.2740,0 -64.4970,-26.2740,0
+    </coordinates></LinearRing></outerBoundaryIs></Polygon>
+  </Placemark>
+</Document>
+</kml>

@@ -9,6 +9,7 @@ import { RecaudacionService } from '../../recaudacion/recaudacion.service.js';
 import { armarAvisoDeuda } from './aviso-deuda.js';
 import type { NotificarDeudaDto, VerificacionDeudaDto } from './dto/circuito.dto.js';
 import { RegistroTramitesService } from './registro-tramites.service.js';
+import { destinoTrasVerificarDeuda } from './validaciones/circuito.validaciones.js';
 
 /** Resultado de notificar la deuda: a quién se mandó y quién no tiene correo. */
 export interface ResultadoAvisoDeuda {
@@ -19,7 +20,8 @@ export interface ResultadoAvisoDeuda {
 /**
  * Recaudación: ¿las personas del trámite deben algo (Rentas u otra concesión)?
  *
- *   SIN_DEUDA (apto)     pasa a Distrito.
+ *   SIN_DEUDA (apto)     pasa a Distrito (o, si llegó porque cambiaron los titulares al corregir,
+ *                        vuelve a la oficina que había observado).
  *   CON_DEUDA (no apto)  NO se rechaza: las deudas quedan registradas en la persona y el
  *                        expediente queda EN ESPERA en Recaudación, sin plazo. Cuando se cancelan
  *                        (POST /api/deudas/:id/cancelar) se reanuda solo y Recaudación lo pasa.
@@ -57,8 +59,20 @@ export class EtapaRecaudacionService {
           const quienes = [...new Set(pendientes.map((d) => nombrePersona(d.persona)))].join(', ');
           throw new ConflictException(`Hay deudas pendientes registradas de: ${quienes}. Cancélelas antes de dar el visto bueno.`);
         }
-        await this.expedientes.actuar(tx, expediente, { tipo: TipoActuacion.VERIFICACION_DEUDA, resultado: ResultadoActuacion.SIN_DEUDA, usuario, observaciones: datos.observaciones });
-        await this.expedientes.pasar(tx, expediente, { etapa: SIGUIENTE_ETAPA[Etapa.RECAUDACION]!, usuario, dictamen: Dictamen.APTO, observaciones: datos.observaciones });
+        //4.1.- ¿A dónde sigue? Distrito, o la oficina que observó si vino por un cambio de titulares.
+        const correccion = await this.expedientes.ultimaActuacion(tx, expediente.id, [TipoActuacion.CORRECCION]);
+        const ultimoSinDeuda = await this.expedientes.ultimaActuacion(tx, expediente.id, [TipoActuacion.VERIFICACION_DEUDA], ResultadoActuacion.SIN_DEUDA);
+        const destino = destinoTrasVerificarDeuda(correccion, ultimoSinDeuda, SIGUIENTE_ETAPA[Etapa.RECAUDACION]!);
+
+        //4.2.- Queda registrado A QUIÉNES se verificó (si después cambian, se vuelve a verificar).
+        await this.expedientes.actuar(tx, expediente, {
+          tipo: TipoActuacion.VERIFICACION_DEUDA,
+          resultado: ResultadoActuacion.SIN_DEUDA,
+          usuario,
+          observaciones: datos.observaciones,
+          datos: { personas: personaIds },
+        });
+        await this.expedientes.pasar(tx, expediente, { etapa: destino, usuario, dictamen: Dictamen.APTO, observaciones: datos.observaciones });
         return;
       }
 

@@ -1,4 +1,5 @@
-import { Controller, Get, Param, ParseIntPipe, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Post, Query, StreamableFile, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { ArchivosService } from './archivos.service.js';
 import { CapasService } from './capas.service.js';
 import { CaucesService } from './cauces.service.js';
 import { avisoLejosDelCauce, GeometriaService } from './geometria.service.js';
@@ -10,6 +11,7 @@ export class SigController {
     private readonly capas: CapasService,
     private readonly geometria: GeometriaService,
     private readonly cauces: CaucesService,
+    private readonly archivos: ArchivosService,
   ) {}
 
   /**
@@ -25,6 +27,29 @@ export class SigController {
   @Get('concesiones/:id')
   concesion(@Param('id', ParseIntPipe) id: number) {
     return this.capas.concesion(String(id));
+  }
+
+  /**
+   * GET /api/sig/concesiones/:id/kml: el polígono vigente como KML, para abrirlo en Google
+   * Earth o cargarlo en un GPS (Distrito, inspecciones).
+   */
+  @Get('concesiones/:id/kml')
+  async kmlConcesion(@Param('id', ParseIntPipe) id: number) {
+    const { nombre, kml } = await this.capas.kmlConcesion(String(id));
+    return new StreamableFile(Buffer.from(kml, 'utf8'), { type: 'application/vnd.google-earth.kml+xml', disposition: `attachment; filename="${nombre}"` });
+  }
+
+  /**
+   * GET /api/sig/poligonos/:id/archivo: el archivo ORIGINAL que se presentó (KML o GeoJSON),
+   * tal cual se subió. Se comprueba con el hash que no haya sido modificado en el disco.
+   * El id del polígono viene en la respuesta del alta (ubicacion.poligono.id).
+   */
+  @Get('poligonos/:id/archivo')
+  async archivoPoligono(@Param('id', ParseIntPipe) id: number) {
+    const archivo = await this.capas.archivoPoligono(String(id));
+    const contenido = await this.archivos.leer(archivo.ruta, archivo.sha256);
+    const tipo = archivo.ruta.endsWith('.geojson') ? 'application/geo+json' : 'application/vnd.google-earth.kml+xml';
+    return new StreamableFile(contenido, { type: tipo, disposition: `attachment; filename*=UTF-8''${encodeURIComponent(archivo.nombre)}` });
   }
 
   /**
@@ -48,7 +73,8 @@ export class SigController {
   /**
    * POST /api/sig/kml/analizar (multipart, campo «archivo»).
    * Vista previa: lee el KML y lo valida con PostGIS SIN guardar nada. Acepta coordenadas
-   * POSGAR 2007 faja 3 (las de la oficina) o latitud/longitud. Devuelve el polígono en GeoJSON
+   * POSGAR 2007 faja 3 (las de la oficina) o latitud/longitud; un GeoJSON que declara su sistema
+   * («crs», ej: Campo Inchauspe) se transforma desde ese sistema. Devuelve el polígono en GeoJSON
    * WGS84, el sistema en que vino, superficie, perímetro y superposiciones con otras concesiones.
    * El formulario lo usa para mostrar el mapa antes de confirmar.
    */
@@ -57,11 +83,12 @@ export class SigController {
   async analizarKml(@UploadedFile() archivo?: ArchivoSubido) {
     const kml = exigirKml(archivo);
     const leido = leerArchivoGeografico(kml);
-    const normalizada = await this.geometria.normalizar(leido.geometria);
+    const normalizada = await this.geometria.normalizar(leido.geometria, undefined, leido.sridDeclarado);
     const analisis = await this.geometria.analizar(normalizada.geometria);
     return {
       archivo: { nombre: kml.originalname, bytes: kml.size },
       nombres: leido.nombres,
+      numerosConcesion: leido.numerosConcesion ?? [],
       avisos: [...normalizada.avisos, ...leido.avisos, avisoLejosDelCauce(analisis)].filter((a): a is string => !!a),
       sistemaOrigen: normalizada.sistemaOrigen,
       sistemaOrigenNombre: normalizada.sistemaOrigenNombre,

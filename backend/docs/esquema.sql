@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ZeHpk3wjePGTtvmBkaFYOwVGUDD499gGGAYNXKYJKkS4yiJ17x9Z3XwBFJMvpuV
+\restrict PYaY2O5IQuNRyooNEFTgV13J7FbCN4ybi8jc7TS8WlYvgTNQ41Osl4vagDt4FB2
 
 -- Dumped from database version 17.11
 -- Dumped by pg_dump version 17.11
@@ -38,6 +38,17 @@ COMMENT ON SCHEMA public IS 'standard public schema';
 --
 
 CREATE SCHEMA sig;
+
+
+--
+-- Name: cat_tipo_opcion_suministro; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.cat_tipo_opcion_suministro AS ENUM (
+    'FUENTE',
+    'SISTEMA',
+    'DESAGUE'
+);
 
 
 --
@@ -151,6 +162,16 @@ CREATE TYPE public.exp_estado_expediente AS ENUM (
 
 
 --
+-- Name: exp_estado_solicitud_numero; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.exp_estado_solicitud_numero AS ENUM (
+    'PENDIENTE',
+    'ASIGNADA'
+);
+
+
+--
 -- Name: exp_etapa; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -218,7 +239,9 @@ CREATE TYPE public.exp_tipo_actuacion AS ENUM (
     'ANTECEDENTES',
     'EVALUACION_TECNICA',
     'CLAUSURA',
-    'TOMA_CONOCIMIENTO'
+    'TOMA_CONOCIMIENTO',
+    'SOLICITUD_NUMERO',
+    'NOTIFICACION'
 );
 
 
@@ -239,6 +262,26 @@ CREATE TYPE public.exp_tipo_tramite AS ENUM (
     'BAJA_POZO',
     'REGISTRO_EMPRESA',
     'OTRO'
+);
+
+
+--
+-- Name: not_estado_email; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.not_estado_email AS ENUM (
+    'ENVIADO',
+    'NO_ENVIADO_PRUEBA',
+    'ERROR'
+);
+
+
+--
+-- Name: not_tipo_email; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.not_tipo_email AS ENUM (
+    'AVISO_DEUDA'
 );
 
 
@@ -330,9 +373,17 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.cat_cuenca (
+    activo boolean DEFAULT true NOT NULL,
+    creado_usuario_id bigint DEFAULT '1'::bigint NOT NULL,
+    creado_en timestamp with time zone DEFAULT now() NOT NULL,
+    modificado_usuario_id bigint,
+    modificado_en timestamp with time zone DEFAULT now() NOT NULL,
+    baja_motivo text,
+    baja_en timestamp with time zone,
+    baja_usuario_id bigint,
     id integer NOT NULL,
     nombre character varying(120) NOT NULL,
-    activo boolean DEFAULT true NOT NULL
+    CONSTRAINT chk_cuenca_baja CHECK ((activo OR ((baja_motivo IS NOT NULL) AND (baja_en IS NOT NULL))))
 );
 
 
@@ -361,9 +412,17 @@ ALTER SEQUENCE public.cat_cuenca_id_seq OWNED BY public.cat_cuenca.id;
 --
 
 CREATE TABLE public.cat_departamento (
+    activo boolean DEFAULT true NOT NULL,
+    creado_usuario_id bigint DEFAULT '1'::bigint NOT NULL,
+    creado_en timestamp with time zone DEFAULT now() NOT NULL,
+    modificado_usuario_id bigint,
+    modificado_en timestamp with time zone DEFAULT now() NOT NULL,
+    baja_motivo text,
+    baja_en timestamp with time zone,
+    baja_usuario_id bigint,
     id integer NOT NULL,
     nombre character varying(80) NOT NULL,
-    activo boolean DEFAULT true NOT NULL
+    CONSTRAINT chk_departamento_baja CHECK ((activo OR ((baja_motivo IS NOT NULL) AND (baja_en IS NOT NULL))))
 );
 
 
@@ -392,10 +451,18 @@ ALTER SEQUENCE public.cat_departamento_id_seq OWNED BY public.cat_departamento.i
 --
 
 CREATE TABLE public.cat_distrito (
+    activo boolean DEFAULT true NOT NULL,
+    creado_usuario_id bigint DEFAULT '1'::bigint NOT NULL,
+    creado_en timestamp with time zone DEFAULT now() NOT NULL,
+    modificado_usuario_id bigint,
+    modificado_en timestamp with time zone DEFAULT now() NOT NULL,
+    baja_motivo text,
+    baja_en timestamp with time zone,
+    baja_usuario_id bigint,
     id integer NOT NULL,
     codigo character varying(10) NOT NULL,
     nombre character varying(60) NOT NULL,
-    activo boolean DEFAULT true NOT NULL
+    CONSTRAINT chk_distrito_baja CHECK ((activo OR ((baja_motivo IS NOT NULL) AND (baja_en IS NOT NULL))))
 );
 
 
@@ -457,11 +524,19 @@ ALTER SEQUENCE public.cat_documento_requerido_id_seq OWNED BY public.cat_documen
 --
 
 CREATE TABLE public.cat_localidad (
+    activo boolean DEFAULT true NOT NULL,
+    creado_usuario_id bigint DEFAULT '1'::bigint NOT NULL,
+    creado_en timestamp with time zone DEFAULT now() NOT NULL,
+    modificado_usuario_id bigint,
+    modificado_en timestamp with time zone DEFAULT now() NOT NULL,
+    baja_motivo text,
+    baja_en timestamp with time zone,
+    baja_usuario_id bigint,
     id integer NOT NULL,
     nombre character varying(100) NOT NULL,
-    activo boolean DEFAULT true NOT NULL,
     departamento_id integer NOT NULL,
-    distrito_id integer NOT NULL
+    distrito_id integer NOT NULL,
+    CONSTRAINT chk_localidad_baja CHECK ((activo OR ((baja_motivo IS NOT NULL) AND (baja_en IS NOT NULL))))
 );
 
 
@@ -496,6 +571,114 @@ CREATE TABLE public.cat_situacion_legal (
     orden smallint DEFAULT '0'::smallint NOT NULL,
     activo boolean DEFAULT true NOT NULL
 );
+
+
+--
+-- Name: cat_suministro_canal; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.cat_suministro_canal (
+    id integer NOT NULL,
+    nivel smallint NOT NULL,
+    nombre character varying(120) NOT NULL,
+    zona_id integer NOT NULL,
+    padre_id integer,
+    CONSTRAINT chk_suministro_canal_nivel CHECK ((((nivel >= 1) AND (nivel <= 5)) AND ((padre_id IS NULL) = (nivel = 1))))
+);
+
+
+--
+-- Name: cat_suministro_canal_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.cat_suministro_canal_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: cat_suministro_canal_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.cat_suministro_canal_id_seq OWNED BY public.cat_suministro_canal.id;
+
+
+--
+-- Name: cat_suministro_opcion; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.cat_suministro_opcion (
+    id integer NOT NULL,
+    tipo public.cat_tipo_opcion_suministro NOT NULL,
+    nombre character varying(120) NOT NULL,
+    zona_id integer NOT NULL
+);
+
+
+--
+-- Name: cat_suministro_opcion_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.cat_suministro_opcion_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: cat_suministro_opcion_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.cat_suministro_opcion_id_seq OWNED BY public.cat_suministro_opcion.id;
+
+
+--
+-- Name: cat_suministro_zona; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.cat_suministro_zona (
+    activo boolean DEFAULT true NOT NULL,
+    creado_usuario_id bigint DEFAULT '1'::bigint NOT NULL,
+    creado_en timestamp with time zone DEFAULT now() NOT NULL,
+    modificado_usuario_id bigint,
+    modificado_en timestamp with time zone DEFAULT now() NOT NULL,
+    baja_motivo text,
+    baja_en timestamp with time zone,
+    baja_usuario_id bigint,
+    id integer NOT NULL,
+    localidad_origen character varying(100) NOT NULL,
+    departamento_id integer NOT NULL,
+    distrito_id integer NOT NULL,
+    localidad_id integer,
+    CONSTRAINT chk_suministro_zona_baja CHECK ((activo OR ((baja_motivo IS NOT NULL) AND (baja_en IS NOT NULL))))
+);
+
+
+--
+-- Name: cat_suministro_zona_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.cat_suministro_zona_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: cat_suministro_zona_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.cat_suministro_zona_id_seq OWNED BY public.cat_suministro_zona.id;
 
 
 --
@@ -686,18 +869,6 @@ ALTER SEQUENCE public.con_inmueble_id_seq OWNED BY public.con_inmueble.id;
 
 
 --
--- Name: con_numero_concesion_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.con_numero_concesion_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
 -- Name: con_poligono; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -718,6 +889,7 @@ CREATE TABLE public.con_poligono (
     creado_en timestamp with time zone DEFAULT now() NOT NULL,
     concesion_id bigint NOT NULL,
     expediente_id bigint,
+    desde date,
     CONSTRAINT chk_poligono_archivo CHECK (((archivo_ruta IS NULL) = (archivo_sha256 IS NULL)))
 );
 
@@ -792,7 +964,7 @@ CREATE TABLE public.con_suministro (
     desde date,
     hasta date,
     id bigint NOT NULL,
-    fuente_principal character varying(120) NOT NULL,
+    fuente_principal character varying(120),
     fuentes_adicionales character varying(120)[] DEFAULT '{}'::character varying[] NOT NULL,
     sistema_distribucion character varying(120),
     canal_principal character varying(120),
@@ -1205,6 +1377,43 @@ ALTER SEQUENCE public.exp_resolucion_id_seq OWNED BY public.exp_resolucion.id;
 
 
 --
+-- Name: exp_solicitud_numero; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.exp_solicitud_numero (
+    id bigint NOT NULL,
+    estado public.exp_estado_solicitud_numero DEFAULT 'PENDIENTE'::public.exp_estado_solicitud_numero NOT NULL,
+    etiquetas character varying(100)[] DEFAULT '{}'::character varying[] NOT NULL,
+    numeros character varying(20)[] DEFAULT '{}'::character varying[] NOT NULL,
+    solicitado_en timestamp with time zone DEFAULT now() NOT NULL,
+    asignado_en timestamp with time zone,
+    expediente_id bigint NOT NULL,
+    solicitado_por_usuario_id bigint NOT NULL,
+    asignado_por_usuario_id bigint,
+    CONSTRAINT chk_solicitud_asignada CHECK (((estado <> 'ASIGNADA'::public.exp_estado_solicitud_numero) OR ((cardinality(numeros) > 0) AND (asignado_en IS NOT NULL))))
+);
+
+
+--
+-- Name: exp_solicitud_numero_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.exp_solicitud_numero_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: exp_solicitud_numero_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.exp_solicitud_numero_id_seq OWNED BY public.exp_solicitud_numero.id;
+
+
+--
 -- Name: mig_lote; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1277,6 +1486,43 @@ CREATE SEQUENCE public.mig_registro_origen_id_seq
 --
 
 ALTER SEQUENCE public.mig_registro_origen_id_seq OWNED BY public.mig_registro_origen.id;
+
+
+--
+-- Name: not_email; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.not_email (
+    id bigint NOT NULL,
+    tipo public.not_tipo_email NOT NULL,
+    para character varying(150)[] NOT NULL,
+    asunto character varying(200) NOT NULL,
+    cuerpo text NOT NULL,
+    estado public.not_estado_email NOT NULL,
+    error text,
+    creado_en timestamp with time zone DEFAULT now() NOT NULL,
+    expediente_id bigint,
+    enviado_por_usuario_id bigint NOT NULL
+);
+
+
+--
+-- Name: not_email_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.not_email_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: not_email_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.not_email_id_seq OWNED BY public.not_email.id;
 
 
 --
@@ -1600,7 +1846,7 @@ CREATE VIEW sig.v_concesiones AS
     s.sistema_distribucion AS sistema,
     s.canal_principal,
     (p.origen)::text AS origen_poligono,
-    p.creado_en AS poligono_desde,
+    COALESCE(p.desde, (p.creado_en)::date) AS poligono_desde,
     p.geom
    FROM (((((((public.con_poligono p
      JOIN public.con_concesion c ON ((c.id = p.concesion_id)))
@@ -1692,6 +1938,27 @@ ALTER TABLE ONLY public.cat_documento_requerido ALTER COLUMN id SET DEFAULT next
 --
 
 ALTER TABLE ONLY public.cat_localidad ALTER COLUMN id SET DEFAULT nextval('public.cat_localidad_id_seq'::regclass);
+
+
+--
+-- Name: cat_suministro_canal id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cat_suministro_canal ALTER COLUMN id SET DEFAULT nextval('public.cat_suministro_canal_id_seq'::regclass);
+
+
+--
+-- Name: cat_suministro_opcion id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cat_suministro_opcion ALTER COLUMN id SET DEFAULT nextval('public.cat_suministro_opcion_id_seq'::regclass);
+
+
+--
+-- Name: cat_suministro_zona id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cat_suministro_zona ALTER COLUMN id SET DEFAULT nextval('public.cat_suministro_zona_id_seq'::regclass);
 
 
 --
@@ -1807,6 +2074,13 @@ ALTER TABLE ONLY public.exp_resolucion ALTER COLUMN id SET DEFAULT nextval('publ
 
 
 --
+-- Name: exp_solicitud_numero id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.exp_solicitud_numero ALTER COLUMN id SET DEFAULT nextval('public.exp_solicitud_numero_id_seq'::regclass);
+
+
+--
 -- Name: mig_lote id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1818,6 +2092,13 @@ ALTER TABLE ONLY public.mig_lote ALTER COLUMN id SET DEFAULT nextval('public.mig
 --
 
 ALTER TABLE ONLY public.mig_registro_origen ALTER COLUMN id SET DEFAULT nextval('public.mig_registro_origen_id_seq'::regclass);
+
+
+--
+-- Name: not_email id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.not_email ALTER COLUMN id SET DEFAULT nextval('public.not_email_id_seq'::regclass);
 
 
 --
@@ -1863,6 +2144,22 @@ ALTER TABLE ONLY sig.cauce ALTER COLUMN id SET DEFAULT nextval('sig.cauce_id_seq
 
 
 --
+-- Name: not_email PK_18b7b0d2399f90c5907efc125e6; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.not_email
+    ADD CONSTRAINT "PK_18b7b0d2399f90c5907efc125e6" PRIMARY KEY (id);
+
+
+--
+-- Name: cat_suministro_zona PK_25ee8cdfba449d734ed55172f7f; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cat_suministro_zona
+    ADD CONSTRAINT "PK_25ee8cdfba449d734ed55172f7f" PRIMARY KEY (id);
+
+
+--
 -- Name: con_punto PK_31b3fca937b2c13cfd16f131dd4; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1892,6 +2189,14 @@ ALTER TABLE ONLY public.cat_departamento
 
 ALTER TABLE ONLY public.emp_empresa
     ADD CONSTRAINT "PK_4615954e5b06348a47ca45a7aec" PRIMARY KEY (id);
+
+
+--
+-- Name: cat_suministro_opcion PK_4b4e2a19fa788c76f5c56b9eb08; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cat_suministro_opcion
+    ADD CONSTRAINT "PK_4b4e2a19fa788c76f5c56b9eb08" PRIMARY KEY (id);
 
 
 --
@@ -1999,11 +2304,27 @@ ALTER TABLE ONLY public.exp_movimiento
 
 
 --
+-- Name: cat_suministro_canal PK_9baf21a88477561cd6c94386dbe; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cat_suministro_canal
+    ADD CONSTRAINT "PK_9baf21a88477561cd6c94386dbe" PRIMARY KEY (id);
+
+
+--
 -- Name: con_inmueble PK_a5b0ff12d65504b0a612d04fc98; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.con_inmueble
     ADD CONSTRAINT "PK_a5b0ff12d65504b0a612d04fc98" PRIMARY KEY (id);
+
+
+--
+-- Name: exp_solicitud_numero PK_aa15cb8040083ae49c47d25af19; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.exp_solicitud_numero
+    ADD CONSTRAINT "PK_aa15cb8040083ae49c47d25af19" PRIMARY KEY (id);
 
 
 --
@@ -2177,6 +2498,13 @@ CREATE INDEX idx_domicilio_concesion ON public.con_domicilio USING btree (conces
 
 
 --
+-- Name: idx_email_expediente; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_email_expediente ON public.not_email USING btree (expediente_id, creado_en);
+
+
+--
 -- Name: idx_empresa_estado; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2293,6 +2621,13 @@ CREATE INDEX idx_pozo_geom ON public.poz_pozo USING gist (geom);
 --
 
 CREATE INDEX idx_punto_geom ON public.con_punto USING gist (geom);
+
+
+--
+-- Name: idx_solicitud_estado; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_solicitud_estado ON public.exp_solicitud_numero USING btree (estado, solicitado_en);
 
 
 --
@@ -2450,10 +2785,52 @@ CREATE UNIQUE INDEX uk_resolucion ON public.exp_resolucion USING btree (numero, 
 
 
 --
+-- Name: uk_solicitud_pendiente; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_solicitud_pendiente ON public.exp_solicitud_numero USING btree (expediente_id) WHERE (estado = 'PENDIENTE'::public.exp_estado_solicitud_numero);
+
+
+--
+-- Name: uk_suministro_canal_hijo; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_suministro_canal_hijo ON public.cat_suministro_canal USING btree (padre_id, nombre) WHERE (padre_id IS NOT NULL);
+
+
+--
+-- Name: uk_suministro_canal_principal; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_suministro_canal_principal ON public.cat_suministro_canal USING btree (zona_id, nombre) WHERE (padre_id IS NULL);
+
+
+--
+-- Name: uk_suministro_opcion; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_suministro_opcion ON public.cat_suministro_opcion USING btree (zona_id, tipo, nombre);
+
+
+--
 -- Name: uk_suministro_vigente; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX uk_suministro_vigente ON public.con_suministro USING btree (concesion_id) WHERE vigente;
+
+
+--
+-- Name: uk_suministro_zona_localidad; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_suministro_zona_localidad ON public.cat_suministro_zona USING btree (localidad_id, distrito_id) WHERE (localidad_id IS NOT NULL);
+
+
+--
+-- Name: uk_suministro_zona_origen; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uk_suministro_zona_origen ON public.cat_suministro_zona USING btree (departamento_id, distrito_id, localidad_origen);
 
 
 --
@@ -2692,6 +3069,22 @@ ALTER TABLE ONLY public.con_domicilio
 
 
 --
+-- Name: not_email fk_email_expediente; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.not_email
+    ADD CONSTRAINT fk_email_expediente FOREIGN KEY (expediente_id) REFERENCES public.exp_expediente(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: not_email fk_email_usuario; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.not_email
+    ADD CONSTRAINT fk_email_usuario FOREIGN KEY (enviado_por_usuario_id) REFERENCES public.seg_usuario(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: exp_expediente fk_exp_tomado_por; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2876,6 +3269,46 @@ ALTER TABLE ONLY public.exp_resolucion
 
 
 --
+-- Name: exp_solicitud_numero fk_solnum_asignado_por; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.exp_solicitud_numero
+    ADD CONSTRAINT fk_solnum_asignado_por FOREIGN KEY (asignado_por_usuario_id) REFERENCES public.seg_usuario(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: exp_solicitud_numero fk_solnum_expediente; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.exp_solicitud_numero
+    ADD CONSTRAINT fk_solnum_expediente FOREIGN KEY (expediente_id) REFERENCES public.exp_expediente(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: exp_solicitud_numero fk_solnum_solicitado_por; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.exp_solicitud_numero
+    ADD CONSTRAINT fk_solnum_solicitado_por FOREIGN KEY (solicitado_por_usuario_id) REFERENCES public.seg_usuario(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: cat_suministro_canal fk_suministro_canal_padre; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cat_suministro_canal
+    ADD CONSTRAINT fk_suministro_canal_padre FOREIGN KEY (padre_id) REFERENCES public.cat_suministro_canal(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: cat_suministro_canal fk_suministro_canal_zona; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cat_suministro_canal
+    ADD CONSTRAINT fk_suministro_canal_zona FOREIGN KEY (zona_id) REFERENCES public.cat_suministro_zona(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: con_suministro fk_suministro_concesion; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2889,6 +3322,38 @@ ALTER TABLE ONLY public.con_suministro
 
 ALTER TABLE ONLY public.con_suministro
     ADD CONSTRAINT fk_suministro_expediente FOREIGN KEY (expediente_id) REFERENCES public.exp_expediente(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: cat_suministro_opcion fk_suministro_opcion_zona; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cat_suministro_opcion
+    ADD CONSTRAINT fk_suministro_opcion_zona FOREIGN KEY (zona_id) REFERENCES public.cat_suministro_zona(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: cat_suministro_zona fk_suministro_zona_departamento; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cat_suministro_zona
+    ADD CONSTRAINT fk_suministro_zona_departamento FOREIGN KEY (departamento_id) REFERENCES public.cat_departamento(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: cat_suministro_zona fk_suministro_zona_distrito; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cat_suministro_zona
+    ADD CONSTRAINT fk_suministro_zona_distrito FOREIGN KEY (distrito_id) REFERENCES public.cat_distrito(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: cat_suministro_zona fk_suministro_zona_localidad; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.cat_suministro_zona
+    ADD CONSTRAINT fk_suministro_zona_localidad FOREIGN KEY (localidad_id) REFERENCES public.cat_localidad(id) ON DELETE RESTRICT;
 
 
 --
@@ -2927,5 +3392,5 @@ ALTER TABLE ONLY public.seg_usuario
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZeHpk3wjePGTtvmBkaFYOwVGUDD499gGGAYNXKYJKkS4yiJ17x9Z3XwBFJMvpuV
+\unrestrict PYaY2O5IQuNRyooNEFTgV13J7FbCN4ybi8jc7TS8WlYvgTNQ41Osl4vagDt4FB2
 

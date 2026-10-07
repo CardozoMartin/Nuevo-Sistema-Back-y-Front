@@ -5,6 +5,7 @@ import { Cuenca } from './entities/cuenca.entity.js';
 import { Departamento } from './entities/departamento.entity.js';
 import { Distrito } from './entities/distrito.entity.js';
 import { Localidad } from './entities/localidad.entity.js';
+import { SuministroCatalogoService } from './suministro/suministro-catalogo.service.js';
 
 /** Lo que manda el formulario en el domicilio y en la ubicación de la concesión: los nombres. */
 export interface NombresUbicacion {
@@ -44,7 +45,10 @@ const alfabetico = new Intl.Collator('es');
 export class UbicacionesService implements OnApplicationBootstrap {
   private readonly logger = new Logger(UbicacionesService.name);
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly suministro: SuministroCatalogoService,
+  ) {}
 
   /** Al arrancar la API: carga los catálogos que estén vacíos. */
   async onApplicationBootstrap() {
@@ -59,6 +63,9 @@ export class UbicacionesService implements OnApplicationBootstrap {
       await this.dataSource.manager.save(leerCuencasIniciales().map((nombre) => this.dataSource.manager.create(Cuenca, { nombre })));
       this.logger.log('Catálogo de cuencas cargado.');
     }
+
+    //3.- Catálogo de suministro (fuentes y árbol de canales): necesita las localidades ya cargadas.
+    await this.suministro.cargarSiFalta();
   }
 
   /**

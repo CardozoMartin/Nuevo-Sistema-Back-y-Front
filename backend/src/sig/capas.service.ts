@@ -93,6 +93,41 @@ export class CapasService {
     return fila.feature;
   }
 
+  /**
+   * Datos del archivo original de un polígono (el KML / GeoJSON que se presentó), para
+   * descargarlo. 404 si el polígono no existe o no vino de un archivo (ej: migrado).
+   */
+  async archivoPoligono(poligonoId: string): Promise<{ nombre: string; ruta: string; sha256: string }> {
+    const [f] = await this.dataSource.query(`SELECT archivo_nombre, archivo_ruta, archivo_sha256 FROM con_poligono WHERE id = $1`, [poligonoId]);
+    if (!f) throw new NotFoundException('No se encontró el polígono.');
+    if (!f.archivo_ruta) throw new NotFoundException('Este polígono no se cargó desde un archivo (por ejemplo, vino del padrón anterior).');
+    return { nombre: f.archivo_nombre, ruta: f.archivo_ruta, sha256: f.archivo_sha256 };
+  }
+
+  /**
+   * El polígono vigente de una concesión como KML (WGS84), para abrirlo en Google Earth o en
+   * un GPS. Lleva los datos principales en la descripción. 404 si no tiene polígono.
+   */
+  async kmlConcesion(concesionId: string): Promise<{ nombre: string; kml: string }> {
+    const [f] = await this.dataSource.query(
+      `SELECT v.numero, v.expediente, v.titular, v.superficie_ha, ST_AsKML(ST_Transform(v.geom, ${SRID_WGS84}), 7) AS kml
+         FROM sig.v_concesiones v WHERE v.concesion_id = $1`,
+      [concesionId],
+    );
+    if (!f) throw new NotFoundException('La concesión no existe o no tiene polígono cargado.');
+    const titulo = f.numero ? `Concesión ${f.numero}` : `Alta en trámite (expediente ${f.expediente})`;
+    const detalle = [f.titular && `Titular: ${f.titular}`, f.expediente && `Expediente: ${f.expediente}`, `Superficie: ${Number(f.superficie_ha).toLocaleString('es-AR')} ha`]
+      .filter(Boolean)
+      .join(' · ');
+    const xml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return {
+      nombre: f.numero ? `concesion-${f.numero}.kml` : `concesion-id-${concesionId}.kml`,
+      kml:
+        `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>${xml(titulo)}</name>` +
+        `<Placemark><name>${xml(titulo)}</name><description>${xml(detalle)}</description>${f.kml}</Placemark></Document></kml>\n`,
+    };
+  }
+
   /** Lee "oeste,sur,este,norte" de la query string. */
   static leerRecuadro(texto?: string): Recuadro | undefined {
     if (!texto) return undefined;

@@ -4,6 +4,7 @@ import type { EntityManager } from 'typeorm';
 import { Condicion } from './entities/condicion.entity.js';
 import { Domicilio } from './entities/domicilio.entity.js';
 import { Inmueble } from './entities/inmueble.entity.js';
+import { Poligono } from './entities/poligono.entity.js';
 import { Punto } from './entities/punto.entity.js';
 import { Suministro } from './entities/suministro.entity.js';
 import { Titular } from './entities/titular.entity.js';
@@ -20,8 +21,8 @@ export interface DatosVigentes {
   suministro: Suministro | null;
 }
 
-/** Tablas con historial que cuelgan de la concesión. */
-const TABLAS_VERSIONADAS = [Titular, Domicilio, Inmueble, Condicion, Uso, Punto, Suministro] as const;
+/** Tablas con historial que cuelgan de la concesión (el polígono también: rige desde la resolución). */
+const TABLAS_VERSIONADAS = [Titular, Domicilio, Inmueble, Condicion, Uso, Punto, Suministro, Poligono] as const;
 
 /** Trae lo vigente de la concesión, con los nombres del catálogo de ubicación ya cargados. */
 export async function cargarDatosVigentes(tx: EntityManager, concesionId: string): Promise<DatosVigentes> {

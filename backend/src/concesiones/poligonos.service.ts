@@ -26,7 +26,9 @@ export interface PoligonoVigente {
   perimetroM: number;
   puntoInterior: { latitud: number; longitud: number };
   origen: string;
-  archivo: { nombre: string; bytes: number } | null;
+  /** Archivo presentado (se descarga con GET /api/sig/poligonos/:id/archivo). */
+  archivo: { nombre: string; bytes: number; sistemaOrigen: string | null } | null;
+  /** Fecha de la resolución que lo aprobó, o la de carga mientras está en trámite. */
   desde: Date;
 }
 
@@ -82,7 +84,8 @@ export class PoligonosService {
 
   async vigente(tx: EntityManager, concesionId: string): Promise<PoligonoVigente | null> {
     const [f] = await tx.query(
-      `SELECT id, superficie_ha, perimetro_m, origen, archivo_nombre, archivo_bytes, creado_en,
+      `SELECT id, superficie_ha, perimetro_m, origen, archivo_nombre, archivo_bytes, sistema_origen,
+              COALESCE(desde::timestamptz, creado_en) AS desde,
               ST_AsGeoJSON(ST_Transform(geom, ${SRID_WGS84}), 7)::json AS geojson,
               ST_Y(ST_Transform(ST_PointOnSurface(geom), ${SRID_WGS84})) AS lat,
               ST_X(ST_Transform(ST_PointOnSurface(geom), ${SRID_WGS84})) AS lon
@@ -98,8 +101,8 @@ export class PoligonosService {
       perimetroM: Number(f.perimetro_m),
       puntoInterior: { latitud: Number(f.lat), longitud: Number(f.lon) },
       origen: f.origen,
-      archivo: f.archivo_nombre ? { nombre: f.archivo_nombre, bytes: Number(f.archivo_bytes) } : null,
-      desde: f.creado_en,
+      archivo: f.archivo_nombre ? { nombre: f.archivo_nombre, bytes: Number(f.archivo_bytes), sistemaOrigen: f.sistema_origen } : null,
+      desde: f.desde,
     };
   }
 }

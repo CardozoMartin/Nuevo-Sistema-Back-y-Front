@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 import { CatalogosService } from '../../../catalogos/catalogos.service.js';
 import { caudalDeUso, caudalTotal } from '../../../concesiones/caudal.js';
@@ -6,6 +6,8 @@ import { TipoPunto } from '../../../concesiones/concesiones.constantes.js';
 import { Condicion } from '../../../concesiones/entities/condicion.entity.js';
 import { Punto } from '../../../concesiones/entities/punto.entity.js';
 import { Uso } from '../../../concesiones/entities/uso.entity.js';
+import { Etapa } from '../../../expedientes/expedientes.constantes.js';
+import { GeometriaService } from '../../../sig/geometria.service.js';
 import { SRID_POSGAR, SRID_WGS84 } from '../../../sig/sig.constantes.js';
 import { AltaConcesionService, type AltaEditable } from '../alta-concesion.service.js';
 import type { RespuestaAlta } from '../alta-concesion.respuesta.js';
@@ -18,7 +20,9 @@ import { exigirPeriodoValido, exigirPuntoEntregaSiCorresponde, exigirUsosDelCata
  * - Condiciones (con_condicion): carácter, código de servicio, período y el caudal asignado,
  *   que se propone con la suma de los caudales de los usos (en el paso 6 se puede corregir).
  * - Usos (con_uso): cada uno con su magnitud y su caudal = magnitud × dotación del catálogo.
- * - Puntos (con_punto): el desagüe siempre; el punto de entrega si algún uso lo exige.
+ * - Puntos (con_punto): el desagüe siempre; el punto de entrega si algún uso lo exige. Si
+ *   quedan lejos del polígono se avisa (suele ser una coordenada mal tipeada).
+ * - En el cierre no se modifica: los usos y el caudal son lo que aprobó la resolución.
  */
 @Injectable()
 export class UsosAltaService {
@@ -26,9 +30,11 @@ export class UsosAltaService {
     private readonly dataSource: DataSource,
     private readonly alta: AltaConcesionService,
     private readonly catalogos: CatalogosService,
+    private readonly geometria: GeometriaService,
   ) {}
 
-  async guardar(expedienteId: string, datos: UsosDto, usuarioId: string): Promise<RespuestaAlta> {
+  /** Devuelve el alta y los avisos (puntos lejos del polígono). */
+  async guardar(expedienteId: string, datos: UsosDto, usuarioId: string): Promise<RespuestaAlta & { avisos: string[] }> {
     const codigos = datos.items.map((i) => i.uso);
 
     //1.- Se valida que el fin del período no sea anterior al inicio.
@@ -49,10 +55,15 @@ export class UsosAltaService {
     });
     const total = caudalTotal(usos.map((u) => u.caudal));
 
-    await this.dataSource.transaction(async (tx) => {
+    const avisos = await this.dataSource.transaction(async (tx) => {
       //5.- Se valida que Catastro pueda editar: etapa editable y expediente tomado por quien guarda.
       const editable = await this.alta.exigirEditable(tx, expedienteId, usuarioId);
       const { expediente, concesion } = editable;
+
+      //5.1.- En el cierre los usos y el caudal no cambian: son los que aprobó la resolución.
+      if (expediente.etapa === Etapa.CIERRE) {
+        throw new ConflictException('En el cierre no se pueden modificar los usos, el caudal ni los puntos de desagüe y entrega: quedaron aprobados en la resolución.');
+      }
 
       //6.- Condiciones del derecho, con el caudal asignado propuesto (la suma de los usos).
       await this.alta.guardarEnVigente(tx, Condicion, editable, {
@@ -79,10 +90,13 @@ export class UsosAltaService {
         await this.guardarPunto(tx, editable, TipoPunto.ENTREGA, coordenada, referencia);
       }
       await this.alta.marcarModificado(tx, editable);
+
+      //9.- Si ya hay polígono, se avisa si algún punto queda lejos (no se rechaza).
+      return this.geometria.avisosPuntosLejanos(concesion.id, tx);
     });
 
-    //9.- Se devuelve el alta actualizada.
-    return this.alta.obtener(expedienteId);
+    //10.- Se devuelve el alta actualizada con los avisos.
+    return { ...(await this.alta.obtener(expedienteId)), avisos };
   }
 
   /**

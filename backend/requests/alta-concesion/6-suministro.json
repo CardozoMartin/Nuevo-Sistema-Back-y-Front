@@ -1,9 +1,9 @@
 {
-  "fuentes": ["RIO CALERA", "ARR. EL TIMBO"],
-  "sistemaDistribucion": "DIQUE CALERA",
-  "canalPrincipal": "MATRIZ",
-  "canalSecundario": "COSSIO",
-  "canalesAdicionales": ["PROPIO"],
-  "desague": "MISMA PROPIEDAD",
+  "fuentes": ["ARR. EL TIMBO", "RIO SALI"],
+  "sistemaDistribucion": "ARR. EL TIMBO",
+  "canalPrincipal": "ARR. EL TIMBO",
+  "canalSecundario": "PROPIO",
+  "canalesAdicionales": ["LOS RALOS", "COMPUERTA 4"],
+  "desague": "AL ARR. EL TIMBO",
   "observacion": ""
 }

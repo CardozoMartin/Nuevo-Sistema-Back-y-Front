@@ -51,7 +51,9 @@ read -r LON1 LAT1 LON2 LAT2 <<< "$(curl -s "$API/sig/cauces" | node -e "
     let rio; try { rio = JSON.parse(s).features.find((f) => /tajamar/i.test(f.properties.nombre ?? '')) } catch {}
     if (!rio) return console.log('-64.70 -26.30 -64.70 -26.33');
     const v = rio.geometry.coordinates, i = ${NUM} % v.length, j = (i + Math.floor(v.length / 2)) % v.length;
-    const p = ([lon, lat]) => (lon + 0.001).toFixed(6) + ' ' + lat.toFixed(6);
+    // Además, cada corrida corre la parcela entre 100 y 1.100 m al este: dos corridas casi nunca caen en el mismo lugar.
+    const este = 0.001 + (${NUM} % 5) * 0.0025;
+    const p = ([lon, lat]) => (lon + este).toFixed(6) + ' ' + lat.toFixed(6);
     console.log(p(v[i]) + ' ' + p(v[j]));
   })")"
 KML1=$(mktemp --suffix=.kml); KML2=$(mktemp --suffix=.kml)
@@ -75,11 +77,32 @@ llamar GET "$API/personas?documento=23456789" $CAT; espera 200 "ahora la persona
 
 paso "3-6. Resto de la carga"
 llamar POST "$ALTA/$ID/enviar" $CAT '{}'; espera 400 "no se puede enviar incompleta"
-llamar PUT "$ALTA/$ID/ubicacion" $CAT -F "archivo=@$KML1" -F departamento=BURRUYACU -F "localidad=7 DE ABRIL" -F distrito=II; espera 200 "ubicación (KML)"
+llamar PUT "$ALTA/$ID/suministro" $CAT @6-suministro.json; espera 400 "suministro antes de la ubicación (el catálogo depende de ella)"
+llamar PUT "$ALTA/$ID/ubicacion" $CAT -F "archivo=@$KML1" -F departamento=BURRUYACU -F "localidad=ALTA GRACIA" -F distrito=II; espera 200 "ubicación (KML)"
+echo "  avisos: $(campo 'r.avisos.join(" | ")')"
+POLIGONO=$(campo 'r.ubicacion.poligono.id'); CONCESION=$(campo 'r.concesion.id')
+
+paso "El archivo presentado: se descarga tal cual se subió"
+llamar GET "$API/sig/poligonos/$POLIGONO/archivo" $CAT; espera 200 "descarga del archivo original"
+if cmp -s /tmp/drh_resp "$KML1"; then printf '  \033[32m✔ es idéntico al que se subió\033[0m\n'; else printf '  \033[31m✘ el archivo descargado no es el que se subió\033[0m\n'; FALLOS=$((FALLOS+1)); fi
+llamar GET "$API/sig/concesiones/$CONCESION/kml" $CAT; espera 200 "polígono como KML para Google Earth"
+
 MATRICULA="MAT-$NUM"
 llamar PUT "$ALTA/$ID/inmueble" $CAT "{\"catastral\":{\"matricula\":\"$MATRICULA\",\"parcela\":\"1-10\",\"circunscripcion\":\"II\",\"seccion\":\"B\"},\"registral\":{\"libro\":\"100\",\"folio\":\"300\",\"anio\":1990}}"; espera 200 "inmueble"
-llamar PUT "$ALTA/$ID/usos" $CAT @5-usos.json; espera 200 "usos"
-llamar PUT "$ALTA/$ID/suministro" $CAT @6-suministro.json; espera 200 "suministro"; echo "  pasos: $(campo 'r.pasos')"
+
+paso "Usos: el desagüe y el punto de entrega tienen que estar cerca del polígono"
+llamar PUT "$ALTA/$ID/usos" $CAT @5-usos.json; espera 200 "usos (con puntos de otra zona)"
+if [[ $(campo 'r.avisos.length') -ge 1 ]]; then printf '  \033[32m✔ avisa: %s\033[0m\n' "$(campo 'r.avisos[0]')"; else printf '  \033[31m✘ no avisó que el desagüe está lejos\033[0m\n'; FALLOS=$((FALLOS+1)); fi
+# El punto interior del polígono (en POSGAR) como desagüe, y la entrega 10 m al norte.
+read -r PX PY <<< "$(curl -s -F "archivo=@$KML1" "$API/sig/kml/analizar" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const p=JSON.parse(s).puntoInteriorPosgar; console.log(p.x+' '+p.y)})")"
+USOS=$(node -e "const u=require('./5-usos.json'); u.desague={x:$PX,y:$PY}; u.puntoEntrega={...u.puntoEntrega,x:$PX,y:+($PY+10).toFixed(2)}; console.log(JSON.stringify(u))")
+llamar PUT "$ALTA/$ID/usos" $CAT "$USOS"; espera 200 "usos (puntos dentro del polígono)"
+if [[ $(campo 'r.avisos.length') == 0 ]]; then printf '  \033[32m✔ sin avisos\033[0m\n'; else printf '  \033[31m✘ avisó: %s\033[0m\n' "$(campo 'r.avisos[0]')"; FALLOS=$((FALLOS+1)); fi
+
+paso "Suministro: tiene que ser un camino del árbol de la DRH para ALTA GRACIA (Burruyacu, II)"
+llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO LULES"]}'; espera 400 "fuente que no es de la zona"
+llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO SALI"],"canalPrincipal":"ARR. EL TIMBO","canalSecundario":"JULIAN PAZ","canalesAdicionales":["LOS RALOS","COMPUERTA 4"]}'; espera 400 "canal de otra rama del árbol"
+llamar PUT "$ALTA/$ID/suministro" $CAT @6-suministro.json; espera 200 "suministro (camino completo hasta el canal cuarto)"; echo "  pasos: $(campo 'r.pasos')"
 
 paso "Catastro envía a Recaudación"
 llamar POST "$ALTA/$ID/enviar" $CAT '{"observaciones":"Carga completa."}'; espera 201 "enviado"; echo "  ahora: $(campo 'r.circuito.oficinaNombre') · $(campo 'r.circuito.etapaNombre') · tomado: $(campo 'r.circuito.tomadoPor')"
@@ -100,13 +123,20 @@ llamar GET "$API/deudas?personaId=$PERSONA" $REC; DEUDA=$(campo 'r.find(d=>d.est
 llamar POST "$API/deudas/$DEUDA/cancelar" $REC '{"comprobante":"Recibo 0001-00012345"}'; espera 201 "deuda cancelada"; echo "  expedientes reanudados: $(campo 'r.expedientesReanudados')"
 llamar POST "$ALTA/$ID/recaudacion" $REC '{"resultado":"SIN_DEUDA","observaciones":"Deuda regularizada."}'; espera 201 "sin deuda → Distrito"
 
-paso "Distrito observa → Catastro corrige → reenvía a Distrito"
+paso "Distrito observa → Catastro corrige (y suma un cotitular) → Recaudación lo verifica → vuelve a Distrito"
 llamar POST "$API/expedientes/$ID/tomar" $DIS; espera 201 "Distrito lo toma"
 llamar POST "$ALTA/$ID/distrito" $DIS '{"resultado":"OBSERVADO"}'; espera 400 "observar sin motivo"
 llamar POST "$ALTA/$ID/distrito" $DIS '{"resultado":"OBSERVADO","observaciones":"Corregir el caudal: el canal no tiene capacidad para 13,5 l/s."}'; espera 201 "observado"; echo "  ahora: $(campo 'r.circuito.oficinaNombre') · $(campo 'r.circuito.etapaNombre') · estado $(campo 'r.circuito.estado')"
 llamar POST "$API/expedientes/$ID/tomar" $CAT; espera 201 "Catastro lo toma"
-llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO CALERA"],"sistemaDistribucion":"DIQUE CALERA","canalPrincipal":"MATRIZ","caudalAsignado":10}'; espera 200 "Catastro corrige el caudal"
-llamar POST "$ALTA/$ID/reenviar" $CAT '{"observaciones":"Caudal corregido a 10 l/s."}'; espera 201 "reenviado"; echo "  vuelve a: $(campo 'r.circuito.oficinaNombre')"
+llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO SALI"],"sistemaDistribucion":"TOMA PROPIA","canalPrincipal":"ARR. EL TIMBO","caudalAsignado":10}'; espera 200 "Catastro corrige el caudal"
+# Un cotitular nuevo (persona que Recaudación nunca verificó).
+TITULARES=$(node -e "const t=require('./2-titulares.json'); t.titulares.push({tipoPersona:'FISICA',tipoDocumento:'DNI',documento:'4$NUM',apellido:'Medina',nombre:'Lucía',fechaNacimiento:'1990-04-20'}); console.log(JSON.stringify(t))")
+llamar PUT "$ALTA/$ID/titulares" $CAT "$TITULARES"; espera 200 "se suma un cotitular al corregir"
+llamar POST "$ALTA/$ID/reenviar" $CAT '{"observaciones":"Caudal corregido a 10 l/s. Se agrega la cotitular Lucía Medina."}'; espera 201 "reenviado"
+if [[ $(campo 'r.circuito.etapa') == RECAUDACION ]]; then printf '  \033[32m✔ cambiaron los titulares: pasa primero por Recaudación\033[0m\n'; else printf '  \033[31m✘ debía ir a Recaudación y fue a %s\033[0m\n' "$(campo 'r.circuito.etapa')"; FALLOS=$((FALLOS+1)); fi
+llamar POST "$API/expedientes/$ID/tomar" $REC; espera 201 "Recaudación lo toma"
+llamar POST "$ALTA/$ID/recaudacion" $REC '{"resultado":"SIN_DEUDA","observaciones":"La cotitular no registra deuda."}'; espera 201 "sin deuda"
+if [[ $(campo 'r.circuito.etapa') == DISTRITO ]]; then printf '  \033[32m✔ vuelve a Distrito, la oficina que observó (no empieza de nuevo)\033[0m\n'; else printf '  \033[31m✘ debía volver a Distrito y fue a %s\033[0m\n' "$(campo 'r.circuito.etapa')"; FALLOS=$((FALLOS+1)); fi
 llamar POST "$API/expedientes/$ID/tomar" $DIS; espera 201 "Distrito lo toma de nuevo"
 llamar POST "$ALTA/$ID/distrito" $DIS '{"resultado":"APTO","observaciones":"Hay disponibilidad hídrica."}'; espera 201 "apto → Jurídico"
 
@@ -138,10 +168,22 @@ llamar POST "$ALTA/$ID/resolucion" $SEC "{\"numero\":\"$RES\",\"anio\":$ANIO,\"f
 paso "Catastro: cierre"
 llamar POST "$API/expedientes/$ID/tomar" $CAT; espera 201 "Catastro lo toma"
 llamar POST "$ALTA/$ID/padron" $CAT '{"padron":"777001"}'; espera 409 "padrón antes de la verificación final"
+
+paso "Cierre: solo se completa lo que falta (lo aprobado en la resolución no cambia)"
+llamar PUT "$ALTA/$ID/usos" $CAT "$USOS"; espera 409 "los usos y el caudal no cambian"
+llamar PUT "$ALTA/$ID/inmueble" $CAT "{\"catastral\":{\"matricula\":\"OTRA-$NUM\",\"parcela\":\"1-10\",\"circunscripcion\":\"II\",\"seccion\":\"B\"},\"registral\":{\"libro\":\"100\",\"folio\":\"300\",\"anio\":1990}}"; espera 409 "no se cambia la matrícula"
+llamar PUT "$ALTA/$ID/inmueble" $CAT "{\"catastral\":{\"matricula\":\"$MATRICULA\",\"parcela\":\"1-10\",\"circunscripcion\":\"II\",\"seccion\":\"B\",\"lamina\":\"14\"},\"registral\":{\"libro\":\"100\",\"folio\":\"300\",\"anio\":1990,\"serie\":\"A\"}}"; espera 200 "se completan lámina y serie"
+llamar PUT "$ALTA/$ID/ubicacion" $CAT -F "archivo=@$KML2" -F departamento=BURRUYACU -F "localidad=ALTA GRACIA" -F distrito=II; espera 409 "no se reemplaza el polígono aprobado"
+llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO SALI"],"sistemaDistribucion":"TOMA PROPIA","canalPrincipal":"ARR. EL TIMBO","caudalAsignado":12}'; espera 409 "no se cambia el caudal"
 llamar POST "$ALTA/$ID/verificacion-final" $CAT '{"observaciones":"Datos completos."}'; espera 201 "verificación final"; echo "  ahora: $(campo 'r.circuito.etapaNombre')"
 llamar POST "$ALTA/$ID/padron" $CAT "{\"padron\":\"P-$NUM\"}"; espera 201 "padrón → FINALIZADO"
 echo "  expediente: $(campo 'r.circuito.estado') · concesión $(campo 'r.concesion.numero') $(campo 'r.concesion.estado') · resolución $(campo 'r.concesion.resolucion.numero')/$(campo 'r.concesion.resolucion.anio')"
 llamar POST "$API/expedientes/$ID/tomar" $CAT; espera 409 "un expediente finalizado ya no circula"
+
+paso "Visor: la concesión otorgada, con el polígono vigente desde la resolución"
+llamar GET "$API/sig/concesiones/$CONCESION" $CAT; espera 200 "en la capa del visor"
+echo "  N° $(campo 'r.properties.numero') · $(campo 'r.properties.estado') · $(campo 'r.properties.superficie_ha') ha · polígono desde $(campo 'r.properties.poligono_desde')"
+if [[ $(campo 'r.properties.poligono_desde') == "$ANIO-10-02"* ]]; then printf '  \033[32m✔ el polígono rige desde la fecha de la resolución\033[0m\n'; else printf '  \033[31m✘ poligono_desde debía ser %s\033[0m\n' "$ANIO-10-02"; FALLOS=$((FALLOS+1)); fi
 
 paso "Historial del expediente $ID"
 llamar GET "$API/expedientes/$ID/historial" $CAT
@@ -150,7 +192,7 @@ node -e "for (const h of JSON.parse(process.argv[1])) { const f=new Date(h.fecha
 paso "Duplicados: otra alta sobre la misma parcela"
 llamar POST "$ALTA" $CAT "{\"expediente\":{\"numero\":\"$((NUM+1))\",\"reparticion\":\"332\",\"anio\":$ANIO},\"situacionLegal\":\"TITULAR\",\"documentacionPresentada\":[1]}"; ID2=$(campo 'r.id')
 llamar PUT "$ALTA/$ID2/inmueble" $CAT "{\"catastral\":{\"matricula\":\"$MATRICULA\",\"parcela\":\"9\"},\"registral\":{}}"; espera 409 "misma matrícula catastral"
-llamar PUT "$ALTA/$ID2/ubicacion" $CAT -F "archivo=@$KML1" -F departamento=BURRUYACU -F "localidad=7 DE ABRIL" -F distrito=II; espera 409 "mismo polígono"
+llamar PUT "$ALTA/$ID2/ubicacion" $CAT -F "archivo=@$KML1" -F departamento=BURRUYACU -F "localidad=ALTA GRACIA" -F distrito=II; espera 409 "mismo polígono"
 
 paso "Catálogo de ubicación: localidad de otro departamento"
 llamar PUT "$ALTA/$ID2/titulares" $CAT '{"titulares":[{"tipoPersona":"FISICA","tipoDocumento":"DNI","documento":"23456789","apellido":"Medina","nombre":"Juan Carlos","fechaNacimiento":"1960-01-10","telefono":"381-5555555"}],"domicilios":[{"calle":"Ruta 304","departamento":"LEALES","localidad":"7 DE ABRIL","distrito":"II"}]}'
@@ -159,7 +201,7 @@ espera 400 "domicilio con una localidad de Burruyacu en Leales"
 paso "Rechazo: la segunda alta (otra parcela) llega a Distrito y es «no apto»"
 llamar PUT "$ALTA/$ID2/titulares" $CAT '{"titulares":[{"tipoPersona":"FISICA","tipoDocumento":"DNI","documento":"23456789","apellido":"Medina","nombre":"Juan Carlos","fechaNacimiento":"1960-01-10","telefono":"381-5555555"}],"domicilios":[{"calle":"Ruta 304","departamento":"LEALES","localidad":"VILLA DE LEALES","distrito":"III"}]}'
 espera 200 "titular existente reutilizado"; echo "  misma persona: $(campo 'r.titulares[0].personaId') (antes $PERSONA)"
-llamar PUT "$ALTA/$ID2/ubicacion" $CAT -F "archivo=@$KML2" -F departamento=BURRUYACU -F "localidad=7 DE ABRIL" -F distrito=II; espera 200 "ubicación (otra parcela)"
+llamar PUT "$ALTA/$ID2/ubicacion" $CAT -F "archivo=@$KML2" -F departamento=BURRUYACU -F "localidad=ALTA GRACIA" -F distrito=II; espera 200 "ubicación (otra parcela)"
 llamar PUT "$ALTA/$ID2/inmueble" $CAT "{\"catastral\":{\"matricula\":\"MAT-$((NUM+1))\",\"parcela\":\"9\"},\"registral\":{}}"; espera 200 "inmueble"
 llamar PUT "$ALTA/$ID2/usos" $CAT '{"desague":{"x":3630793.87,"y":7088018.41},"items":[{"uso":"agricola-riego","magnitud":4}]}'; espera 200 "usos"
 llamar PUT "$ALTA/$ID2/suministro" $CAT '{"fuentes":["RIO SALI"]}'; espera 200 "suministro"
@@ -177,8 +219,35 @@ echo "  ubicación: $(campo 'r.ubicacion.departamento+" / "+r.ubicacion.localida
 llamar PUT "$ALTA/$ID3/ubicacion" $CAT -F departamento=CHICLIGASTA -F "localidad=GASTONA NORTE" -F distrito=II; espera 400 "distrito que no es el de la localidad"
 llamar PUT "$ALTA/$ID3/inmueble" $CAT "{\"catastral\":{\"matricula\":\"MAT-$((NUM+2))\",\"parcela\":\"3\"},\"registral\":{}}"; espera 200 "inmueble"
 llamar PUT "$ALTA/$ID3/usos" $CAT @5-usos.json; espera 200 "usos"
-llamar PUT "$ALTA/$ID3/suministro" $CAT @6-suministro.json; espera 200 "suministro"
+llamar PUT "$ALTA/$ID3/suministro" $CAT @6-suministro.json; espera 400 "GASTONA NORTE no tiene catálogo de suministro: no se eligen fuentes ni canales"
+llamar PUT "$ALTA/$ID3/suministro" $CAT '{"fuentes":[],"observacion":"La zona no figura en el catálogo de suministro.","caudalAsignado":8}'; espera 200 "suministro: solo observación y caudal"
 llamar POST "$ALTA/$ID3/enviar" $CAT '{}'; espera 201 "enviada a Recaudación sin polígono"
+
+paso "Polígono obligatorio para la verificación final: la tercera alta llega al cierre sin KML"
+llamar POST "$API/expedientes/$ID3/tomar" $REC; llamar POST "$ALTA/$ID3/recaudacion" $REC '{"resultado":"SIN_DEUDA"}'; espera 201 "Recaudación"
+llamar POST "$API/expedientes/$ID3/tomar" $DIS; llamar POST "$ALTA/$ID3/distrito" $DIS '{"resultado":"APTO"}'; espera 201 "Distrito"
+llamar POST "$API/expedientes/$ID3/tomar" $JUR; llamar POST "$ALTA/$ID3/juridico" $JUR '{"resultado":"APTO"}'; espera 201 "Jurídico"
+llamar POST "$API/expedientes/$ID3/tomar" $SEC; llamar POST "$ALTA/$ID3/numero-concesion" $SEC; espera 201 "pide el número"
+llamar GET "$API/solicitudes-numero?estado=PENDIENTE&expedienteId=$ID3" $CAT; SOL3=$(campo 'r[0].id')
+llamar POST "$API/solicitudes-numero/$SOL3/asignar" $CAT "{\"numeros\":[\"8$NUM\"]}"; espera 201 "Catastro carga el número"
+llamar POST "$ALTA/$ID3/resolucion" $SEC "{\"numero\":\"$((RES+1))\",\"anio\":$ANIO,\"fecha\":\"$ANIO-10-03\"}"; espera 201 "resolución → cierre"
+llamar POST "$API/expedientes/$ID3/tomar" $CAT
+llamar POST "$ALTA/$ID3/verificacion-final" $CAT '{}'; espera 400 "sin polígono no hay verificación final"
+# Polígono de la tercera parcela (al norte de la segunda), en el cierre: se puede cargar porque faltaba.
+KML3=$(mktemp --suffix=.kml); kml_cuadrado "$KML3" "$LON2" "$(node -e "console.log(($LAT2+0.004).toFixed(6))")"
+llamar PUT "$ALTA/$ID3/ubicacion" $CAT -F "archivo=@$KML3" -F departamento=CHICLIGASTA -F "localidad=GASTONA NORTE" -F distrito=V; espera 200 "en el cierre se carga el polígono que faltaba"
+llamar POST "$ALTA/$ID3/verificacion-final" $CAT '{}'; espera 201 "verificación final con polígono"
+
+paso "Archivo del polígono: GeoJSON que declara su sistema de coordenadas"
+# Mismo cuadrado de 100 m en las mismas coordenadas, declarado en POSGAR 2007 y en Campo Inchauspe (el sistema viejo).
+geojson() { printf '{"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"urn:ogc:def:crs:EPSG::%s"}},"features":[{"type":"Feature","properties":{},"geometry":{"type":"Polygon","coordinates":[[[3560000,7030000],[3560100,7030000],[3560100,7030100],[3560000,7030100],[3560000,7030000]]]}}]}' "$1" > "$2"; }
+GJ1=$(mktemp --suffix=.geojson); GJ2=$(mktemp --suffix=.geojson); GJ3=$(mktemp --suffix=.geojson)
+geojson 5345 "$GJ1"; geojson 22193 "$GJ2"; geojson 4326 "$GJ3"
+llamar POST "$API/sig/kml/analizar" $CAT -F "archivo=@$GJ1"; espera 201 "declarado POSGAR 2007"; X1=$(campo 'r.puntoInteriorPosgar.x'); Y1=$(campo 'r.puntoInteriorPosgar.y')
+llamar POST "$API/sig/kml/analizar" $CAT -F "archivo=@$GJ2"; espera 201 "declarado Campo Inchauspe"; echo "  $(campo 'r.sistemaOrigenNombre') · $(campo 'r.avisos[0]')"
+CORRIMIENTO=$(node -e "console.log(Math.round(Math.hypot($(campo 'r.puntoInteriorPosgar.x')-$X1, $(campo 'r.puntoInteriorPosgar.y')-$Y1)))")
+if [[ $CORRIMIENTO -gt 150 ]]; then printf '  \033[32m✔ se transformó con el cambio de datum: queda corrido %s m respecto de POSGAR 2007\033[0m\n' "$CORRIMIENTO"; else printf '  \033[31m✘ el corrimiento fue de %s m (se esperaban unos 225)\033[0m\n' "$CORRIMIENTO"; FALLOS=$((FALLOS+1)); fi
+llamar POST "$API/sig/kml/analizar" $CAT -F "archivo=@$GJ3"; espera 400 "declara latitud/longitud pero los números son POSGAR"
 
 paso "Bandejas"
 for o in catastro recaudacion distrito juridico secretaria_general; do llamar GET "$API/expedientes/bandeja/$o" $CAT; echo "  $o: $(campo 'r.length') expediente(s)"; done

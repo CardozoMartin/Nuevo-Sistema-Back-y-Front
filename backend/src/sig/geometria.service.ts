@@ -2,12 +2,13 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { MultiPolygon } from 'geojson';
 import { DataSource, type EntityManager } from 'typeorm';
 import { detectarSistema, NOMBRE_SISTEMA, SistemaCoordenadas } from './kml/sistema-coordenadas.js';
-import { DISTANCIA_MAX_CAUCE_M, LIMITES_TUCUMAN, SRID_POSGAR, SRID_WGS84, TOLERANCIA_SUPERPOSICION_M2 } from './sig.constantes.js';
+import { DISTANCIA_MAX_CAUCE_M, DISTANCIA_MAX_PUNTO_M, LIMITES_TUCUMAN, SRID_POSGAR, SRID_WGS84, TOLERANCIA_SUPERPOSICION_M2 } from './sig.constantes.js';
 
 /** Geometría lista para analizar y guardar: en WGS84, con el sistema en que vino el archivo. */
 export interface GeometriaNormalizada {
   geometria: MultiPolygon;
-  sistemaOrigen: SistemaCoordenadas;
+  /** POSGAR_FAJA3, WGS84 o «EPSG:nnnn» si el archivo declaró otro sistema (ej: Campo Inchauspe). */
+  sistemaOrigen: string;
   /** Nombre legible del sistema de origen (para mostrarlo). */
   sistemaOrigenNombre: string;
   avisos: string[];
@@ -80,8 +81,24 @@ export class GeometriaService {
    *   - Con los ejes invertidos: se corrigen y se avisa.
    * La ida y vuelta POSGAR → WGS84 → POSGAR conserva la posición con error de décimas de mm.
    */
-  async normalizar(geometria: MultiPolygon, tx: EntityManager = this.dataSource.manager): Promise<GeometriaNormalizada> {
+  async normalizar(geometria: MultiPolygon, tx: EntityManager = this.dataSource.manager, sridDeclarado?: number): Promise<GeometriaNormalizada> {
+    //1.- El archivo declara un sistema que no es ni POSGAR 2007 ni WGS84 (ej: Campo Inchauspe):
+    //    se transforma con PostGIS, que conoce todos los sistemas EPSG.
+    if (sridDeclarado && sridDeclarado !== SRID_WGS84 && sridDeclarado !== SRID_POSGAR) return this.desdeSistemaDeclarado(geometria, sridDeclarado, tx);
+
+    //2.- Se reconoce el sistema por el tamaño de los números (y se corrigen los ejes invertidos).
     const deteccion = detectarSistema(geometria);
+
+    //3.- Si el archivo declaró POSGAR 2007 o WGS84, los números tienen que coincidir.
+    const declarado = sridDeclarado === SRID_POSGAR ? SistemaCoordenadas.POSGAR_FAJA3 : sridDeclarado === SRID_WGS84 ? SistemaCoordenadas.WGS84 : undefined;
+    if (declarado && declarado !== deteccion.sistema) {
+      throw new BadRequestException(
+        `El archivo declara ${NOMBRE_SISTEMA[declarado]}, pero sus coordenadas están en ${NOMBRE_SISTEMA[deteccion.sistema]}. ` +
+          'Revise en QGIS el sistema de referencia de la capa antes de exportarla.',
+      );
+    }
+
+    //4.- WGS84 queda igual; POSGAR se pasa a WGS84.
     const base = { sistemaOrigen: deteccion.sistema, sistemaOrigenNombre: NOMBRE_SISTEMA[deteccion.sistema], avisos: deteccion.avisos };
     if (deteccion.sistema === SistemaCoordenadas.WGS84) return { ...base, geometria: deteccion.geometria };
     const [fila] = await tx.query(
@@ -89,6 +106,29 @@ export class GeometriaService {
       [JSON.stringify(deteccion.geometria)],
     );
     return { ...base, geometria: fila.geojson as MultiPolygon };
+  }
+
+  /**
+   * Geometría en un sistema declarado por el archivo, distinto de POSGAR 2007 y de WGS84.
+   *   1. Tiene que ser un sistema que PostGIS conozca (spatial_ref_sys).
+   *   2. Se transforma a WGS84 con el cambio de datum que corresponda (Campo Inchauspe → ~225 m).
+   *   3. Si los números no tenían nada que ver con ese sistema, lo detecta después
+   *      `analizar` (el polígono cae fuera de Tucumán).
+   */
+  private async desdeSistemaDeclarado(geometria: MultiPolygon, srid: number, tx: EntityManager): Promise<GeometriaNormalizada> {
+    const [sistema] = await tx.query(`SELECT split_part(srtext, '"', 2) AS nombre FROM spatial_ref_sys WHERE srid = $1`, [srid]);
+    if (!sistema) throw new BadRequestException(`El archivo declara el sistema EPSG:${srid}, que no se reconoce. Expórtelo en EPSG:5345 (POSGAR 2007 faja 3).`);
+    const [fila] = await tx.query(`SELECT ST_AsGeoJSON(ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($1), $2::int), ${SRID_WGS84}), 10)::json AS geojson`, [
+      JSON.stringify(geometria),
+      srid,
+    ]);
+    const nombre = `${sistema.nombre} (EPSG:${srid})`;
+    return {
+      geometria: fila.geojson as MultiPolygon,
+      sistemaOrigen: `EPSG:${srid}`,
+      sistemaOrigenNombre: nombre,
+      avisos: [`El archivo está en ${nombre}: se transformó a POSGAR 2007 faja 3, el sistema oficial.`],
+    };
   }
 
   /**
@@ -156,6 +196,29 @@ export class GeometriaService {
       superposiciones,
       cauceCercano: cauce ? { nombre: cauce.nombre, tipo: cauce.tipo, distanciaM: Math.round(Number(cauce.m)) } : null,
     };
+  }
+
+  /**
+   * Desagüe y punto de entrega lejos del polígono de la concesión: casi siempre es una
+   * coordenada mal tipeada. Devuelve un aviso por punto (vacío si están bien o si todavía no
+   * hay polígono). Se mide en POSGAR (metros); 0 si el punto está dentro del polígono.
+   */
+  async avisosPuntosLejanos(concesionId: string, tx: EntityManager = this.dataSource.manager): Promise<string[]> {
+    const filas: { tipo: string; x: string; y: string; m: number }[] = await tx.query(
+      `SELECT pt.tipo, pt.coord_x AS x, pt.coord_y AS y, ST_Distance(pt.geom, p.geom) AS m
+         FROM con_punto pt
+         JOIN con_poligono p ON p.concesion_id = pt.concesion_id AND p.vigente
+        WHERE pt.concesion_id = $1 AND pt.vigente AND pt.geom IS NOT NULL
+          AND ST_Distance(pt.geom, p.geom) > $2
+        ORDER BY pt.tipo`,
+      [concesionId, DISTANCIA_MAX_PUNTO_M],
+    );
+    const km = (m: number) => (m / 1000).toLocaleString('es-AR', { maximumFractionDigits: 1 });
+    return filas.map(
+      (f) =>
+        `El ${f.tipo === 'DESAGUE' ? 'punto de desagüe' : 'punto de entrega'} (X ${Number(f.x).toLocaleString('es-AR')}, Y ${Number(f.y).toLocaleString('es-AR')}) ` +
+        `está a ${km(Number(f.m))} km del polígono de la concesión: verifique las coordenadas.`,
+    );
   }
 
   /** Superposiciones del polígono vigente YA GUARDADO de una concesión (para mostrarlas al consultarla). */

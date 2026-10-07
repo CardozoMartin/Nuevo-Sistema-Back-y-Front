@@ -13,18 +13,23 @@ import { Distrito } from './entities/distrito.entity.js';
 import { DocumentoRequerido } from './entities/documento-requerido.entity.js';
 import { Localidad } from './entities/localidad.entity.js';
 import { SituacionLegal } from './entities/situacion-legal.entity.js';
+import { SuministroCanal } from './entities/suministro-canal.entity.js';
+import { SuministroOpcion } from './entities/suministro-opcion.entity.js';
+import { SuministroZona } from './entities/suministro-zona.entity.js';
 import { TipoUso } from './entities/tipo-uso.entity.js';
+import { SuministroCatalogoService } from './suministro/suministro-catalogo.service.js';
 import { UbicacionesService } from './ubicaciones.service.js';
 
 /**
  * Tablas de referencia (cat_). Las usan los trámites para validar lo que se carga.
  * El catálogo de ubicación (departamentos, localidades, distritos, cuencas) tiene su ABM
- * con baja lógica (AbmUbicacionesController + abm/).
+ * con baja lógica (AbmUbicacionesController + abm/). El catálogo de suministro de riego (el árbol
+ * de fuentes y canales de la DRH) está en suministro/ y valida el paso 6 del alta.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([SituacionLegal, DocumentoRequerido, TipoUso, Departamento, Localidad, Distrito, Cuenca])],
+  imports: [TypeOrmModule.forFeature([SituacionLegal, DocumentoRequerido, TipoUso, Departamento, Localidad, Distrito, Cuenca, SuministroZona, SuministroOpcion, SuministroCanal])],
   controllers: [CatalogosController, AbmUbicacionesController],
-  providers: [CatalogosService, UbicacionesService, DepartamentosService, LocalidadesService, DistritosService, CuencasService],
-  exports: [CatalogosService, UbicacionesService],
+  providers: [CatalogosService, UbicacionesService, SuministroCatalogoService, DepartamentosService, LocalidadesService, DistritosService, CuencasService],
+  exports: [CatalogosService, UbicacionesService, SuministroCatalogoService],
 })
 export class CatalogosModule {}

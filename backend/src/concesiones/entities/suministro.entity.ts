@@ -8,9 +8,9 @@ import { FilaVersionada } from './fila-versionada.js';
  *
  *   fuente → sistema de distribución → canal principal → secundario → terciario → cuarto → quinto
  *
- * Las opciones de cada nivel dependen de la ubicación de la concesión (catálogo de
- * suministro por departamento / localidad / distrito).
- * TODO(catalogos): validar cada valor contra ese catálogo.
+ * Las opciones de cada nivel dependen de la ubicación de la concesión: salen del catálogo de
+ * suministro de la DRH (cat_suministro_zona / _opcion / _canal) y el alta las valida contra él.
+ * Si la ubicación no tiene catálogo, solo se cargan la observación y el caudal (sin fuente).
  *
  * Historial: un solo suministro vigente por concesión; una reubicación puede cambiarlo.
  */
@@ -24,9 +24,9 @@ export class Suministro extends FilaVersionada {
   @JoinColumn({ name: 'concesion_id', foreignKeyConstraintName: 'fk_suministro_concesion' })
   concesion: Relation<Concesion>;
 
-  /** Fuente principal de agua (río, arroyo, pozo…). */
-  @Column({ name: 'fuente_principal', length: 120 })
-  fuentePrincipal: string;
+  /** Fuente principal de agua (río, arroyo, pozo…). NULL si la ubicación no tiene catálogo de suministro. */
+  @Column({ name: 'fuente_principal', type: 'varchar', length: 120, nullable: true })
+  fuentePrincipal: string | null;
 
   /** Fuentes adicionales, en el orden en que se cargaron. */
   @Column({ name: 'fuentes_adicionales', type: 'varchar', length: 120, array: true, default: () => "'{}'" })

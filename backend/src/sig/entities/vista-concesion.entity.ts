@@ -48,7 +48,7 @@ import { VistaInmueble } from '../../concesiones/entities/vista-inmueble.entity.
            s.sistema_distribucion                       AS sistema,
            s.canal_principal,
            p.origen::text                               AS origen_poligono,
-           p.creado_en                                  AS poligono_desde,
+           COALESCE(p.desde, p.creado_en::date)         AS poligono_desde,
            p.geom
       FROM con_poligono p
       JOIN con_concesion c   ON c.id = p.concesion_id
@@ -107,6 +107,7 @@ export class VistaConcesion {
   @ViewColumn() caracter: string | null;
   @ViewColumn() usos: string | null;
   @ViewColumn({ name: 'origen_poligono' }) origenPoligono: string;
-  @ViewColumn({ name: 'poligono_desde' }) poligonoDesde: Date;
+  /** Desde cuándo rige el polígono (la resolución que lo aprobó; mientras está en trámite, la fecha de carga). */
+  @ViewColumn({ name: 'poligono_desde' }) poligonoDesde: string;
   @ViewColumn() geom: MultiPolygon;
 }

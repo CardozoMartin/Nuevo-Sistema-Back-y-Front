@@ -22,6 +22,13 @@ export interface KmlLeido {
   nombres: string[];
   /** Cosas que se ignoraron y conviene que el usuario sepa. */
   avisos: string[];
+  /**
+   * Sistema de coordenadas que DECLARA el archivo (solo GeoJSON, miembro «crs»). Si viene, se
+   * respeta en lugar de reconocerlo por el tamaño de los números (ver GeometriaService.normalizar).
+   */
+  sridDeclarado?: number;
+  /** Números de concesión que trae el archivo (propiedad «concesion» de las capas de la DRH). */
+  numerosConcesion?: string[];
 }
 
 /** Quita la altura: [lon, lat, z] → [lon, lat]. */

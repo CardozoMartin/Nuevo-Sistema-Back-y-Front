@@ -1,21 +1,22 @@
 // Paso 6 del alta: suministro de agua (la cascada fuente → sistema → canales).
-import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Texto, TextoLista } from '../../../comun/validadores/texto.js';
 import { MAX_CANALES_ADICIONALES } from '../../../concesiones/concesiones.constantes.js';
 
 /**
- * Los valores salen del catálogo de suministro según la ubicación del inmueble.
- * TODO(catalogos): validarlos contra ese catálogo cuando esté el paso de ubicación.
- * Por ahora se valida la estructura de la cascada (ver el service).
+ * Los valores salen del catálogo de suministro de la ubicación de la concesión (paso 3) y el
+ * service los valida contra ese árbol (GET /api/catalogos/suministro?departamento=&localidad=&distrito=).
  */
 export class SuministroDto {
-  /** La primera es la fuente principal; el resto, adicionales. Sin repetir. */
+  /**
+   * La primera es la fuente principal; el resto, adicionales. Sin repetir. Obligatoria si la
+   * ubicación tiene catálogo de suministro; vacía si no lo tiene (se controla en el service).
+   */
   @ArrayUnique({ message: 'Hay fuentes repetidas.' })
   @MaxLength(120, { each: true })
   @IsNotEmpty({ each: true, message: 'Seleccione la fuente de agua.' })
   @IsString({ each: true })
   @ArrayMaxSize(10)
-  @ArrayMinSize(1, { message: 'Seleccione al menos una fuente de agua.' })
   @IsArray()
   @TextoLista()
   fuentes: string[];

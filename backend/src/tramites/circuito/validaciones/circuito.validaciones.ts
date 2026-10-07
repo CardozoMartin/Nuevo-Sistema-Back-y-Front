@@ -25,3 +25,35 @@ export function normalizarNumerosConcesion(numeros: string[], cantidadPedida: nu
   if (repetido) throw new ConflictException(`El número de concesión ${repetido} está repetido.`);
   return normalizados;
 }
+
+/**
+ * Personas que hoy forman parte del trámite y Recaudación todavía no verificó (por ejemplo,
+ * un titular agregado al corregir lo que observó Jurídico). `verificadas` es lo que guardó
+ * la última verificación «sin deuda»; si no lo tiene (verificaciones anteriores a esta regla)
+ * se toma como que no hubo cambios.
+ */
+export function personasSinVerificar(verificadas: unknown, actuales: string[]): string[] {
+  if (!Array.isArray(verificadas)) return [];
+  const ya = new Set(verificadas.map(String));
+  return actuales.filter((id) => !ya.has(id));
+}
+
+/** Lo mínimo de una actuación para decidir a dónde sigue el expediente. */
+export interface ActuacionResumen {
+  id: string;
+  datos: Record<string, unknown> | null;
+}
+
+/**
+ * A dónde pasa el expediente cuando Recaudación da el «sin deuda»:
+ *   - Normalmente, a la etapa siguiente (Distrito).
+ *   - Si llegó a Recaudación porque, al corregir, cambiaron los titulares (corrección con
+ *     `reverificaDeuda`), vuelve a la oficina que había observado (`vuelveA`): lo que ya
+ *     aprobaron las demás sigue aprobado.
+ * Vale la corrección POSTERIOR al último «sin deuda» (los ids de las actuaciones son crecientes).
+ */
+export function destinoTrasVerificarDeuda<E extends string>(correccion: ActuacionResumen | null, ultimoSinDeuda: ActuacionResumen | null, siguiente: E): E {
+  if (!correccion?.datos?.reverificaDeuda || typeof correccion.datos.vuelveA !== 'string') return siguiente;
+  if (ultimoSinDeuda && BigInt(ultimoSinDeuda.id) > BigInt(correccion.id)) return siguiente;
+  return correccion.datos.vuelveA as E;
+}

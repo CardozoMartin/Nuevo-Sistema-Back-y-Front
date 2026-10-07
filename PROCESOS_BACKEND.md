@@ -8,7 +8,7 @@ La documentación técnica del backend (puesta en marcha, endpoints, PostGIS, es
 (`backend/src/tramites/<tramite>/README.md`). El estado del frontend está en
 [Proyecto En React - Full/ESTADO_MIGRACION.md](Proyecto%20En%20React%20-%20Full/ESTADO_MIGRACION.md).
 
-**Última actualización:** 07/10/2026 — circuito del alta por las oficinas con servicios reutilizables, aviso de deuda por correo y N° de concesión pedido a Catastro (6.3).
+**Última actualización:** 07/10/2026 — revisión integral del alta (6.4): archivo del polígono (sistema declarado, descarga, KML), visor, catálogo de suministro de la DRH en la base, cierre «solo completar», polígono obligatorio al cierre y titulares nuevos vuelven a Recaudación.
 
 ---
 
@@ -39,7 +39,8 @@ La documentación técnica del backend (puesta en marcha, endpoints, PostGIS, es
 | Módulos base: `seguridad`, `personas`, `recaudacion`, `catalogos`, `expedientes`, `concesiones` | ✅ Hecho (sin login) | — |
 | SIG: KML/GeoJSON, validación PostGIS, POSGAR 07, vistas `sig.v_concesiones` / `sig.v_pozos`, cauces, QGIS | ✅ Hecho | ✅ |
 | Migración del padrón (importador, lotes, datos demo) | ✅ Hecho (falta el padrón real) | — |
-| **Alta de Concesión** — circuito completo; tablas con historial y carga reorganizada por pasos (6.1); oficinas como servicios reutilizables, aviso de deuda por correo y N° de concesión pedido a Catastro (6.3) | ✅ Hecho | ✅ |
+| **Alta de Concesión** — circuito completo; tablas con historial y carga reorganizada por pasos (6.1); oficinas como servicios reutilizables, aviso de deuda por correo y N° de concesión pedido a Catastro (6.3); revisión integral: archivo, visor, suministro contra el catálogo, cierre (6.4) | ✅ Hecho | ✅ |
+| Catálogo de suministro de riego (árbol de la DRH) en la base, con validación y vinculación de zonas (6.4) | ✅ Hecho (78 zonas por vincular) | ✅ (mock) |
 | Catálogos de ubicación (departamentos, localidades, distritos, cuencas) con **ABM y baja lógica** (6.2) | ✅ Hecho | ✅ (mock, sin ABM) |
 | **Baja de Pozo** — de oficio y a solicitud | ✅ Hecho | ⏳ |
 | Pozos (tabla, importación, búsqueda, ficha, capa) | 🟡 Parcial | ⏳ |
@@ -121,6 +122,8 @@ programarlo, y recién después pasa a su carpeta en `src/tramites/` con su READ
 ## 4. Deuda técnica conocida
 
 1. **Migraciones**: pasar de `DB_SYNCHRONIZE` a migraciones de TypeORM (ya dio problemas con esquemas de vistas y CHECKs).
+   **Ya bloquea:** una base con el esquema anterior a 6.1 no arranca (`DROP TYPE con_caracter` falla porque
+   `con_condicion` usa el mismo tipo). Para probar se usó otra base (`drh_nuevo`) en el mismo contenedor (6.4.5).
 2. **Archivos adjuntos** al expediente: informe de Distrito, dictamen, resolución firmada, actas, fotos de máquinas.
 3. **«Soltar» un expediente tomado** por otra persona de la misma oficina.
 4. **Catálogos** (`cat_`) con sus FKs; la documentación de baja de pozo (`DOCUMENTOS_BAJA`) es provisoria.
@@ -302,12 +305,12 @@ directamente no lo exporta. El backend ya reconoce ese caso, pero la fuente natu
 
 **Propuesta:**
 1. **GeoJSON como formato recomendado:** declara el sistema de coordenadas y se exporta de QGIS o de AutoCAD Map.
-   Se respeta el `crs` del archivo, en lugar de adivinarlo por el tamaño de los números.
+   Se respeta el `crs` del archivo, en lugar de adivinarlo por el tamaño de los números. **Hecho (6.4).**
 2. **KML se sigue aceptando**, porque lo usan Google Earth y los GPS.
 3. **DXF** (AutoCAD → Guardar como DXF, formato abierto) se puede sumar después. El **DWG** es un formato
    cerrado y no se puede leer directo desde Node sin un conversor externo. Hasta entonces, se convierte en QGIS.
 4. Si el GeoJSON trae la propiedad `concesion` (como el de la DRH), se compara con el número de concesión y se avisa
-   si no coincide.
+   si no coincide. **Hecho (6.4)**: también avisa si es el número de otra concesión ya registrada.
 
 #### 6.1.5 Organización del código (cuando se apruebe el diseño)
 
@@ -561,6 +564,101 @@ aviso de deuda).
 | D3 | N° de resolución | Lo escribe Secretaría |
 | D4 | N° de concesión | Lo carga **Catastro a mano** desde su libro («Petete», ~50.000 hojas). El sistema controla que no esté usado y muestra el último registrado. Más adelante, cuando se deje el libro, el sistema lo podrá generar |
 | D5 | Orden | Primero el N° de concesión, después la resolución: cuando el expediente vuelve a Catastro ya tiene las dos, aprobadas por el director |
+
+### 6.4 Alta de Concesión — revisión integral (carga, archivo del polígono, visor)
+
+> **Estado:** hecho (07/10/2026). El alta es la base de los demás trámites (búsqueda, cambio de titularidad,
+> reducción, subdivisión…), así que se revisó entera antes de seguir: que valide todo el proceso, que el
+> archivo del polígono quede bien guardado y ubicado, y que el visor muestre lo que corresponde.
+
+#### 6.4.1 Decisiones (07/10/2026)
+
+| # | Pregunta | Decisión |
+| --- | --- | --- |
+| D1 | Jurídico o Distrito observan y Catastro, al corregir, cambia los titulares: Recaudación nunca verificaba a los nuevos | **Vuelve a Recaudación**: al reenviar, si hay personas que Recaudación no verificó, pasa primero por Recaudación y con el «sin deuda» vuelve a la oficina que observó |
+| D2 | ¿Qué puede cambiar Catastro en el cierre (después de la resolución firmada)? | **Solo completar.** Titulares, domicilios, ubicación, polígono, usos y caudal quedan fijos; del inmueble y del suministro se completan los campos vacíos |
+| D3 | ¿Hasta cuándo puede faltar el polígono? (D6 de 6.1: optativo en la carga) | **Obligatorio para la verificación final** del cierre: toda concesión otorgada queda en el visor y en QGIS |
+| D4 | Catálogo de suministro | Es el que entregaron los jefes, real: es un **árbol que tiene que existir en la base** y el paso 6 se valida contra él |
+
+#### 6.4.2 Qué se hizo
+
+**Archivo del polígono**
+- **Sistema de coordenadas declarado.** Un GeoJSON con `crs` (QGIS lo agrega al exportar) se transforma desde
+  ese sistema con PostGIS. Antes se ignoraba y el sistema se adivinaba por los números: un archivo en
+  **Campo Inchauspe** (EPSG:22193, el sistema viejo) se tomaba como POSGAR 2007 y quedaba **corrido 225 m**
+  en Tucumán (más que el ancho de una parcela). Si declara POSGAR o WGS84 y los números son del otro, 400.
+  En `con_poligono.sistema_origen` queda `EPSG:22193` (o `POSGAR_FAJA3` / `WGS84`).
+- **Número de concesión del archivo** (propiedad `concesion` de las capas de la DRH): aviso si no coincide con la
+  concesión o si es el de otra ya registrada.
+- **Descarga del original:** `GET /api/sig/poligonos/:id/archivo`, comprobado con su SHA-256.
+- **KML para Google Earth o un GPS:** `GET /api/sig/concesiones/:id/kml` (Distrito, inspecciones).
+- **Desagüe y punto de entrega lejos del polígono** (más de 1 km): aviso en el paso 5 y al cargar el polígono.
+
+**Visor**
+- `con_poligono.desde`: el polígono rige desde la fecha de la resolución, como el resto de lo cargado
+  (antes quedaba con la fecha de carga). `sig.v_concesiones.poligono_desde` lo muestra (la fecha de carga
+  mientras está en trámite). Es la base para reducción, ampliación y reubicación.
+- Polígono obligatorio al cierre (D3): ninguna concesión vigente nueva queda fuera del visor.
+
+**Catálogo de suministro (D4)** — `catalogos/suministro/`
+- Tablas: `cat_suministro_zona` (departamento + localidad + distrito, con baja lógica), `cat_suministro_opcion`
+  (fuentes, sistemas, desagües) y `cat_suministro_canal` (el **árbol**: cada canal apunta a su padre;
+  principal = nivel 1 … quinto = nivel 5; CHECK del nivel; nombre único dentro del padre).
+- Se carga solo al arrancar desde `recursos/catalogos/suministro.json` (copia sin tocar del archivo del front).
+  Junta las dos partes del archivo que se superponen (`canalesPrincipales` y `cascada`).
+- `GET /api/catalogos/suministro` devuelve el mismo formato que `/catalogoSuministro` de json-server (con
+  `?departamento=&localidad=&distrito=`, solo esa ubicación).
+- Paso 6: cada fuente, el sistema y el desagüe tienen que ser de la zona, y los canales un **camino del árbol**
+  (el secundario deriva del principal elegido, y así hasta el quinto). Se guarda con los nombres del catálogo. Si
+  la ubicación no tiene catálogo, solo observación y caudal (como hace el formulario). Se revalida al enviar y en
+  la verificación final, porque la ubicación pudo cambiar después del paso 6.
+- `con_suministro.fuente_principal` pasa a admitir NULL (ubicación sin catálogo: el formulario no ofrece fuentes).
+
+**Circuito**
+- D1: cada «sin deuda» guarda a quiénes verificó (`datos.personas`) y al reenviar se comparan con los titulares
+  actuales. La corrección que pasa por Recaudación queda marcada (`reverificaDeuda`, `vuelveA`) y el «sin deuda»
+  siguiente la manda a esa oficina (`destinoTrasVerificarDeuda`). Recaudación verifica a todos los titulares
+  actuales (también a los ya verificados: pudieron sumar deudas).
+- D2: `validaciones/cierre.validaciones.ts` (`exigirSoloCompletar`, `exigirSinCambios`), aplicadas en los pasos 2 a 6.
+
+**Código nuevo:** `sig/kml/sistema-coordenadas.ts` (`sridDeclarado`), `catalogos/suministro/` (árbol en funciones
+puras + service), `catalogos/entities/suministro-*.entity.ts`, `tramites/alta-concesion/validaciones/cierre.validaciones.ts`.
+
+#### 6.4.3 Verificado (07/10/2026)
+
+- `circuito-completo.sh` del alta: **100 verificaciones** (35 nuevas): suministro antes de la ubicación, descarga
+  idéntica del original, KML de la concesión, aviso de desagüe a 44,7 km, sin avisos con los puntos dentro, fuente
+  fuera de la zona, canal de otra rama, cotitular nuevo → Recaudación → vuelve a Distrito, cierre (usos, matrícula,
+  polígono y caudal bloqueados; lámina y serie se completan), polígono vigente desde la resolución en el visor,
+  ubicación sin catálogo (solo observación), verificación final sin polígono (400) y con el polígono cargado en el
+  cierre, GeoJSON en Campo Inchauspe (corrido 225 m) y declarado WGS84 con números POSGAR (400).
+- Baja de pozo (47), 19 pruebas e2e y **32 unitarias** (17 nuevas: sistema declarado, cierre, árbol de
+  suministro, reverificación de deuda).
+- Para que las parcelas de prueba no caigan sobre las de corridas anteriores, el script ahora también las corre
+  entre 100 y 1.100 m al este según la corrida.
+
+#### 6.4.4 Para revisar con la DRH
+
+1. **El catálogo de suministro trae 20 líneas de la página web** mezcladas como canales secundarios
+   («2. COSTO: ESTAMPILLAS PROVINCIALES $ 30», «6. E-MAIL: CATASTRO@…», «4. TELÉFONO: 0381 – 4526393»,
+   «FORMULARIOS»…). Se descartan al cargar (`esTextoAjeno`, quedan en el log). **Hoy el front las ofrece como
+   canales**: conviene corregir también el archivo de origen.
+2. **78 zonas del catálogo de suministro no coinciden con ninguna localidad** del catálogo de ubicación. Algunas
+   son el mismo lugar escrito distinto («TRANCAS» / «VILLA DE TRANCAS», «JUAN B ALBERDI» / «JUAN BAUTISTA
+   ALBERDI») y otras son localidades que **faltan** en el catálogo de ubicación (CONCEPCIÓN, FAMAILLÁ, LULES,
+   YERBA BUENA…). Mientras no se vinculen, esas ubicaciones no tienen opciones de suministro. Herramientas:
+   `GET /api/catalogos/suministro/zonas?sinVincular=true`, `PUT /api/catalogos/suministro/zonas/:id/localidad`
+   y el ABM de localidades (6.2) para agregar las que faltan. También ayuda con 6.1.8 (localidades del padrón).
+3. **15 zonas «(SIN LOCALIDAD)»**: ¿valen para todo el departamento y distrito cuando la localidad no tiene zona
+   propia? Hoy no se usan (el formulario tampoco las encuentra).
+4. Queda un caso parecido a D1: si **Jurídico** observa y Catastro cambia el **polígono o los usos**, el expediente
+   vuelve a Jurídico sin que Distrito evalúe el cambio. ¿Debería volver a Distrito?
+
+#### 6.4.5 Base de datos de desarrollo
+
+La base `drh_sistema` del contenedor tenía el esquema anterior a 6.1 (con 1 expediente) y `DB_SYNCHRONIZE` no puede
+actualizarla (deuda técnica 1). No se tocó: se creó `drh_nuevo` en el mismo contenedor y el `.env` local apunta ahí
+(`DB_NAME=drh_nuevo`), con los catálogos, los cauces y los datos de prueba cargados.
 
 ---
 

@@ -1,6 +1,6 @@
 # Tablas de la base `drh_sistema`
 
-> Generado con `npm run db:tablas` el 7/10/2026, 01:11:08. **No editar a mano:** se vuelve a generar.
+> Generado con `npm run db:tablas` el 7/10/2026, 12:52:20. **No editar a mano:** se vuelve a generar.
 > Las tablas las crea TypeORM a partir de las entidades (`src/**/entities/*.entity.ts`); ver «Cómo se generan las tablas» en `PROCESOS_BACKEND.md`.
 
 ## Catálogos (`cat_`)
@@ -9,8 +9,6 @@
 
 | Columna | Tipo | Obligatoria | Por defecto | Clave |
 | --- | --- | --- | --- | --- |
-| `id` | integer | sí | nextval('cat_cuenca_id_seq'::regclass) | PK |
-| `nombre` | character varying(120) | sí |  |  |
 | `activo` | boolean | sí | true |  |
 | `creado_usuario_id` | bigint | sí | '1'::bigint |  |
 | `creado_en` | timestamp with time zone | sí | now() |  |
@@ -19,6 +17,8 @@
 | `baja_motivo` | text | no |  |  |
 | `baja_en` | timestamp with time zone | no |  |  |
 | `baja_usuario_id` | bigint | no |  |  |
+| `id` | integer | sí | nextval('cat_cuenca_id_seq'::regclass) | PK |
+| `nombre` | character varying(120) | sí |  |  |
 
 **Índices**
 
@@ -32,8 +32,6 @@
 
 | Columna | Tipo | Obligatoria | Por defecto | Clave |
 | --- | --- | --- | --- | --- |
-| `id` | integer | sí | nextval('cat_departamento_id_seq'::regclass) | PK |
-| `nombre` | character varying(80) | sí |  |  |
 | `activo` | boolean | sí | true |  |
 | `creado_usuario_id` | bigint | sí | '1'::bigint |  |
 | `creado_en` | timestamp with time zone | sí | now() |  |
@@ -42,6 +40,8 @@
 | `baja_motivo` | text | no |  |  |
 | `baja_en` | timestamp with time zone | no |  |  |
 | `baja_usuario_id` | bigint | no |  |  |
+| `id` | integer | sí | nextval('cat_departamento_id_seq'::regclass) | PK |
+| `nombre` | character varying(80) | sí |  |  |
 
 **Índices**
 
@@ -55,9 +55,6 @@
 
 | Columna | Tipo | Obligatoria | Por defecto | Clave |
 | --- | --- | --- | --- | --- |
-| `id` | integer | sí | nextval('cat_distrito_id_seq'::regclass) | PK |
-| `codigo` | character varying(10) | sí |  |  |
-| `nombre` | character varying(60) | sí |  |  |
 | `activo` | boolean | sí | true |  |
 | `creado_usuario_id` | bigint | sí | '1'::bigint |  |
 | `creado_en` | timestamp with time zone | sí | now() |  |
@@ -66,6 +63,9 @@
 | `baja_motivo` | text | no |  |  |
 | `baja_en` | timestamp with time zone | no |  |  |
 | `baja_usuario_id` | bigint | no |  |  |
+| `id` | integer | sí | nextval('cat_distrito_id_seq'::regclass) | PK |
+| `codigo` | character varying(10) | sí |  |  |
+| `nombre` | character varying(60) | sí |  |  |
 
 **Índices**
 
@@ -93,11 +93,7 @@
 
 | Columna | Tipo | Obligatoria | Por defecto | Clave |
 | --- | --- | --- | --- | --- |
-| `id` | integer | sí | nextval('cat_localidad_id_seq'::regclass) | PK |
-| `nombre` | character varying(100) | sí |  |  |
 | `activo` | boolean | sí | true |  |
-| `departamento_id` | integer | sí |  | FK → cat_departamento.id |
-| `distrito_id` | integer | sí |  | FK → cat_distrito.id |
 | `creado_usuario_id` | bigint | sí | '1'::bigint |  |
 | `creado_en` | timestamp with time zone | sí | now() |  |
 | `modificado_usuario_id` | bigint | no |  |  |
@@ -105,6 +101,10 @@
 | `baja_motivo` | text | no |  |  |
 | `baja_en` | timestamp with time zone | no |  |  |
 | `baja_usuario_id` | bigint | no |  |  |
+| `id` | integer | sí | nextval('cat_localidad_id_seq'::regclass) | PK |
+| `nombre` | character varying(100) | sí |  |  |
+| `departamento_id` | integer | sí |  | FK → cat_departamento.id |
+| `distrito_id` | integer | sí |  | FK → cat_distrito.id |
 
 **Índices**
 
@@ -124,6 +124,65 @@
 | `titulo` | character varying(80) | sí |  |  |
 | `orden` | smallint | sí | '0'::smallint |  |
 | `activo` | boolean | sí | true |  |
+
+### `cat_suministro_canal`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `id` | integer | sí | nextval('cat_suministro_canal_id_seq'::regclass) | PK |
+| `nivel` | smallint | sí |  |  |
+| `nombre` | character varying(120) | sí |  |  |
+| `zona_id` | integer | sí |  | FK → cat_suministro_zona.id |
+| `padre_id` | integer | no |  | FK → cat_suministro_canal.id |
+
+**Índices**
+
+- `uk_suministro_canal_hijo`: UNIQUE USING btree (padre_id, nombre) WHERE (padre_id IS NOT NULL)
+- `uk_suministro_canal_principal`: UNIQUE USING btree (zona_id, nombre) WHERE (padre_id IS NULL)
+
+**Controles (CHECK)**
+
+- `chk_suministro_canal_nivel`: CHECK ((((nivel >= 1) AND (nivel <= 5)) AND ((padre_id IS NULL) = (nivel = 1))))
+
+### `cat_suministro_opcion`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `id` | integer | sí | nextval('cat_suministro_opcion_id_seq'::regclass) | PK |
+| `tipo` | cat_tipo_opcion_suministro | sí |  |  |
+| `nombre` | character varying(120) | sí |  |  |
+| `zona_id` | integer | sí |  | FK → cat_suministro_zona.id |
+
+**Índices**
+
+- `uk_suministro_opcion`: UNIQUE USING btree (zona_id, tipo, nombre)
+
+### `cat_suministro_zona`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `activo` | boolean | sí | true |  |
+| `creado_usuario_id` | bigint | sí | '1'::bigint |  |
+| `creado_en` | timestamp with time zone | sí | now() |  |
+| `modificado_usuario_id` | bigint | no |  |  |
+| `modificado_en` | timestamp with time zone | sí | now() |  |
+| `baja_motivo` | text | no |  |  |
+| `baja_en` | timestamp with time zone | no |  |  |
+| `baja_usuario_id` | bigint | no |  |  |
+| `id` | integer | sí | nextval('cat_suministro_zona_id_seq'::regclass) | PK |
+| `localidad_origen` | character varying(100) | sí |  |  |
+| `departamento_id` | integer | sí |  | FK → cat_departamento.id |
+| `distrito_id` | integer | sí |  | FK → cat_distrito.id |
+| `localidad_id` | integer | no |  | FK → cat_localidad.id |
+
+**Índices**
+
+- `uk_suministro_zona_localidad`: UNIQUE USING btree (localidad_id, distrito_id) WHERE (localidad_id IS NOT NULL)
+- `uk_suministro_zona_origen`: UNIQUE USING btree (departamento_id, distrito_id, localidad_origen)
+
+**Controles (CHECK)**
+
+- `chk_suministro_zona_baja`: CHECK ((activo OR ((baja_motivo IS NOT NULL) AND (baja_en IS NOT NULL))))
 
 ### `cat_tipo_uso`
 
@@ -275,6 +334,7 @@
 | `creado_en` | timestamp with time zone | sí | now() |  |
 | `concesion_id` | bigint | sí |  | FK → con_concesion.id |
 | `expediente_id` | bigint | no |  | FK → exp_expediente.id |
+| `desde` | date | no |  |  |
 
 **Índices**
 
@@ -321,7 +381,7 @@
 | `desde` | date | no |  |  |
 | `hasta` | date | no |  |  |
 | `id` | bigint | sí | nextval('con_suministro_id_seq'::regclass) | PK |
-| `fuente_principal` | character varying(120) | sí |  |  |
+| `fuente_principal` | character varying(120) | no |  |  |
 | `fuentes_adicionales` | character varying(120)[] | sí | '{}'::character varying[] |  |
 | `sistema_distribucion` | character varying(120) | no |  |  |
 | `canal_principal` | character varying(120) | no |  |  |
@@ -780,13 +840,14 @@ Consultas guardadas que se leen como una tabla (no guardan datos). Su SQL está 
 | Vista | Columnas |
 | --- | --- |
 | `public.con_v_inmueble` | inmueble_id (bigint), concesion_id (bigint), departamento (character varying), localidad (character varying), distrito (character varying), cuenca (character varying), padron (character varying), matricula_catastral (character varying), circunscripcion (character varying), seccion (character varying), parcela (character varying), lamina (character varying), orden (character varying), desde (date) |
-| `sig.v_concesiones` | poligono_id (bigint), concesion_id (bigint), numero (character varying), estado (text), tipo_derecho (text), origen (text), anio_otorgamiento (smallint), expediente (text), oficina_actual (text), titular (text), documento (character varying), cantidad_titulares (integer), departamento (character varying), localidad (character varying), distrito (character varying), cuenca (character varying), padron (character varying), matricula_catastral (character varying), parcela (character varying), superficie_ha (double precision), caudal_lps (double precision), caracter (text), codigo_servicio (smallint), usos (text), fuente (character varying), sistema (character varying), canal_principal (character varying), origen_poligono (text), poligono_desde (timestamp with time zone), geom (USER-DEFINED) |
+| `sig.v_concesiones` | poligono_id (bigint), concesion_id (bigint), numero (character varying), estado (text), tipo_derecho (text), origen (text), anio_otorgamiento (smallint), expediente (text), oficina_actual (text), titular (text), documento (character varying), cantidad_titulares (integer), departamento (character varying), localidad (character varying), distrito (character varying), cuenca (character varying), padron (character varying), matricula_catastral (character varying), parcela (character varying), superficie_ha (double precision), caudal_lps (double precision), caracter (text), codigo_servicio (smallint), usos (text), fuente (character varying), sistema (character varying), canal_principal (character varying), origen_poligono (text), poligono_desde (date), geom (USER-DEFINED) |
 | `sig.v_pozos` | pozo_id (bigint), id_interno (character varying), alias (character varying), estado (text), origen (text), tipo_pozo (character varying), jurisdiccion_drh (boolean), profundidad_m (double precision), nivel_estatico_m (double precision), nivel_dinamico_m (double precision), caudal_m3h (double precision), caudal_lps (double precision), coord_x (double precision), coord_y (double precision), concesion_id (bigint), concesion_numero (character varying), titular (text), departamento (character varying), localidad (character varying), dentro_de_concesion (boolean), geom (USER-DEFINED) |
 
 ## Enumerados
 
 | Tipo | Valores |
 | --- | --- |
+| `cat_tipo_opcion_suministro` | FUENTE, SISTEMA, DESAGUE |
 | `con_caracter` | PERMANENTE, EVENTUAL |
 | `con_estado_concesion` | EN_TRAMITE, DENEGADA, VIGENTE, MODIFICADA, ANULADA, ARCHIVADA |
 | `con_origen_concesion` | SISTEMA, MIGRACION |

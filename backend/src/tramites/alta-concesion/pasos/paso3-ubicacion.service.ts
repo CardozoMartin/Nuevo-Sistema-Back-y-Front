@@ -1,10 +1,12 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { DataSource, type EntityManager } from 'typeorm';
-import { UbicacionesService } from '../../../catalogos/ubicaciones.service.js';
+import { DataSource, Not, type EntityManager } from 'typeorm';
+import { UbicacionesService, type UbicacionValidada } from '../../../catalogos/ubicaciones.service.js';
 import { OrigenPoligono } from '../../../concesiones/concesiones.constantes.js';
 import { poligonoDuplicado } from '../../../concesiones/duplicados.js';
-import { PoligonosService } from '../../../concesiones/poligonos.service.js';
+import { Concesion } from '../../../concesiones/entities/concesion.entity.js';
 import { Inmueble } from '../../../concesiones/entities/inmueble.entity.js';
+import { PoligonosService } from '../../../concesiones/poligonos.service.js';
+import { Etapa } from '../../../expedientes/expedientes.constantes.js';
 import { ArchivosService } from '../../../sig/archivos.service.js';
 import { avisoLejosDelCauce, GeometriaService } from '../../../sig/geometria.service.js';
 import { exigirKml, extensionDe, leerArchivoGeografico, type ArchivoSubido } from '../../../sig/kml/archivo-kml.js';
@@ -12,14 +14,19 @@ import type { KmlLeido } from '../../../sig/kml/leer-kml.js';
 import { AltaConcesionService, type AltaEditable } from '../alta-concesion.service.js';
 import type { RespuestaAlta } from '../alta-concesion.respuesta.js';
 import type { UbicacionDto } from '../dto/ubicacion.dto.js';
+import { exigirSinCambios } from '../validaciones/cierre.validaciones.js';
 
 /**
  * Paso 3 del alta: ubicación de la concesión.
  *
  * - Departamento, localidad y distrito: obligatorios, del catálogo.
- * - El archivo con la concesión dibujada (KML o GeoJSON, en POSGAR 2007 faja 3 o en
- *   latitud/longitud) es OPTATIVO (decisión D6). Si viene, PostGIS lo valida, lo mide y
- *   controla que no sea una concesión duplicada.
+ * - El archivo con la concesión dibujada (KML o GeoJSON) es OPTATIVO en la carga (decisión D6)
+ *   y OBLIGATORIO para la verificación final del cierre. Si viene, PostGIS lo valida, lo mide
+ *   y controla que no sea una concesión duplicada.
+ * - Sistema de coordenadas: POSGAR 2007 faja 3 o latitud/longitud (se reconocen solos); un
+ *   GeoJSON que declara otro sistema (ej: Campo Inchauspe) se transforma desde ese sistema.
+ * - En el cierre (después de la resolución) la ubicación no cambia y el polígono solo se
+ *   puede cargar si todavía no estaba.
  *
  * Llega como multipart/form-data: «archivo» + los campos de texto.
  */
@@ -34,7 +41,7 @@ export class UbicacionAltaService {
     private readonly archivos: ArchivosService,
   ) {}
 
-  /** Devuelve el alta y los avisos de la lectura del archivo (elementos ignorados, varias partes…). */
+  /** Devuelve el alta y los avisos de la lectura del archivo (sistema, elementos ignorados, río lejano…). */
   async guardar(expedienteId: string, datos: UbicacionDto, usuarioId: string, archivo?: ArchivoSubido): Promise<RespuestaAlta & { avisos: string[] }> {
     //1.- Si viene archivo, se valida que sea KML/GeoJSON y se lee (antes de abrir la
     //    transacción: es trabajo de CPU que no necesita la base).
@@ -48,23 +55,45 @@ export class UbicacionAltaService {
       //3.- Se valida la ubicación contra el catálogo (departamento → localidad → distrito).
       const ubicacion = await this.ubicaciones.exigirUbicacion(datos, tx);
 
-      //4.- Si vino el polígono, se valida, se guarda y se controla que no esté duplicado.
+      //4.- En el cierre solo se completa: la ubicación aprobada no cambia y el polígono, si ya estaba, tampoco.
+      if (editable.expediente.etapa === Etapa.CIERRE) await this.exigirSoloCompletar(tx, editable, ubicacion, !!subido);
+
+      //5.- Si vino el polígono, se valida, se guarda y se controla que no esté duplicado.
       if (subido && leido) await this.guardarPoligono(tx, editable, subido, leido);
 
-      //5.- Se guarda la ubicación en el inmueble vigente (se crea si todavía no existe).
+      //6.- Se guarda la ubicación en el inmueble vigente (se crea si todavía no existe).
       await this.alta.guardarEnVigente(tx, Inmueble, editable, ubicacion);
       await this.alta.marcarModificado(tx, editable);
     });
 
-    //6.- Se devuelve el alta actualizada con los avisos del archivo.
+    //7.- Se devuelve el alta actualizada con los avisos del archivo.
     return { ...(await this.alta.obtener(expedienteId)), avisos: leido?.avisos ?? [] };
+  }
+
+  /** Cierre: la ubicación tiene que ser la misma y el polígono se carga solo si faltaba. */
+  private async exigirSoloCompletar(tx: EntityManager, { concesion }: AltaEditable, nueva: UbicacionValidada, vinoPoligono: boolean): Promise<void> {
+    //1.- La ubicación aprobada (si ya estaba cargada) no cambia.
+    const actual = await tx.findOne(Inmueble, { where: { concesion: { id: concesion.id }, vigente: true }, relations: { departamento: true, localidad: true, distrito: true } });
+    if (actual?.departamento) {
+      exigirSinCambios('la ubicación de la concesión', [
+        { nombre: 'departamento', actual: actual.departamento.id, nuevo: nueva.departamento.id },
+        { nombre: 'localidad', actual: actual.localidad?.id, nuevo: nueva.localidad.id },
+        { nombre: 'distrito', actual: actual.distrito?.id, nuevo: nueva.distrito.id },
+      ]);
+    }
+
+    //2.- El polígono aprobado no se reemplaza (si faltaba, se puede cargar ahora).
+    if (vinoPoligono && (await this.poligonos.vigente(tx, concesion.id))) {
+      throw new ConflictException('En el cierre no se puede reemplazar el polígono: quedó aprobado en la resolución. Si está mal, corresponde un trámite de reubicación o de modificación de superficie.');
+    }
   }
 
   /** Polígono: coordenadas → PostGIS (validar y medir) → archivo original → con_poligono → duplicados. */
   private async guardarPoligono(tx: EntityManager, { expediente, concesion, usuario }: AltaEditable, archivo: ArchivoSubido, leido: KmlLeido): Promise<void> {
-    //1.- Coordenadas: POSGAR 2007 faja 3 (las de la oficina) o lat/long → WGS84.
-    //    PostGIS valida el polígono (400 si es inválido o cae fuera de Tucumán).
-    const normalizada = await this.geometria.normalizar(leido.geometria, tx);
+    //1.- Coordenadas: el sistema que declara el archivo, o POSGAR 2007 faja 3 / lat-long
+    //    reconocidos por los números → WGS84. PostGIS valida el polígono (400 si es inválido
+    //    o cae fuera de Tucumán).
+    const normalizada = await this.geometria.normalizar(leido.geometria, tx, leido.sridDeclarado);
     leido.geometria = normalizada.geometria;
     leido.avisos.unshift(`Coordenadas en ${normalizada.sistemaOrigenNombre}.`, ...normalizada.avisos);
 
@@ -73,10 +102,13 @@ export class UbicacionAltaService {
     const lejos = avisoLejosDelCauce(analisis);
     if (lejos) leido.avisos.push(lejos);
 
-    //3.- Se guarda el archivo original (respaldo de lo que presentó el titular).
+    //3.- Si el archivo dice de qué concesión es (capas de la DRH), se compara.
+    leido.avisos.push(...(await this.avisosNumeroDelArchivo(tx, concesion, leido.numerosConcesion ?? [])));
+
+    //4.- Se guarda el archivo original (respaldo de lo que presentó el titular).
     const guardado = await this.archivos.guardar('kml', archivo.buffer, extensionDe(archivo));
 
-    //4.- Mientras no está otorgada, el polígono es un borrador: reemplaza al anterior.
+    //5.- Mientras no está otorgada, el polígono es un borrador: reemplaza al anterior.
     await this.poligonos.borrarBorrador(tx, concesion.id);
     await this.poligonos.insertar(tx, {
       concesionId: concesion.id,
@@ -88,9 +120,30 @@ export class UbicacionAltaService {
       usuarioId: usuario.id,
     });
 
-    //5.- Concesión duplicada: si el polígono coincide casi entero con otra concesión activa,
+    //6.- Concesión duplicada: si el polígono coincide casi entero con otra concesión activa,
     //    se rechaza (se deshace todo). Las superposiciones parciales solo se informan.
     const duplicado = await poligonoDuplicado(tx, concesion.id);
     if (duplicado) throw new ConflictException(duplicado);
+
+    //7.- Si los puntos de desagüe / entrega (paso 5) ya estaban, se avisa si quedan lejos del polígono.
+    leido.avisos.push(...(await this.geometria.avisosPuntosLejanos(concesion.id, tx)));
+  }
+
+  /**
+   * Las capas de la DRH traen el número de concesión en cada polígono (propiedad «concesion»).
+   * Si no coincide con esta concesión, o es el de otra ya registrada, se avisa (no se rechaza:
+   * puede ser una capa de referencia reutilizada).
+   */
+  private async avisosNumeroDelArchivo(tx: EntityManager, concesion: Concesion, numeros: string[]): Promise<string[]> {
+    const avisos: string[] = [];
+    for (const numero of numeros) {
+      if (concesion.numero) {
+        if (numero !== concesion.numero) avisos.push(`El archivo dice ser de la concesión ${numero}, pero esta es la concesión ${concesion.numero}: verifique que sea el polígono correcto.`);
+        continue;
+      }
+      const otra = await tx.findOneBy(Concesion, { numero, id: Not(concesion.id) });
+      if (otra) avisos.push(`El archivo dice ser de la concesión ${numero}, que ya está registrada (${otra.estado.toLowerCase()}): verifique que no sea el polígono de otra concesión.`);
+    }
+    return avisos;
   }
 }

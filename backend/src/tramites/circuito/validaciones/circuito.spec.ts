@@ -1,6 +1,6 @@
 // Pruebas de las reglas del circuito y del texto del aviso de deuda (sin base: npm test).
 import { armarAvisoDeuda } from '../aviso-deuda.js';
-import { exigirFechaDelAnio, exigirMotivoSiNoEsApto, normalizarNumerosConcesion } from './circuito.validaciones.js';
+import { destinoTrasVerificarDeuda, exigirFechaDelAnio, exigirMotivoSiNoEsApto, normalizarNumerosConcesion, personasSinVerificar } from './circuito.validaciones.js';
 
 describe('Distrito y Jurídico', () => {
   it('observado y no apto llevan motivo; apto no', () => {
@@ -54,5 +54,25 @@ describe('Aviso de deuda por correo', () => {
     expect(cuerpo).toContain('  - Tasa al uso del agua\n');
     expect(cuerpo).not.toContain('Total');
     expect(cuerpo).toContain('Puede pagar en Brígido Terán 636.');
+  });
+});
+
+describe('Recaudación: titulares que cambiaron al corregir', () => {
+  it('detecta las personas que Recaudación todavía no verificó', () => {
+    expect(personasSinVerificar(['1', '2'], ['1', '2'])).toEqual([]);
+    expect(personasSinVerificar(['1', '2'], ['2', '7'])).toEqual(['7']);
+    // Verificaciones viejas (sin la lista de personas): no se puede saber, se toma como sin cambios.
+    expect(personasSinVerificar(undefined, ['7'])).toEqual([]);
+  });
+
+  it('después del «sin deuda» vuelve a la oficina que observó solo si vino por un cambio de titulares', () => {
+    const correccion = { id: '20', datos: { reverificaDeuda: true, vuelveA: 'JURIDICO' } };
+    expect(destinoTrasVerificarDeuda(null, null, 'DISTRITO')).toBe('DISTRITO');
+    // (Si hubo un «con deuda» en el medio, el último «sin deuda» sigue siendo el anterior a la corrección.)
+    expect(destinoTrasVerificarDeuda(correccion, { id: '10', datos: null }, 'DISTRITO')).toBe('JURIDICO');
+    // Una corrección ya atendida (hubo un «sin deuda» después) no cambia el camino.
+    expect(destinoTrasVerificarDeuda(correccion, { id: '25', datos: null }, 'DISTRITO')).toBe('DISTRITO');
+    // Una corrección común (sin cambio de titulares) tampoco.
+    expect(destinoTrasVerificarDeuda({ id: '30', datos: { respondeA: '29' } }, { id: '10', datos: null }, 'DISTRITO')).toBe('DISTRITO');
   });
 });

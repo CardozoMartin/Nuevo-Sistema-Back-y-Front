@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, type OnModuleInit } from '@nestjs/common';
 import { Not, type EntityManager } from 'typeorm';
+import { SuministroCatalogoService } from '../../catalogos/suministro/suministro-catalogo.service.js';
 import { EstadoConcesion } from '../../concesiones/concesiones.constantes.js';
 import { fijarVigenciaDesde } from '../../concesiones/datos-vigentes.js';
 import { matriculaEnUso, poligonoDuplicado } from '../../concesiones/duplicados.js';
@@ -8,7 +9,7 @@ import { Inmueble } from '../../concesiones/entities/inmueble.entity.js';
 import { Titular } from '../../concesiones/entities/titular.entity.js';
 import type { Expediente } from '../../expedientes/entities/expediente.entity.js';
 import type { Resolucion } from '../../expedientes/entities/resolucion.entity.js';
-import { TipoTramite } from '../../expedientes/expedientes.constantes.js';
+import { Etapa, TipoTramite } from '../../expedientes/expedientes.constantes.js';
 import type { Persona } from '../../personas/entities/persona.entity.js';
 import type { Usuario } from '../../seguridad/entities/usuario.entity.js';
 import type { ConfigTramite } from '../circuito/config-tramite.js';
@@ -37,6 +38,7 @@ export class AltaCircuitoConfig implements ConfigTramite, OnModuleInit {
   constructor(
     private readonly alta: AltaConcesionService,
     private readonly registro: RegistroTramitesService,
+    private readonly catalogoSuministro: SuministroCatalogoService,
   ) {}
 
   onModuleInit() {
@@ -49,7 +51,11 @@ export class AltaCircuitoConfig implements ConfigTramite, OnModuleInit {
     return titulares.map((t) => t.persona);
   }
 
-  /** Los seis pasos de la carga completos y sin duplicados (matrícula o polígono). */
+  /**
+   * Los seis pasos de la carga completos, el suministro del catálogo y sin duplicados (matrícula o polígono).
+   * Para la verificación final (cierre), además, el polígono: es optativo en la carga
+   * preliminar (D6) pero toda concesión otorgada tiene que verse en el visor y en QGIS.
+   */
   async validarCarga(tx: EntityManager, expediente: Expediente): Promise<void> {
     //1.- Todos los pasos completos.
     const piezas = await this.alta.cargarPiezas(tx, expediente.id);
@@ -57,7 +63,29 @@ export class AltaCircuitoConfig implements ConfigTramite, OnModuleInit {
     const faltan = Object.entries(pasos).filter(([, completo]) => !completo).map(([paso]) => NOMBRE_PASO[paso] ?? paso);
     if (faltan.length) throw new BadRequestException(`Falta completar: ${faltan.join(', ')}.`);
 
-    //2.- Que no sea una concesión duplicada.
+    //2.- En el cierre, el polígono es obligatorio.
+    if (expediente.etapa === Etapa.CIERRE && !piezas.poligono) {
+      throw new BadRequestException('Falta el polígono de la concesión (KML o GeoJSON): es obligatorio para la verificación final, así la concesión queda en el visor.');
+    }
+
+    //3.- El suministro tiene que seguir siendo del catálogo de la ubicación (pudo cambiar después del paso 6).
+    const s = piezas.datos.suministro;
+    if (s) {
+      const seleccion = {
+        fuentes: [s.fuentePrincipal, ...s.fuentesAdicionales].filter((f): f is string => !!f),
+        sistemaDistribucion: s.sistemaDistribucion,
+        canalPrincipal: s.canalPrincipal,
+        canalSecundario: s.canalSecundario,
+        canalesAdicionales: [s.canalTerciario, s.canalCuarto, s.canalQuinto].filter((c): c is string => !!c),
+        desague: s.desague,
+      };
+      await this.catalogoSuministro.exigirValido(tx, piezas.datos.inmueble, seleccion).catch((error: unknown) => {
+        if (error instanceof BadRequestException) throw new BadRequestException(`Suministro (paso 6): ${error.message} Vuelva a guardar el suministro.`);
+        throw error;
+      });
+    }
+
+    //4.- Que no sea una concesión duplicada.
     const matricula = piezas.datos.inmueble?.matriculaCatastral;
     const duplicado = (matricula && (await matriculaEnUso(tx, matricula, piezas.concesion.id))) || (await poligonoDuplicado(tx, piezas.concesion.id));
     if (duplicado) throw new ConflictException(duplicado);

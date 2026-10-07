@@ -44,12 +44,15 @@ Cómo se generan las tablas a partir de las entidades: sección 8 de [PROCESOS_B
 | POST   | `/api/tramites/alta-concesion` | Paso 1 del alta: registra el expediente en papel |
 | GET    | `/api/tramites/alta-concesion/:id` | Todo lo cargado del alta y qué pasos están completos |
 | PUT    | `/api/tramites/alta-concesion/:id/titulares` | Paso 2: titulares y domicilios |
-| PUT    | `/api/tramites/alta-concesion/:id/ubicacion` | Paso 3: departamento/localidad/distrito + KML (multipart) |
+| PUT    | `/api/tramites/alta-concesion/:id/ubicacion` | Paso 3: departamento/localidad/distrito + KML/GeoJSON (multipart; optativo en la carga, obligatorio para la verificación final) |
 | PUT    | `/api/tramites/alta-concesion/:id/inmueble` | Paso 4: parcela (catastro + dominio) |
-| PUT    | `/api/tramites/alta-concesion/:id/usos` | Paso 5: usos, magnitudes, desagüe y punto de entrega |
-| PUT    | `/api/tramites/alta-concesion/:id/suministro` | Paso 6: fuentes, canales y caudal asignado |
+| PUT    | `/api/tramites/alta-concesion/:id/usos` | Paso 5: usos, magnitudes, desagüe y punto de entrega (avisa si los puntos quedan lejos del polígono) |
+| PUT    | `/api/tramites/alta-concesion/:id/suministro` | Paso 6: fuentes, canales y caudal asignado, validados contra el catálogo de suministro de la ubicación |
 | GET    | `/api/catalogos/tipos-uso` | Tipos de uso con su dotación |
 | GET    | `/api/catalogos/ubicaciones` | Departamento → localidad → distritos activos (mismo formato que `/catalogoLocalidades` del mock) |
+| GET    | `/api/catalogos/suministro` | Catálogo de suministro de riego (mismo formato que `/catalogoSuministro` del mock). Con `?departamento=&localidad=&distrito=`, solo esa ubicación |
+| GET    | `/api/catalogos/suministro/zonas?sinVincular=true` | Zonas del catálogo de suministro y la localidad a la que están vinculadas |
+| PUT    | `/api/catalogos/suministro/zonas/:id/localidad` | Vincula una zona a una localidad (`{ "localidadId" }`, null la desvincula). Catastro o administrador |
 | GET / POST | `/api/catalogos/{departamentos, localidades, distritos, cuencas}` | ABM del catálogo de ubicación: listado (`?todas=true`, `?q=`; localidades también `?departamentoId=`, `?distritoId=`) y alta |
 | GET / PUT | `/api/catalogos/{…}/:id` | Uno / modificación |
 | DELETE | `/api/catalogos/{…}/:id` | **Baja lógica** con `{ "motivo" }` (mínimo 10 caracteres). Nunca se borra la fila |
@@ -68,7 +71,9 @@ Cómo se generan las tablas a partir de las entidades: sección 8 de [PROCESOS_B
 | GET    | `/api/usuarios` | Usuarios (de prueba, hasta que haya login) |
 | GET    | `/api/sig/concesiones?bbox=o,s,e,n` | Concesiones con polígono, GeoJSON WGS84 (para el visor) |
 | GET    | `/api/sig/concesiones/:id` | Una concesión como Feature GeoJSON |
-| POST   | `/api/sig/kml/analizar` | Vista previa de un KML: valida, mide y detecta superposiciones sin guardar |
+| GET    | `/api/sig/concesiones/:id/kml` | El polígono vigente como KML, para Google Earth o un GPS |
+| GET    | `/api/sig/poligonos/:id/archivo` | El archivo original (KML/GeoJSON) tal como se presentó; se comprueba con su hash |
+| POST   | `/api/sig/kml/analizar` | Vista previa de un KML/GeoJSON: valida, mide y detecta superposiciones sin guardar |
 
 **Catálogo de ubicación (ABM).** Lo modifican usuarios de Catastro o administradores. Los nombres se guardan en
 mayúsculas y sin espacios de más, y no se repiten (aunque el otro esté dado de baja: en ese caso se reactiva).
@@ -144,7 +149,7 @@ src/
 ├── personas/                per_: titulares, únicos por documento
 ├── recaudacion/             rec_: deudas de los titulares
 ├── notificaciones/          not_: correos del sistema (nodemailer; sin SMTP_HOST, modo prueba)
-├── catalogos/               cat_: situaciones legales, tipos de uso, departamentos, localidades, distritos y cuencas
+├── catalogos/               cat_: situaciones legales, tipos de uso, ubicación (con ABM) y el árbol de suministro de riego
 ├── expedientes/             exp_: expediente y su circuito (tomar, pasar, actuaciones, historial, bandejas)
 ├── concesiones/             con_: concesión y, con historial (vigente/desde/hasta), titulares, domicilios,
 │                            inmueble, condiciones, usos, puntos, suministro y polígonos
@@ -166,7 +171,9 @@ del código están en español y explican el proceso paso a paso.
 Todo se guarda en **POSGAR 2007 / Argentina faja 3 (EPSG:5345)**, el sistema de la oficina.
 Los KML/GeoJSON se aceptan en POSGAR (X ≈ 3.500.000, Y ≈ 7.000.000) o en latitud/longitud: el
 sistema se reconoce solo y, si vienen con los ejes invertidos, se corrigen con aviso
-(`src/sig/kml/sistema-coordenadas.ts`). Los puntos de desagüe y de entrega se cargan como X/Y
+(`src/sig/kml/sistema-coordenadas.ts`). Un GeoJSON que **declara** su sistema (`crs`, lo agrega
+QGIS) se transforma desde ese sistema: un archivo en Campo Inchauspe (EPSG:22193) queda bien
+ubicado, a unos 225 m de donde quedaría si se lo tomara como POSGAR 2007. Los puntos de desagüe y de entrega se cargan como X/Y
 POSGAR; PostGIS calcula la latitud/longitud que usa el mapa web.
 
 ## Capa de ríos y canales
@@ -200,5 +207,9 @@ reglas y comandos en [docs/migracion.md](docs/migracion.md).
   Ya dio dos problemas: no crea esquemas para las vistas (se resolvió en `crearDataSource`) y no
   actualiza un CHECK que cambia de expresión pero conserva el nombre.
 - **Usuarios y login** (`seg_`): el usuario de autoría está fijo en `1` (`TODO(login)` en los services).
+  Una base creada con una versión anterior de las entidades ya no se actualiza sola (pasó con `con_condicion`):
+  hay que crearla de nuevo. Mientras no haya migraciones, para probar se puede usar otra base en el mismo
+  contenedor (`CREATE DATABASE …` + `CREATE EXTENSION postgis` y `DB_NAME` en el `.env`).
 - Catálogos (`cat_`) y sus FKs; resto del circuito de empresas (dictamen, resolución, observar, bajas, historial).
+- Catálogo de suministro: 78 zonas de la DRH sin vincular a una localidad (`GET /api/catalogos/suministro/zonas?sinVincular=true`).
 - Conectar el frontend: apuntar `VITE_API_URL` a `http://localhost:3000/api` cuando los endpoints cubran lo que usa cada pantalla.

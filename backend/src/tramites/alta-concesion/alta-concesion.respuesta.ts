@@ -98,7 +98,7 @@ function seccionUsos({ usos, puntos, condicion }: DatosVigentes) {
 function seccionSuministro({ suministro: s }: DatosVigentes) {
   if (!s) return null;
   return {
-    fuentes: [s.fuentePrincipal, ...s.fuentesAdicionales],
+    fuentes: s.fuentePrincipal ? [s.fuentePrincipal, ...s.fuentesAdicionales] : [],
     sistemaDistribucion: s.sistemaDistribucion,
     canalPrincipal: s.canalPrincipal,
     canalSecundario: s.canalSecundario,

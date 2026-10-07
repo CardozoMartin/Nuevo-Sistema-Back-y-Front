@@ -68,7 +68,8 @@ export class Poligono {
   archivoBytes: number | null;
 
   /**
-   * Sistema de coordenadas en que vino el archivo (POSGAR_FAJA3 o WGS84). Lo guardado está
+   * Sistema de coordenadas en que vino el archivo: POSGAR_FAJA3, WGS84 o «EPSG:nnnn» si un
+   * GeoJSON declaró otro (ej: EPSG:22193, Campo Inchauspe). Lo guardado está
    * siempre en POSGAR; esto queda para saber cómo lo presentó el titular.
    */
   @Column({ name: 'sistema_origen', type: 'varchar', length: 20, nullable: true })
@@ -78,6 +79,14 @@ export class Poligono {
 
   @Column({ default: true })
   vigente: boolean;
+
+  /**
+   * Desde cuándo rige: la fecha de la resolución que lo aprobó (se completa al otorgarse, como
+   * en las demás tablas con historial). NULL mientras el trámite está en curso; para mostrar,
+   * se usa la fecha de carga.
+   */
+  @Column({ type: 'date', nullable: true })
+  desde: string | null;
 
   @Column({ type: 'timestamptz', nullable: true })
   hasta: Date | null;

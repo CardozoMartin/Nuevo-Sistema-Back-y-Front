@@ -27,6 +27,12 @@ export const LIMITES_TUCUMAN = { oeste: -66.3, sur: -28.1, este: -64.4, norte: -
  */
 export const DISTANCIA_MAX_CAUCE_M = 2000;
 
+/**
+ * Distancia máxima esperable entre el desagüe o el punto de entrega y el polígono de la
+ * concesión (metros). Más lejos, lo más probable es un error al tipear la coordenada. Solo se avisa.
+ */
+export const DISTANCIA_MAX_PUNTO_M = 1000;
+
 /** Superposición mínima para avisar (m²). Debajo de esto son diferencias de digitalización. */
 export const TOLERANCIA_SUPERPOSICION_M2 = 1;
 

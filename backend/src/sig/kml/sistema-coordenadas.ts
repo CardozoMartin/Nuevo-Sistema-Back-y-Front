@@ -47,6 +47,32 @@ export interface Deteccion {
 }
 
 /**
+ * Código EPSG que declara un GeoJSON en su miembro «crs» (lo agregan QGIS, AutoCAD Map y
+ * ogr2ogr cuando el archivo no está en latitud/longitud). undefined si no declara ninguno.
+ *
+ *   "urn:ogc:def:crs:EPSG::5345"           → 5345   (lo que exporta QGIS)
+ *   "EPSG:22193"                           → 22193
+ *   "http://www.opengis.net/def/crs/EPSG/0/5345" → 5345
+ *   "urn:ogc:def:crs:OGC:1.3:CRS84"        → 4326   (latitud/longitud, el estándar)
+ *
+ * Si declara algo que no se puede leer, 400: es mejor rechazarlo que adivinar.
+ */
+export function sridDeclarado(crs: unknown): number | undefined {
+  if (crs == null) return undefined;
+  const nombre = (crs as { properties?: { name?: unknown } }).properties?.name;
+  if (typeof nombre === 'string') {
+    //1.- CRS84 es latitud/longitud WGS84 con la longitud primero (el estándar de GeoJSON).
+    if (/CRS:?84$/i.test(nombre.trim())) return 4326;
+    //2.- Cualquier forma de «EPSG … número»: se toma el número del final.
+    const epsg = /EPSG\D*(?:\d+(?:\.\d+)*\D+)?(\d{4,6})\s*$/i.exec(nombre.trim());
+    if (epsg) return Number(epsg[1]);
+  }
+  throw new BadRequestException(
+    `El GeoJSON declara un sistema de coordenadas que no se reconoce (${JSON.stringify(nombre ?? crs)}). ` + 'Expórtelo desde QGIS en EPSG:5345 (POSGAR 2007 faja 3) o en EPSG:4326.',
+  );
+}
+
+/**
  * Reconoce el sistema de coordenadas de un MultiPolygon y corrige el orden de los ejes si
  * venían invertidos. Todos los vértices tienen que estar en el mismo sistema.
  */

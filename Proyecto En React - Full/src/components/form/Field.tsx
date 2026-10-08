@@ -21,9 +21,9 @@ export const errorId = (id: string) => `${id}-error`
 export function Field({ id, label, required, hint, error, hideLabel, className, children }: FieldProps) {
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <label htmlFor={id} className={cn('text-sm font-medium text-slate-900 dark:text-slate-200', hideLabel && 'sr-only')}>
+      <label htmlFor={id} className={cn('text-sm font-semibold text-slate-800 dark:text-slate-200', hideLabel && 'sr-only')}>
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-red-600" title="Obligatorio">*</span>}
       </label>
       {children}
       {error ? (

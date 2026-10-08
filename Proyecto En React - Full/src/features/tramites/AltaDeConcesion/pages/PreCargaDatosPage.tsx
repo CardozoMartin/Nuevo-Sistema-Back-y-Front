@@ -6,6 +6,7 @@ import { ROUTES } from '@/config/routes'
 import { Alert, EmptyState, ErrorState, LoadingState } from '@/components/feedback/States'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { AvisoObligatorios, EncabezadoTarjeta } from '@/components/ui/EncabezadoTarjeta'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Stepper } from '@/components/ui/Stepper'
@@ -204,6 +205,13 @@ function CargaDatos({ alta }: { alta: AltaBackend }) {
         <Stepper steps={SECCIONES} current={actual} maxReached={alcanzada} onSelect={irA} />
 
         <Card>
+          <EncabezadoTarjeta
+            antetitulo={`Paso ${actual + 1} de ${SECCIONES.length}`}
+            titulo={seccion.titulo}
+            descripcion={seccion.descripcion}
+            icono={seccion.icono}
+            extra={<AvisoObligatorios />}
+          />
           <form noValidate onSubmit={(e) => void terminar(e)} className="p-6 md:p-8">
             <seccion.Component />
           </form>

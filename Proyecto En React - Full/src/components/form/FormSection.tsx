@@ -22,9 +22,9 @@ export function FormSection({ title, icon, description, actions, variant = 'plai
         className,
       )}
     >
-      <div className="mb-4 flex items-start justify-between gap-3">
+      <div className={cn('mb-5 flex items-start justify-between gap-3', variant === 'plain' && 'border-b border-slate-200 pb-2 dark:border-slate-700')}>
         <div>
-          <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900 dark:text-white">
+          <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
             {icon && <Icon name={icon} className="text-primary" />}
             {title}
           </h3>

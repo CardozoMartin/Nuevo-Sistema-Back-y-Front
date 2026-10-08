@@ -6,6 +6,7 @@ import { Alert, ErrorState, LoadingState } from '@/components/feedback/States'
 import { FormRadioCardGroup } from '@/components/form'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { AvisoObligatorios, EncabezadoTarjeta } from '@/components/ui/EncabezadoTarjeta'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { toApiError } from '@/services/api/errors'
 import type { SituacionLegalInfo } from '@/types/domain'
@@ -71,6 +72,13 @@ export default function InicioAltaPage() {
       />
 
       <Card>
+          <EncabezadoTarjeta
+            antetitulo="Catastro · Inicio del trámite"
+            titulo="Registro del expediente"
+            descripcion="Número del expediente en papel y situación legal de quien solicita la concesión."
+            icono="post_add"
+            extra={<AvisoObligatorios />}
+          />
           {situaciones.isPending ? (
             <LoadingState mensaje="Cargando situaciones legales…" />
           ) : situaciones.isError ? (
@@ -82,7 +90,9 @@ export default function InicioAltaPage() {
 
                 <div className="flex flex-col gap-4 border-t border-slate-100 pt-6 dark:border-slate-700">
                   <div>
-                    <h2 className="text-base font-bold text-slate-900 dark:text-white">Situación legal del solicitante</h2>
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                      Situación legal del solicitante <span className="text-red-600">*</span>
+                    </h2>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                       Seleccione una opción para ver los papeles requeridos antes de continuar el expediente.
                     </p>

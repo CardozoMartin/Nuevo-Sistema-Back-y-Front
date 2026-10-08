@@ -95,6 +95,8 @@ export function SuministroFields({ prefix, ubicacion }: Props) {
               name={n(`fuentes.${i}.valor`)}
               label={i === 0 ? 'Fuente de agua' : `Fuente adicional ${i}`}
               hideLabel={i > 0}
+              // Obligatoria cuando la ubicación tiene catálogo (sin opciones, solo se cargan observación y caudal).
+              required={i === 0 && opcionesFuente.length > 0}
               placeholder="Seleccione una fuente"
               options={opcionesFuente}
               disabled={opcionesFuente.length === 0}

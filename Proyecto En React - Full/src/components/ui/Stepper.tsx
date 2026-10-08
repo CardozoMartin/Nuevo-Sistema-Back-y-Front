@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { cn } from '@/lib/cn'
 import { Icon } from './Icon'
 
@@ -15,45 +16,65 @@ interface StepperProps {
   onSelect: (index: number) => void
 }
 
-/** Pasos de un formulario largo con barra de avance. */
+/**
+ * Pasos de un formulario largo: círculos numerados unidos por una línea (como los
+ * formularios de trámites del Estado). Completo = tilde verde; actual = azul; el resto, gris.
+ * Se puede volver a cualquier paso ya alcanzado.
+ */
 export function Stepper({ steps, current, maxReached, onSelect }: StepperProps) {
-  const progreso = Math.round((current / Math.max(steps.length - 1, 1)) * 100)
+  // En pantallas angostas los pasos se desplazan: se muestra siempre el actual.
+  const actual = useRef<HTMLLIElement>(null)
+  useEffect(() => {
+    actual.current?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [current])
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-          <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progreso}%` }} />
-        </div>
-        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">{progreso}% completado</span>
-      </div>
-
-      <ol className="flex overflow-x-auto border-b border-slate-200 dark:border-slate-700">
+    <nav aria-label="Pasos del formulario" className="overflow-x-auto">
+      <ol className="flex min-w-max items-start">
         {steps.map((step, i) => {
           const activo = i === current
           const completo = i < maxReached && !activo
           const habilitado = i <= maxReached
           return (
-            <li key={step.key} className="flex-1">
+            <li key={step.key} ref={activo ? actual : undefined} className="relative flex flex-1 flex-col items-center px-2">
+              {/* Línea hacia el paso anterior (azul si ya se pasó por acá). */}
+              {i > 0 && (
+                <span
+                  aria-hidden="true"
+                  className={cn('absolute top-5 right-1/2 z-0 h-0.5 w-full -translate-y-1/2', i <= maxReached ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-600')}
+                />
+              )}
               <button
                 type="button"
                 disabled={!habilitado}
                 onClick={() => onSelect(i)}
                 aria-current={activo ? 'step' : undefined}
-                className={cn(
-                  '-mb-px flex w-full items-center justify-center gap-1.5 border-b-2 px-4 py-3.5 text-sm font-medium whitespace-nowrap transition-colors',
-                  activo && 'border-primary bg-primary/5 font-semibold text-primary',
-                  !activo && habilitado && 'border-transparent text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-primary dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800/40',
-                  !habilitado && 'cursor-not-allowed border-transparent text-slate-400 dark:text-slate-600',
-                )}
+                className="group relative z-10 flex min-w-24 flex-col items-center gap-2 disabled:cursor-not-allowed"
               >
-                {completo ? <Icon name="check_circle" filled className="text-lg! text-green-600" /> : <span>{i + 1}.</span>}
-                {step.label}
+                <span
+                  className={cn(
+                    'flex size-10 items-center justify-center rounded-full border-2 text-base font-bold transition-colors',
+                    activo && 'border-primary bg-primary text-white ring-4 ring-primary/15',
+                    completo && 'border-green-600 bg-green-600 text-white group-hover:bg-green-700',
+                    !activo && !completo && habilitado && 'border-primary bg-white text-primary group-hover:bg-primary/10 dark:bg-surface-dark',
+                    !habilitado && 'border-slate-300 bg-white text-slate-400 dark:border-slate-600 dark:bg-surface-dark',
+                  )}
+                >
+                  {completo ? <Icon name="check" className="text-xl!" /> : i + 1}
+                </span>
+                <span
+                  className={cn(
+                    'text-center text-sm whitespace-nowrap',
+                    activo ? 'font-bold text-primary' : habilitado ? 'font-medium text-slate-700 group-hover:text-primary dark:text-slate-300' : 'text-slate-400',
+                  )}
+                >
+                  {step.label}
+                </span>
               </button>
             </li>
           )
         })}
       </ol>
-    </div>
+    </nav>
   )
 }

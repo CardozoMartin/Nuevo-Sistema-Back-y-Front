@@ -9,7 +9,6 @@ import { Card } from '@/components/ui/Card'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { toApiError } from '@/services/api/errors'
 import type { SituacionLegalInfo } from '@/types/domain'
-import { AltasEnCurso } from '../components/AltasEnCurso'
 import { DocumentacionRequerida } from '../components/DocumentacionRequerida'
 import { NumeroExpedienteFields } from '../../shared/components/NumeroExpedienteFields'
 import { expedienteVacio } from '../../shared/schemas/expediente'
@@ -71,8 +70,7 @@ export default function InicioAltaPage() {
         description="Inicie el proceso de registro para una nueva concesión. Necesitará el número de expediente físico para validar la solicitud."
       />
 
-      <div className="flex flex-col gap-6">
-        <Card>
+      <Card>
           {situaciones.isPending ? (
             <LoadingState mensaje="Cargando situaciones legales…" />
           ) : situaciones.isError ? (
@@ -112,10 +110,7 @@ export default function InicioAltaPage() {
               </form>
             </FormProvider>
           )}
-        </Card>
-
-        <AltasEnCurso />
-      </div>
+      </Card>
     </>
   )
 }

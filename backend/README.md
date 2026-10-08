@@ -40,7 +40,6 @@ Cómo se generan las tablas a partir de las entidades: sección 8 de [PROCESOS_B
 | GET    | `/api/empresas/:id` | Una empresa con sus máquinas |
 | POST   | `/api/empresas`     | Alta de empresa + máquinas en una transacción. 409 si el CUIT o un código de máquina ya existen |
 | GET    | `/api/catalogos/situaciones-legales` | Situaciones legales con la documentación que exige cada una |
-| GET    | `/api/tramites/alta-concesion` | Altas en carga en Catastro |
 | POST   | `/api/tramites/alta-concesion` | Paso 1 del alta: registra el expediente en papel |
 | GET    | `/api/tramites/alta-concesion/:id` | Todo lo cargado del alta y qué pasos están completos |
 | PUT    | `/api/tramites/alta-concesion/:id/titulares` | Paso 2: titulares y domicilios |
@@ -51,8 +50,13 @@ Cómo se generan las tablas a partir de las entidades: sección 8 de [PROCESOS_B
 | GET    | `/api/catalogos/tipos-uso` | Tipos de uso con su dotación |
 | GET    | `/api/catalogos/ubicaciones` | Departamento → localidad → distritos activos (mismo formato que `/catalogoLocalidades` del mock) |
 | GET    | `/api/catalogos/suministro` | Catálogo de suministro de riego (mismo formato que `/catalogoSuministro` del mock). Con `?departamento=&localidad=&distrito=`, solo esa ubicación |
-| GET    | `/api/catalogos/suministro/zonas?sinVincular=true` | Zonas del catálogo de suministro y la localidad a la que están vinculadas |
+| GET    | `/api/catalogos/suministro/zonas?sinVincular=true&todas=true` | Zonas del catálogo de suministro y la localidad a la que están vinculadas |
+| GET    | `/api/catalogos/suministro/zonas/:id` | Ficha de la zona: fuentes, sistemas, desagües y árbol de canales, con ids (también lo dado de baja) |
+| POST / PUT | `/api/catalogos/suministro/zonas`, `/zonas/:id` | Alta de una zona (`{ departamentoId, distritoId, localidadId?, localidadOrigen? }`) / corrige su nombre de origen |
 | PUT    | `/api/catalogos/suministro/zonas/:id/localidad` | Vincula una zona a una localidad (`{ "localidadId" }`, null la desvincula). Catastro o administrador |
+| POST / PUT | `/api/catalogos/suministro/zonas/:id/opciones`, `/opciones/:id` | Alta (`{ tipo: FUENTE \| SISTEMA \| DESAGUE, nombre }`) / corrige el nombre |
+| POST / PUT | `/api/catalogos/suministro/zonas/:id/canales`, `/canales/:id` | Alta de un canal (`{ nombre, padreId? }`: sin padre es principal; hasta el quinto) / corrige el nombre |
+| DELETE / POST | `/api/catalogos/suministro/{zonas, opciones, canales}/:id`, `…/:id/reactivar` | **Baja lógica** con `{ "motivo" }` (un canal se lleva sus derivaciones) / reactivación |
 | GET / POST | `/api/catalogos/{departamentos, localidades, distritos, cuencas}` | ABM del catálogo de ubicación: listado (`?todas=true`, `?q=`; localidades también `?departamentoId=`, `?distritoId=`) y alta |
 | GET / PUT | `/api/catalogos/{…}/:id` | Uno / modificación |
 | DELETE | `/api/catalogos/{…}/:id` | **Baja lógica** con `{ "motivo" }` (mínimo 10 caracteres). Nunca se borra la fila |
@@ -73,6 +77,10 @@ Cómo se generan las tablas a partir de las entidades: sección 8 de [PROCESOS_B
 | GET    | `/api/sig/concesiones/:id` | Una concesión como Feature GeoJSON |
 | GET    | `/api/sig/concesiones/:id/kml` | El polígono vigente como KML, para Google Earth o un GPS |
 | GET    | `/api/sig/poligonos/:id/archivo` | El archivo original (KML/GeoJSON) tal como se presentó; se comprueba con su hash |
+| GET    | `/api/sig/cauces?bbox=o,s,e,n` | Ríos y canales activos, líneas simplificadas en GeoJSON WGS84 (para el visor) |
+| GET / POST | `/api/catalogos/cauces` | ABM de ríos y canales: listado sin trazado (`?todas=true`, `?q=`, `?tipo=RIO\|CANAL`, `?fuente=`) / alta `{ nombre, tipo, linea: [[x, y]…], sistema?: WGS84\|POSGAR, fuente? }` |
+| GET / PUT | `/api/catalogos/cauces/:id` | Uno con su trazado completo / modificación (solo lo que cambia; con `linea`, el trazado nuevo) |
+| DELETE / POST | `/api/catalogos/cauces/:id`, `…/:id/reactivar` | **Baja lógica** con `{ "motivo" }` (sale del visor y de los avisos) / reactivación |
 | POST   | `/api/sig/kml/analizar` | Vista previa de un KML/GeoJSON: valida, mide y detecta superposiciones sin guardar |
 
 **Catálogo de ubicación (ABM).** Lo modifican usuarios de Catastro o administradores. Los nombres se guardan en
@@ -184,7 +192,12 @@ npm run sig:cauces      # carga recursos/sig/cauces-osm.json (OpenStreetMap) en 
 
 Es la capa «Ríos y canales» del visor y se ve también en QGIS. Cuando la DRH tenga su propia
 capa de cauces y canales de riego, se carga con otra fuente
-(`npm run migracion -- cargar-cauces <archivo.json> --fuente DRH`).
+(`npm run migracion -- cargar-cauces <archivo.json> --fuente DRH`). La carga de un archivo
+**da de baja** los cauces anteriores de esa misma fuente (no los borra).
+
+Un río o canal suelto se agrega, corrige o da de baja por la API (`/api/catalogos/cauces`, ver la
+tabla de endpoints). Si no se indica `fuente`, queda como `DRH`: una carga posterior de un archivo
+con `--fuente DRH` también lo da de baja.
 
 ## Datos de prueba y padrón
 
@@ -212,4 +225,5 @@ reglas y comandos en [docs/migracion.md](docs/migracion.md).
   contenedor (`CREATE DATABASE …` + `CREATE EXTENSION postgis` y `DB_NAME` en el `.env`).
 - Catálogos (`cat_`) y sus FKs; resto del circuito de empresas (dictamen, resolución, observar, bajas, historial).
 - Catálogo de suministro: 78 zonas de la DRH sin vincular a una localidad (`GET /api/catalogos/suministro/zonas?sinVincular=true`).
+- Pantallas de administración de catálogos (ubicación, suministro, cauces): hoy solo por la API.
 - Conectar el frontend: apuntar `VITE_API_URL` a `http://localhost:3000/api` cuando los endpoints cubran lo que usa cada pantalla.

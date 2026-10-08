@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, In, type DeepPartial, type EntityManager, type EntityTarget, type FindOptionsWhere } from 'typeorm';
+import { DataSource, type DeepPartial, type EntityManager, type EntityTarget, type FindOptionsWhere } from 'typeorm';
 import { cargarDatosVigentes } from '../../concesiones/datos-vigentes.js';
 import { Concesion } from '../../concesiones/entities/concesion.entity.js';
 import type { Condicion } from '../../concesiones/entities/condicion.entity.js';
@@ -9,7 +9,7 @@ import { PoligonosService } from '../../concesiones/poligonos.service.js';
 import { DocumentacionPresentada } from '../../expedientes/entities/documentacion-presentada.entity.js';
 import { Expediente } from '../../expedientes/entities/expediente.entity.js';
 import { SolicitudNumero } from '../../expedientes/entities/solicitud-numero.entity.js';
-import { EstadoExpediente, Etapa, formatearNumeroExpediente, NOMBRE_ETAPA, Oficina, TipoTramite } from '../../expedientes/expedientes.constantes.js';
+import { EstadoExpediente, Etapa, NOMBRE_ETAPA, TipoTramite } from '../../expedientes/expedientes.constantes.js';
 import { ExpedientesService } from '../../expedientes/expedientes.service.js';
 import type { Usuario } from '../../seguridad/entities/usuario.entity.js';
 import { GeometriaService } from '../../sig/geometria.service.js';
@@ -57,32 +57,6 @@ export class AltaConcesionService {
     private readonly geometria: GeometriaService,
     private readonly poligonos: PoligonosService,
   ) {}
-
-  /** Altas que Catastro está cargando o corrigiendo (la lista «altas en curso»). */
-  async listarEnCarga() {
-    //1.- Expedientes de alta en Catastro, en carga o en corrección, los últimos tocados primero.
-    const expedientes = await this.dataSource.manager.find(Expediente, {
-      where: {
-        tipoTramite: TipoTramite.ALTA_CONCESION,
-        oficinaActual: Oficina.CATASTRO,
-        etapa: In([Etapa.CARGA, Etapa.CORRECCION]),
-        estado: In([EstadoExpediente.EN_TRAMITE, EstadoExpediente.OBSERVADO]),
-      },
-      order: { modificadoEn: 'DESC' },
-    });
-
-    //2.- Lo que muestra la lista.
-    return expedientes.map((e) => ({
-      id: e.id,
-      numeroExpediente: formatearNumeroExpediente(e.numero, e.reparticion, e.anio),
-      etapa: e.etapa,
-      estado: e.estado,
-      titular: e.solicitanteNombre,
-      documento: e.solicitanteDocumento,
-      fechaIngreso: e.fechaIngreso,
-      actualizado: e.modificadoEn,
-    }));
-  }
 
   /** Todo lo cargado en un alta (cualquiera sea la oficina en que esté). */
   async obtener(expedienteId: string): Promise<RespuestaAlta> {

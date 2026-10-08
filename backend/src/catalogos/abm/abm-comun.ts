@@ -1,4 +1,5 @@
-// Piezas comunes del ABM del catálogo de ubicación: nombres, permisos, baja lógica y respuesta.
+// Piezas comunes de los ABM de catálogos (ubicación, suministro de riego, cauces): nombres,
+// permisos, baja lógica y respuesta.
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Oficina } from '../../expedientes/expedientes.constantes.js';
 import type { Usuario } from '../../seguridad/entities/usuario.entity.js';
@@ -20,7 +21,7 @@ export function normalizarNombre(texto: string): string {
 export async function exigirAdministradorDeCatalogo(usuarios: UsuariosService, usuarioId: string): Promise<Usuario> {
   const usuario = await usuarios.obtener(usuarioId);
   if (!usuario.esAdministrador && usuario.oficina?.codigo !== Oficina.CATASTRO) {
-    throw new ForbiddenException('Solo Catastro (o un administrador) puede modificar el catálogo de ubicación.');
+    throw new ForbiddenException('Solo Catastro (o un administrador) puede modificar los catálogos.');
   }
   return usuario;
 }

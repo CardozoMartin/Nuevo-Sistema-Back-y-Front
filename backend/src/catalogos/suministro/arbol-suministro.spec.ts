@@ -34,6 +34,12 @@ describe('Catálogo de suministro: lectura del archivo de la DRH', () => {
     expect(datos.cascada).toMatchObject({ MATRIZ: { 'DVDO. NORTE': { 'LOS RALOS': { 'COMPUERTA 1': [], 'CPTA.7': ['PROPIO'] } } } });
   });
 
+  it('junta los canales hermanos que quedan con el mismo nombre al normalizar (no pisa el primero)', () => {
+    // Caso real: Talamuyo (Juan B. Alberdi, distrito VI) trae «DVDO. NORTE» y «DVDO.  NORTE».
+    const repetido = { B: { L: { VI: { cascada: { MATRIZ: { 'DVDO. NORTE': { 'LOS RALOS': { 'COMPUERTA 27': ['PROPIO'] } }, 'DVDO.  NORTE': { 'LOS RALOS': {} } } } } } } };
+    expect(normalizarCatalogo(repetido).B.L.VI.cascada).toEqual({ MATRIZ: { 'DVDO. NORTE': { 'LOS RALOS': { 'COMPUERTA 27': ['PROPIO'] } } } });
+  });
+
   it('descarta los textos de la página web que vinieron mezclados como canales', () => {
     const descartados: string[] = [];
     const conBasura = { B: { L: { II: { canalesPrincipales: { MATRIZ: ['DVDO. NORTE', '2. COSTO: ESTAMPILLAS PROVINCIALES $ 30'] }, cascada: { MATRIZ: { FORMULARIOS: {} } } } } } };

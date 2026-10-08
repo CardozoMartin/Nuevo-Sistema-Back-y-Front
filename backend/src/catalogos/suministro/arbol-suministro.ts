@@ -78,11 +78,22 @@ export function normalizarCatalogo(crudo: Record<string, Record<string, Record<s
     return false;
   };
   const lista = (xs: unknown) => [...new Set((Array.isArray(xs) ? xs : []).map(normalizarValor).filter(valido))].sort(alfabetico.compare);
+  // Dos canales hermanos pueden quedar con el mismo nombre al normalizar («DVDO.  NORTE» y
+  // «DVDO. NORTE»): se juntan sus derivaciones en lugar de pisar las del primero.
+  const comoNodo = (n: NodoCascada | string[]): NodoCascada => (Array.isArray(n) ? Object.fromEntries(n.map((h) => [h, {}])) : n);
+  const juntar = (a: NodoCascada | string[], b: NodoCascada | string[]): NodoCascada | string[] => {
+    if (Array.isArray(a) && Array.isArray(b)) return lista([...a, ...b]);
+    const salida = { ...comoNodo(a) };
+    for (const [nombre, hijos] of Object.entries(comoNodo(b))) salida[nombre] = nombre in salida ? juntar(salida[nombre], hijos) : hijos;
+    return salida;
+  };
   const cascada = (nodo: unknown): NodoCascada => {
     const salida: NodoCascada = {};
     for (const [canal, hijos] of Object.entries((nodo ?? {}) as Record<string, unknown>)) {
       const nombre = normalizarValor(canal);
-      if (valido(nombre)) salida[nombre] = Array.isArray(hijos) ? lista(hijos) : cascada(hijos);
+      if (!valido(nombre)) continue;
+      const normalizado = Array.isArray(hijos) ? lista(hijos) : cascada(hijos);
+      salida[nombre] = nombre in salida ? juntar(salida[nombre], normalizado) : normalizado;
     }
     return salida;
   };

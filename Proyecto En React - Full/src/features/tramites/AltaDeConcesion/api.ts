@@ -7,7 +7,6 @@
 import { backend } from '@/services/api/backend'
 import type {
   AltaBackend,
-  AltaEnCarga,
   DeudaBackend,
   EntradaHistorial,
   ExpedienteEnBandeja,
@@ -30,7 +29,6 @@ const datos = <T>(p: Promise<{ data: T }>) => p.then((r) => r.data)
 export const altaConcesionApi = {
   // --- Catálogos y consultas ---------------------------------------------------
   situacionesLegales: () => datos(backend.get<SituacionLegalBackend[]>('/catalogos/situaciones-legales')),
-  listarEnCarga: () => datos(backend.get<AltaEnCarga[]>(ALTA)),
   obtener: (id: string) => datos(backend.get<AltaBackend>(`${ALTA}/${id}`)),
 
   // --- Catastro: carga (una sección por PUT) -------------------------------------

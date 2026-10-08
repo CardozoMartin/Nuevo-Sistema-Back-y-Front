@@ -40,12 +40,6 @@ export class AltaConcesionController {
   // Consultas
   // ---------------------------------------------------------------------------
 
-  /** Altas que Catastro está cargando o corrigiendo. */
-  @Get()
-  listarEnCarga() {
-    return this.alta.listarEnCarga();
-  }
-
   /** Todo lo cargado del alta, dónde está y qué pasos de la carga están completos. */
   @Get(':id')
   obtener(@Param('id', ParseIntPipe) id: number) {

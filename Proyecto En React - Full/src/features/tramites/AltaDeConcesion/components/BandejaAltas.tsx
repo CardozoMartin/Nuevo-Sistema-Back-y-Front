@@ -15,7 +15,8 @@ const ESTADO: Partial<Record<EstadoExpedienteBackend, { texto: string; color: st
 
 /**
  * Altas de concesión que están en la oficina (backend real). Va arriba de la bandeja de los
- * demás trámites, que todavía usan los datos de demostración.
+ * demás trámites, que todavía usan los datos de demostración. En Catastro incluye las altas en
+ * carga y las devueltas para corregir: desde el expediente se continúa o se corrige la carga.
  */
 export function BandejaAltas({ oficina }: { oficina: OficinaBackend }) {
   const navigate = useNavigate()

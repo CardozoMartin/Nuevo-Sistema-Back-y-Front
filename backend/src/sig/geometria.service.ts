@@ -36,7 +36,7 @@ export interface AnalisisGeometria {
   /** Coordenadas POSGAR del punto interior (las que usa la oficina en los papeles). */
   puntoInteriorPosgar: { x: number; y: number };
   superposiciones: Superposicion[];
-  /** Río o canal más cercano (capa sig.cauce). null si la capa no está cargada. */
+  /** Río o canal activo más cercano (capa sig.cauce). null si la capa no está cargada. */
   cauceCercano: { nombre: string | null; tipo: 'RIO' | 'CANAL'; distanciaM: number } | null;
 }
 
@@ -183,7 +183,7 @@ export class GeometriaService {
     // Paso 5: río o canal más cercano (las concesiones van a la vera de los cauces).
     const [cauce] = await tx.query(
       `WITH g AS (SELECT ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($1), ${SRID_WGS84}), ${SRID_POSGAR}) AS geom)
-       SELECT c.nombre, c.tipo, ST_Distance(c.geom, g.geom) AS m FROM sig.cauce c, g ORDER BY ST_Distance(c.geom, g.geom) LIMIT 1`,
+       SELECT c.nombre, c.tipo, ST_Distance(c.geom, g.geom) AS m FROM sig.cauce c, g WHERE c.activo ORDER BY ST_Distance(c.geom, g.geom) LIMIT 1`,
       [geojson],
     );
 

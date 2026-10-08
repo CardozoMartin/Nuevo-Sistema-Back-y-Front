@@ -10,7 +10,6 @@ import type { AltaBackend, OficinaBackend } from './backend.types'
 export const altaKeys = {
   all: ['backend', 'altas'] as const,
   situaciones: () => [...altaKeys.all, 'situaciones-legales'] as const,
-  enCarga: () => [...altaKeys.all, 'en-carga'] as const,
   alta: (id: string) => [...altaKeys.all, 'alta', id] as const,
   historial: (id: string) => [...altaKeys.all, 'historial', id] as const,
   bandejas: () => [...altaKeys.all, 'bandeja'] as const,
@@ -22,10 +21,6 @@ export const altaKeys = {
 
 export function useSituacionesLegales() {
   return useQuery({ queryKey: altaKeys.situaciones(), queryFn: altaConcesionApi.situacionesLegales, staleTime: Infinity })
-}
-
-export function useAltasEnCarga() {
-  return useQuery({ queryKey: altaKeys.enCarga(), queryFn: altaConcesionApi.listarEnCarga })
 }
 
 export function useAlta(id: string | undefined) {
@@ -55,7 +50,6 @@ function useAlActualizar(id: string) {
     else void qc.invalidateQueries({ queryKey: altaKeys.alta(id) })
     void qc.invalidateQueries({ queryKey: altaKeys.historial(id) })
     void qc.invalidateQueries({ queryKey: altaKeys.bandejas() })
-    void qc.invalidateQueries({ queryKey: altaKeys.enCarga() })
   }
 }
 
@@ -65,7 +59,8 @@ export function useIniciarAlta() {
     mutationFn: altaConcesionApi.iniciar,
     onSuccess: (alta) => {
       qc.setQueryData(altaKeys.alta(alta.id), alta)
-      void qc.invalidateQueries({ queryKey: altaKeys.enCarga() })
+      // El alta nueva queda en la bandeja de Catastro (en carga).
+      void qc.invalidateQueries({ queryKey: altaKeys.bandejas() })
     },
   })
 }

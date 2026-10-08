@@ -3,7 +3,8 @@ import { USUARIO_SISTEMA } from '../../comun/usuario-sistema.js';
 
 /**
  * Columnas comunes de las filas de un catálogo que se administra desde la API
- * (departamentos, localidades, distritos, cuencas): autoría y BAJA LÓGICA.
+ * (departamentos, localidades, distritos, cuencas, el catálogo de suministro y los cauces):
+ * autoría y BAJA LÓGICA.
  *
  * Nada se borra (RN-A04): dar de baja es poner activo = false con el motivo, la fecha y
  * quién lo hizo. Una fila dada de baja deja de ofrecerse para las cargas nuevas, pero las

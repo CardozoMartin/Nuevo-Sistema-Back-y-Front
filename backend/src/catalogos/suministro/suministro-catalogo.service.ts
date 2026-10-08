@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import { DataSource, IsNull, Not, type EntityManager } from 'typeorm';
 import { UsuariosService } from '../../seguridad/usuarios.service.js';
-import { exigirAdministradorDeCatalogo, exigirExistente } from '../abm/abm-comun.js';
+import { exigirActiva, exigirAdministradorDeCatalogo, exigirExistente } from '../abm/abm-comun.js';
 import { leerSuministroInicial } from '../catalogos.seed.js';
 import { Departamento } from '../entities/departamento.entity.js';
 import { Distrito } from '../entities/distrito.entity.js';
@@ -35,8 +35,10 @@ export interface ZonaListada {
   distrito: string;
   localidadOrigen: string;
   localidad: { id: number; nombre: string } | null;
+  /** Fuentes y canales activos de la zona. */
   fuentes: number;
   canales: number;
+  activo: boolean;
 }
 
 /**
@@ -153,23 +155,30 @@ export class SuministroCatalogoService {
     return zona ? (await this.datosDeZonas(tx, [zona.id])).get(zona.id)! : null;
   }
 
-  /** Arma las listas y la cascada de varias zonas con dos consultas (no una por zona). */
+  /** Arma las listas y la cascada de varias zonas con dos consultas (no una por zona). Solo lo activo. */
   private async datosDeZonas(tx: EntityManager, zonaIds: number[]): Promise<Map<number, DatosSuministro>> {
-    //1.- Las listas simples y los canales de todas las zonas.
+    //1.- Las listas simples y los canales activos de todas las zonas.
     const opciones: { zona_id: number; tipo: TipoOpcionSuministro; nombre: string }[] = await tx.query(
-      `SELECT zona_id, tipo, nombre FROM cat_suministro_opcion WHERE zona_id = ANY($1)`,
+      `SELECT zona_id, tipo, nombre FROM cat_suministro_opcion WHERE zona_id = ANY($1) AND activo`,
       [zonaIds],
     );
     const canales: { id: number; zona_id: number; padre_id: number | null; nombre: string }[] = await tx.query(
-      `SELECT id, zona_id, padre_id, nombre FROM cat_suministro_canal WHERE zona_id = ANY($1) ORDER BY nivel`,
+      `SELECT id, zona_id, padre_id, nombre FROM cat_suministro_canal WHERE zona_id = ANY($1) AND activo ORDER BY nivel`,
       [zonaIds],
     );
 
     //2.- El árbol de canales de cada zona, armado en memoria (los padres vienen antes que los hijos).
+    //    Un canal cuyo padre está de baja no se ofrece (la baja va en cascada, pero por las dudas).
     const alfabetico = new Intl.Collator('es').compare;
-    const nodos = new Map(canales.map((c) => [c.id, { nombre: c.nombre, hijos: [] as CanalArbol[] }]));
+    const nodos = new Map<number, CanalArbol>();
     const raices = new Map<number, CanalArbol[]>(zonaIds.map((id) => [id, []]));
-    for (const c of canales) (c.padre_id ? nodos.get(c.padre_id)!.hijos : raices.get(c.zona_id)!).push(nodos.get(c.id)!);
+    for (const c of canales) {
+      const destino = c.padre_id ? nodos.get(c.padre_id)?.hijos : raices.get(c.zona_id);
+      if (!destino) continue;
+      const nodo = { nombre: c.nombre, hijos: [] };
+      nodos.set(c.id, nodo);
+      destino.push(nodo);
+    }
     const ordenar = (lista: CanalArbol[]) => lista.sort((a, b) => alfabetico(a.nombre, b.nombre)).forEach((c) => ordenar(c.hijos));
 
     //3.- Cada zona con sus listas ordenadas como las muestra el formulario.
@@ -219,19 +228,23 @@ export class SuministroCatalogoService {
   // Administración: vincular zonas a localidades
   // ---------------------------------------------------------------------------
 
-  /** Zonas del catálogo; `sinVincular` = las que todavía no tienen localidad (para revisarlas). */
-  async listarZonas(filtro: { sinVincular?: boolean; id?: number } = {}): Promise<ZonaListada[]> {
+  /**
+   * Zonas del catálogo; `sinVincular` = las que todavía no tienen localidad (para revisarlas);
+   * `todas` = también las dadas de baja.
+   */
+  async listarZonas(filtro: { sinVincular?: boolean; todas?: boolean; id?: number } = {}): Promise<ZonaListada[]> {
     const filas: (Omit<ZonaListada, 'localidad'> & { localidad_id: number | null; localidad: string | null })[] = await this.dataSource.query(
       `SELECT z.id, d.nombre AS departamento, di.codigo AS distrito, z.localidad_origen AS "localidadOrigen",
-              z.localidad_id, l.nombre AS localidad,
-              (SELECT count(*) FROM cat_suministro_opcion o WHERE o.zona_id = z.id AND o.tipo = 'FUENTE')::int AS fuentes,
-              (SELECT count(*) FROM cat_suministro_canal c WHERE c.zona_id = z.id)::int AS canales
+              z.localidad_id, l.nombre AS localidad, z.activo,
+              (SELECT count(*) FROM cat_suministro_opcion o WHERE o.zona_id = z.id AND o.tipo = 'FUENTE' AND o.activo)::int AS fuentes,
+              (SELECT count(*) FROM cat_suministro_canal c WHERE c.zona_id = z.id AND c.activo)::int AS canales
          FROM cat_suministro_zona z
          JOIN cat_departamento d ON d.id = z.departamento_id
          JOIN cat_distrito di ON di.id = z.distrito_id
          LEFT JOIN cat_localidad l ON l.id = z.localidad_id
-        WHERE z.activo AND ($1::boolean IS NOT TRUE OR z.localidad_id IS NULL) AND ($2::int IS NULL OR z.id = $2)`,
-      [filtro.sinVincular ?? null, filtro.id ?? null],
+        WHERE ($3::boolean IS TRUE OR $2::int IS NOT NULL OR z.activo)
+          AND ($1::boolean IS NOT TRUE OR z.localidad_id IS NULL) AND ($2::int IS NULL OR z.id = $2)`,
+      [filtro.sinVincular ?? null, filtro.id ?? null, filtro.todas ?? null],
     );
     const alfabetico = new Intl.Collator('es').compare;
     return filas
@@ -251,6 +264,7 @@ export class SuministroCatalogoService {
     await this.dataSource.transaction(async (tx) => {
       //1.- La zona.
       const zona = exigirExistente(await tx.findOne(SuministroZona, { where: { id: zonaId }, relations: { departamento: true, distrito: true } }), 'la zona de suministro');
+      exigirActiva(zona, `La zona de suministro «${zona.localidadOrigen}»`);
 
       //2.- La localidad, del mismo departamento y distrito.
       let localidad: Localidad | null = null;

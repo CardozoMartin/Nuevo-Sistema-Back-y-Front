@@ -1,7 +1,6 @@
-import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Put, Query } from '@nestjs/common';
-import { UsuarioActual } from '../seguridad/usuario-actual.decorator.js';
+import { BadRequestException, Controller, Get, Query } from '@nestjs/common';
 import { CatalogosService } from './catalogos.service.js';
-import { FiltroZonasDto, UbicacionSuministroDto, VincularZonaDto } from './dto/suministro.dto.js';
+import { UbicacionSuministroDto } from './dto/suministro.dto.js';
 import { SuministroCatalogoService } from './suministro/suministro-catalogo.service.js';
 import { UbicacionesService } from './ubicaciones.service.js';
 
@@ -28,23 +27,7 @@ export class CatalogosController {
     return this.suministro.datosPara(ubicacion.localidad.id, ubicacion.distrito.id);
   }
 
-  /**
-   * GET /api/catalogos/suministro/zonas?sinVincular=true: las zonas del catálogo de la DRH con la
-   * localidad a la que están vinculadas. Las que no tienen localidad no se ofrecen en el formulario.
-   */
-  @Get('suministro/zonas')
-  zonasSuministro(@Query() filtro: FiltroZonasDto) {
-    return this.suministro.listarZonas({ sinVincular: filtro.sinVincular });
-  }
-
-  /**
-   * PUT /api/catalogos/suministro/zonas/:id/localidad { localidadId }: vincula una zona del
-   * catálogo de la DRH a una localidad (ej: «TRANCAS» → «VILLA DE TRANCAS»). Catastro o administrador.
-   */
-  @Put('suministro/zonas/:id/localidad')
-  vincularZona(@Param('id', ParseIntPipe) id: number, @Body() dto: VincularZonaDto, @UsuarioActual() usuarioId: string) {
-    return this.suministro.vincular(id, dto.localidadId, usuarioId);
-  }
+  // Las zonas del catálogo de suministro (listado, vinculación y ABM) están en AbmSuministroController.
 
   /**
    * GET /api/catalogos/ubicaciones: departamento → localidad → distritos, en el mismo formato

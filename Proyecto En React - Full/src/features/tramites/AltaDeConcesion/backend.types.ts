@@ -93,17 +93,6 @@ export interface AltaBackend {
   pasos: Record<'inicio' | 'titulares' | 'ubicacion' | 'inmueble' | 'usos' | 'suministro', boolean>
 }
 
-export interface AltaEnCarga {
-  id: string
-  numeroExpediente: string
-  etapa: EtapaCircuito
-  estado: EstadoExpedienteBackend
-  titular: string | null
-  documento: string | null
-  fechaIngreso: string
-  actualizado: string
-}
-
 export interface SituacionLegalBackend {
   codigo: string
   nombre: string

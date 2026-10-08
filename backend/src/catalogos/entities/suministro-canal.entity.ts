@@ -1,4 +1,5 @@
 import { Check, Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, type Relation } from 'typeorm';
+import { CHECK_BAJA, FilaCatalogo } from './fila-catalogo.js';
 import { SuministroZona } from './suministro-zona.entity.js';
 
 /** Nombre de cada nivel del árbol de canales (el nivel 1 es el canal principal). */
@@ -17,13 +18,16 @@ export const NIVELES_CANAL = ['canal principal', 'canal secundario', 'canal terc
  * Cada canal apunta a su padre; los principales no tienen padre. Un mismo nombre puede
  * aparecer en distintas ramas («PROPIO»): lo que es único es el nombre dentro de su padre.
  * El suministro de una concesión tiene que ser un camino de este árbol, desde la raíz.
+ *
+ * Con baja lógica: dar de baja un canal da de baja también todo lo que deriva de él.
  */
 @Entity('cat_suministro_canal')
 // Únicos: el nombre entre los principales de la zona, y el nombre entre los hijos de un canal.
 @Index('uk_suministro_canal_principal', ['zona', 'nombre'], { unique: true, where: 'padre_id IS NULL' })
 @Index('uk_suministro_canal_hijo', ['padre', 'nombre'], { unique: true, where: 'padre_id IS NOT NULL' })
 @Check('chk_suministro_canal_nivel', 'nivel BETWEEN 1 AND 5 AND ((padre_id IS NULL) = (nivel = 1))')
-export class SuministroCanal {
+@Check('chk_suministro_canal_baja', CHECK_BAJA)
+export class SuministroCanal extends FilaCatalogo {
   @PrimaryGeneratedColumn()
   id: number;
 

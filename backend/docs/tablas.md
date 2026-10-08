@@ -1,6 +1,6 @@
 # Tablas de la base `drh_sistema`
 
-> Generado con `npm run db:tablas` el 7/10/2026, 12:52:20. **No editar a mano:** se vuelve a generar.
+> Generado con `npm run db:tablas` el 8/10/2026, 11:56:36. **No editar a mano:** se vuelve a generar.
 > Las tablas las crea TypeORM a partir de las entidades (`src/**/entities/*.entity.ts`); ver «Cómo se generan las tablas» en `PROCESOS_BACKEND.md`.
 
 ## Catálogos (`cat_`)
@@ -134,6 +134,14 @@
 | `nombre` | character varying(120) | sí |  |  |
 | `zona_id` | integer | sí |  | FK → cat_suministro_zona.id |
 | `padre_id` | integer | no |  | FK → cat_suministro_canal.id |
+| `activo` | boolean | sí | true |  |
+| `creado_usuario_id` | bigint | sí | '1'::bigint |  |
+| `creado_en` | timestamp with time zone | sí | now() |  |
+| `modificado_usuario_id` | bigint | no |  |  |
+| `modificado_en` | timestamp with time zone | sí | now() |  |
+| `baja_motivo` | text | no |  |  |
+| `baja_en` | timestamp with time zone | no |  |  |
+| `baja_usuario_id` | bigint | no |  |  |
 
 **Índices**
 
@@ -142,6 +150,7 @@
 
 **Controles (CHECK)**
 
+- `chk_suministro_canal_baja`: CHECK ((activo OR ((baja_motivo IS NOT NULL) AND (baja_en IS NOT NULL))))
 - `chk_suministro_canal_nivel`: CHECK ((((nivel >= 1) AND (nivel <= 5)) AND ((padre_id IS NULL) = (nivel = 1))))
 
 ### `cat_suministro_opcion`
@@ -152,10 +161,22 @@
 | `tipo` | cat_tipo_opcion_suministro | sí |  |  |
 | `nombre` | character varying(120) | sí |  |  |
 | `zona_id` | integer | sí |  | FK → cat_suministro_zona.id |
+| `activo` | boolean | sí | true |  |
+| `creado_usuario_id` | bigint | sí | '1'::bigint |  |
+| `creado_en` | timestamp with time zone | sí | now() |  |
+| `modificado_usuario_id` | bigint | no |  |  |
+| `modificado_en` | timestamp with time zone | sí | now() |  |
+| `baja_motivo` | text | no |  |  |
+| `baja_en` | timestamp with time zone | no |  |  |
+| `baja_usuario_id` | bigint | no |  |  |
 
 **Índices**
 
 - `uk_suministro_opcion`: UNIQUE USING btree (zona_id, tipo, nombre)
+
+**Controles (CHECK)**
+
+- `chk_suministro_opcion_baja`: CHECK ((activo OR ((baja_motivo IS NOT NULL) AND (baja_en IS NOT NULL))))
 
 ### `cat_suministro_zona`
 

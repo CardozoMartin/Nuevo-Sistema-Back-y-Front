@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AbmCaucesController } from './abm-cauces.controller.js';
 import { ArchivosService } from './archivos.service.js';
 import { CapasService } from './capas.service.js';
 import { CaucesService } from './cauces.service.js';
@@ -15,11 +16,11 @@ import { SigController } from './sig.controller.js';
  *   - CapasService: publica las capas para la web en GeoJSON.
  *   - ArchivosService: guarda los archivos originales (KML) fuera de la base.
  *   - Vistas sig.v_concesiones y sig.v_pozos, y la tabla sig.cauce (ríos y canales): las capas
- *     que leen QGIS y la web.
+ *     que leen QGIS y la web. Los cauces tienen su ABM por la API (AbmCaucesController).
  */
 @Module({
   imports: [TypeOrmModule.forFeature([VistaConcesion, VistaPozo, Cauce])],
-  controllers: [SigController],
+  controllers: [SigController, AbmCaucesController],
   providers: [GeometriaService, CapasService, CaucesService, ArchivosService],
   exports: [GeometriaService, ArchivosService, CaucesService],
 })

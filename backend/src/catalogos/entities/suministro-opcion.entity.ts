@@ -1,4 +1,5 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, type Relation } from 'typeorm';
+import { Check, Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, type Relation } from 'typeorm';
+import { CHECK_BAJA, FilaCatalogo } from './fila-catalogo.js';
 import { SuministroZona } from './suministro-zona.entity.js';
 
 /** Las tres listas simples de cada zona del catálogo de suministro. */
@@ -11,10 +12,14 @@ export enum TipoOpcionSuministro {
   DESAGUE = 'DESAGUE',
 }
 
-/** Una opción de una lista de la zona (cat_suministro_opcion): fuente, sistema o desagüe. */
+/**
+ * Una opción de una lista de la zona (cat_suministro_opcion): fuente, sistema o desagüe.
+ * Con baja lógica: dada de baja deja de ofrecerse, y las concesiones que ya la tienen la conservan.
+ */
 @Entity('cat_suministro_opcion')
 @Index('uk_suministro_opcion', ['zona', 'tipo', 'nombre'], { unique: true })
-export class SuministroOpcion {
+@Check('chk_suministro_opcion_baja', CHECK_BAJA)
+export class SuministroOpcion extends FilaCatalogo {
   @PrimaryGeneratedColumn()
   id: number;
 

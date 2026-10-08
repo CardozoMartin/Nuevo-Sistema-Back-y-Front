@@ -1,5 +1,6 @@
 import { Check, Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import type { LineString } from 'geojson';
+import { CHECK_BAJA, FilaCatalogo } from '../../catalogos/entities/fila-catalogo.js';
 
 /**
  * Ríos y canales (sig.cauce): capa de referencia del visor y de QGIS. Está en el esquema «sig»
@@ -8,10 +9,14 @@ import type { LineString } from 'geojson';
  * Hoy se carga del trazado de OpenStreetMap (recursos/sig/cauces-osm.json, npm run sig:cauces).
  * Cuando la DRH tenga su propia capa de cauces y canales de riego, se carga con otra `fuente`
  * y conviven (o se reemplaza la de OSM).
+ *
+ * Se administra por la API (POST/PUT/DELETE /api/catalogos/cauces), con baja lógica: un cauce
+ * dado de baja deja de verse en el visor y de usarse para los avisos, pero la fila queda.
  */
 @Entity({ schema: 'sig', name: 'cauce' })
 @Check('chk_cauce_tipo', `tipo IN ('RIO', 'CANAL')`)
-export class Cauce {
+@Check('chk_cauce_baja', CHECK_BAJA)
+export class Cauce extends FilaCatalogo {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -23,7 +28,7 @@ export class Cauce {
   @Column({ length: 10 })
   tipo: 'RIO' | 'CANAL';
 
-  /** De dónde salió el trazado (ej: «OpenStreetMap»). La carga reemplaza los de la misma fuente. */
+  /** De dónde salió el trazado (ej: «OpenStreetMap», «DRH»). La carga de un archivo reemplaza los de la misma fuente. */
   @Column({ length: 60 })
   fuente: string;
 

@@ -8,7 +8,7 @@ La documentación técnica del backend (puesta en marcha, endpoints, PostGIS, es
 (`backend/src/tramites/<tramite>/README.md`). El estado del frontend está en
 [Proyecto En React - Full/ESTADO_MIGRACION.md](Proyecto%20En%20React%20-%20Full/ESTADO_MIGRACION.md).
 
-**Última actualización:** 07/10/2026 — revisión integral del alta (6.4): archivo del polígono (sistema declarado, descarga, KML), visor, catálogo de suministro de la DRH en la base, cierre «solo completar», polígono obligatorio al cierre y titulares nuevos vuelven a Recaudación.
+**Última actualización:** 08/10/2026 — ABM por la API del catálogo de suministro (zonas, fuentes/sistemas/desagües y árbol de canales) y de los ríos y canales (`sig.cauce`), con baja lógica (6.5); corregida la carga del árbol (dos canales que se perdían). Antes, 07/10/2026: revisión integral del alta (6.4).
 
 ---
 
@@ -40,7 +40,8 @@ La documentación técnica del backend (puesta en marcha, endpoints, PostGIS, es
 | SIG: KML/GeoJSON, validación PostGIS, POSGAR 07, vistas `sig.v_concesiones` / `sig.v_pozos`, cauces, QGIS | ✅ Hecho | ✅ |
 | Migración del padrón (importador, lotes, datos demo) | ✅ Hecho (falta el padrón real) | — |
 | **Alta de Concesión** — circuito completo; tablas con historial y carga reorganizada por pasos (6.1); oficinas como servicios reutilizables, aviso de deuda por correo y N° de concesión pedido a Catastro (6.3); revisión integral: archivo, visor, suministro contra el catálogo, cierre (6.4) | ✅ Hecho | ✅ |
-| Catálogo de suministro de riego (árbol de la DRH) en la base, con validación y vinculación de zonas (6.4) | ✅ Hecho (78 zonas por vincular) | ✅ (mock) |
+| Catálogo de suministro de riego (árbol de la DRH) en la base, con validación y vinculación de zonas (6.4) y **ABM con baja lógica** (6.5) | ✅ Hecho (78 zonas por vincular) | ✅ (mock, sin ABM) |
+| Ríos y canales (`sig.cauce`) con **ABM y baja lógica** por la API (6.5) | ✅ Hecho | — |
 | Catálogos de ubicación (departamentos, localidades, distritos, cuencas) con **ABM y baja lógica** (6.2) | ✅ Hecho | ✅ (mock, sin ABM) |
 | **Baja de Pozo** — de oficio y a solicitud | ✅ Hecho | ⏳ |
 | Pozos (tabla, importación, búsqueda, ficha, capa) | 🟡 Parcial | ⏳ |
@@ -659,6 +660,60 @@ puras + service), `catalogos/entities/suministro-*.entity.ts`, `tramites/alta-co
 La base `drh_sistema` del contenedor tenía el esquema anterior a 6.1 (con 1 expediente) y `DB_SYNCHRONIZE` no puede
 actualizarla (deuda técnica 1). No se tocó: se creó `drh_nuevo` en el mismo contenedor y el `.env` local apunta ahí
 (`DB_NAME=drh_nuevo`), con los catálogos, los cauces y los datos de prueba cargados.
+
+### 6.5 ABM del catálogo de suministro y de los ríos y canales
+
+> **Estado:** hecho (08/10/2026). Pedido: poder agregar, corregir y dar de baja lo que haga falta del
+> catálogo de suministro (zonas, fuentes, canales…) y de los ríos y canales, **solo por endpoints** por
+> ahora (sin pantalla). Mismas reglas que el ABM de ubicación (6.2).
+
+#### 6.5.1 Revisión previa del catálogo (08/10/2026)
+
+- Los 7 distritos tienen catálogo: 250 zonas, 2.400 opciones (fuentes, sistemas, desagües) y 3.666 canales.
+  El árbol más profundo llega al canal quinto: no se pierde nada por el corte en el nivel 5.
+- **Corregido:** al normalizar, dos canales hermanos con el mismo nombre escrito distinto («DVDO. NORTE» y
+  «DVDO.  NORTE») se pisaban y se perdían las derivaciones del primero. En TALAMUYO (VI) faltaba
+  `MATRIZ > DVDO. NORTE > LOS RALOS > COMPUERTA 27 > PROPIO`. Ahora se juntan (`normalizarCatalogo`), y en
+  `drh_nuevo` se agregaron esos 2 canales con el ABM nuevo.
+- De las 78 zonas sin vincular (6.4.4 punto 2), **25** tienen una localidad equivalente en el catálogo de ubicación
+  (TRANCAS → VILLA DE TRANCAS, LEOCADIO PAZ → LEOCADIO PAEZ…) y **53** no existen en ese departamento
+  (CONCEPCIÓN, FAMAILLÁ, LULES, JUAN B. ALBERDI, CRUZ ALTA… y unas 30 que figuran en otro departamento).
+
+#### 6.5.2 Qué se hizo
+
+| Catálogo | Endpoints | Reglas |
+| --- | --- | --- |
+| Zonas | `GET/POST /api/catalogos/suministro/zonas`, `GET/PUT/DELETE …/zonas/:id`, `POST …/zonas/:id/reactivar` (y `PUT …/zonas/:id/localidad`, ya existía) | Departamento y distrito activos; la localidad (optativa), del mismo departamento y distrito y sin otra zona; el nombre de origen no se repite en el departamento y distrito. La ficha (`GET …/zonas/:id`) trae las listas y el árbol con ids |
+| Fuentes, sistemas, desagües | `POST …/zonas/:id/opciones` `{ tipo, nombre }`, `PUT/DELETE …/opciones/:id`, `POST …/opciones/:id/reactivar` | Nombre único en su lista de la zona. Se rechazan los textos ajenos (`esTextoAjeno`) |
+| Canales | `POST …/zonas/:id/canales` `{ nombre, padreId? }`, `PUT/DELETE …/canales/:id`, `POST …/canales/:id/reactivar` | Sin padre es principal; con padre, un nivel más (el padre de la misma zona y activo), **hasta el quinto**. Nombre único entre hermanos. La **baja se lleva las derivaciones**; la reactivación devuelve las que se dieron de baja con él (misma fecha de baja) y exige el padre activo |
+| Ríos y canales | `GET/POST /api/catalogos/cauces`, `GET/PUT/DELETE /api/catalogos/cauces/:id`, `POST …/:id/reactivar` | `linea` = vértices `[x, y]` en WGS84 (`[lon, lat]`) o POSGAR 2007 faja 3 (`sistema: "POSGAR"`); se valida que los números sean del sistema indicado, que la línea sea válida y que caiga en Tucumán. PostGIS calcula el largo. Fuente por defecto `DRH` |
+
+Comunes a todos: solo Catastro o un administrador (403); **baja lógica** con motivo (mínimo 10 caracteres);
+lo dado de baja no se edita ni se vuelve a crear con el mismo nombre (409: «reactívelo»); para tocar las listas o
+los canales de una zona, la zona tiene que estar activa.
+
+**Efecto de una baja:**
+- Suministro: deja de ofrecerse en `GET /api/catalogos/suministro` y el paso 6 del alta deja de aceptarla (también
+  al reenviar y en la verificación final). Las concesiones ya cargadas conservan lo que tienen: el suministro se
+  guarda con los **nombres**. Lo mismo al **renombrar**: un alta en trámite con el nombre viejo tiene que volver a elegirlo.
+- Cauces: sale del visor (`GET /api/sig/cauces`) y del aviso del «cauce más cercano» al analizar un polígono.
+- La carga de cauces desde un archivo (`cargar-cauces --fuente X`) ahora **da de baja** los anteriores de esa fuente
+  en lugar de borrarlos.
+
+**Tablas:** `cat_suministro_opcion`, `cat_suministro_canal` y `sig.cauce` suman las columnas comunes de los
+catálogos (`activo`, autoría y baja, `FilaCatalogo`) con su CHECK de baja. Las filas existentes quedan activas.
+
+**Código:** `catalogos/suministro/suministro-abm.service.ts`, `catalogos/abm-suministro.controller.ts` (también
+recibió el listado y la vinculación de zonas), `catalogos/dto/suministro.dto.ts`; `sig/cauces.service.ts`,
+`sig/abm-cauces.controller.ts`, `sig/dto/cauce.dto.ts`.
+
+**Verificado (08/10/2026):** `test/abm-suministro-cauces.e2e-spec.ts` (16 pruebas nuevas: zona, listas, árbol hasta
+el quinto, baja en cascada y reactivación, validación del paso 6, cauces en WGS84 y POSGAR, rechazos por
+georreferencia); todas las e2e (35) y unitarias (33, una nueva por el choque de nombres); `circuito-completo.sh`
+del alta: 100 verificaciones.
+
+**Pendiente:** pantallas de administración en el front; a QGIS, la capa `sig.cauce` le muestra también los dados
+de baja (filtrar `"activo" = true`).
 
 ---
 

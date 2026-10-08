@@ -69,7 +69,9 @@ Para encontrar los pozos a revisar: filtro `"dentro_de_concesion" = false`.
 ## 3 ter. La capa `sig.cauce`
 
 Ríos y canales (líneas, EPSG:5345): `nombre` (vacío en arroyos y acequias sin nombre), `tipo`
-(`RIO` o `CANAL`), `fuente` (hoy `OpenStreetMap`) y `largo_km`. Se carga con `npm run sig:cauces`.
+(`RIO` o `CANAL`), `fuente` (hoy `OpenStreetMap`), `largo_km` y `activo`. Se carga con `npm run sig:cauces`
+y se administra por la API (`/api/catalogos/cauces`). Los dados de baja no se borran: para no verlos,
+filtrar la capa con `"activo" = true` (Propiedades → Fuente → Filtro).
 
 ## 4. Sugerencias de uso
 

@@ -1,10 +1,15 @@
 import { BandejaOficina } from '@/features/expedientes/components/BandejaOficina'
+import { BandejaAltas } from '@/features/tramites/AltaDeConcesion/components/BandejaAltas'
 import { SolicitudesNumeroPanel } from '../components/SolicitudesNumeroPanel'
 
-/** Bandeja de Catastro: pedidos de número de concesión + expedientes que vuelven para el cierre. */
+/**
+ * Bandeja de Catastro: altas de concesión en la oficina (en carga, en corrección o en el cierre),
+ * pedidos de número de concesión y expedientes que vuelven para el cierre.
+ */
 export default function BandejaCatastroPage() {
   return (
     <BandejaOficina oficina="catastro">
+      <BandejaAltas oficina="catastro" />
       <SolicitudesNumeroPanel />
     </BandejaOficina>
   )

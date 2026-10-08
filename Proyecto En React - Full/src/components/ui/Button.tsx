@@ -17,7 +17,7 @@ interface ButtonProps extends ComponentProps<'button'> {
 }
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-primary text-white shadow-md hover:bg-blue-600 hover:shadow-lg focus-visible:ring-blue-500/30',
+  primary: 'bg-primary text-white shadow-md hover:bg-primary-oscuro hover:shadow-lg focus-visible:ring-primary/30',
   secondary:
     'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 focus-visible:ring-slate-400/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700',
   ghost: 'text-slate-600 hover:bg-slate-100 focus-visible:ring-slate-400/30 dark:text-slate-300 dark:hover:bg-slate-700/50',

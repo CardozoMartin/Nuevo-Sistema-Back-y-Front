@@ -3,12 +3,21 @@
 /* Modo oscuro por clase (.dark en <html>), igual que el prototipo */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Identidad institucional: la paleta y la letra del portal del Gobierno de Tucumán
+   (tucuman.gob.ar: --tuc-azul #0B4A6E, --tuc-celeste #00A7DD, Montserrat). */
 @theme {
-  --color-primary: #137fec;
-  --color-background-light: #f6f7f8;
+  --color-primary: #0b4a6e; /* azul Tucumán: botones, enlaces, selección */
+  --color-primary-oscuro: #083a57; /* hover de los botones */
+  --color-celeste: #00a7dd; /* acento (detalles, indicadores) */
+  --color-background-light: #f2f6f9;
   --color-background-dark: #101922;
   --color-surface-dark: #1a2633;
-  --font-display: 'Public Sans', sans-serif;
+  --font-display: 'Montserrat', Arial, Helvetica, sans-serif;
+
+  /* Letras más grandes en todo el sistema (lectura cómoda en la oficina):
+     text-xs 12 → 13 px, text-sm 14 → 15 px. */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
 }
 
 @layer base {
@@ -19,6 +28,11 @@
   }
   body {
     @apply bg-background-light font-display text-slate-900 antialiased dark:bg-background-dark dark:text-slate-100;
+  }
+  /* En modo oscuro el azul institucional no se lee sobre el fondo: se usa el celeste. */
+  .dark {
+    --color-primary: #33b9e4;
+    --color-primary-oscuro: #00a7dd;
   }
 }
 

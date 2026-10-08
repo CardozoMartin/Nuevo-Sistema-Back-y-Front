@@ -246,7 +246,7 @@ export function SubdivisionMap({ madre, fracciones, activa = null, modo = 'ver',
           <button type="button" disabled={!borrador.length} onClick={() => setBorrador((b) => b.slice(0, -1))} className="rounded px-2 py-1 font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-40 dark:text-slate-300 dark:hover:bg-slate-700">
             Deshacer
           </button>
-          <button type="button" disabled={borrador.length < 3} onClick={cerrarBorrador} className="rounded bg-primary px-2 py-1 font-semibold text-white hover:bg-blue-600 disabled:opacity-40">
+          <button type="button" disabled={borrador.length < 3} onClick={cerrarBorrador} className="rounded bg-primary px-2 py-1 font-semibold text-white hover:bg-primary-oscuro disabled:opacity-40">
             Cerrar polígono
           </button>
           <button type="button" onClick={cancelarBorrador} className="rounded px-2 py-1 font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">

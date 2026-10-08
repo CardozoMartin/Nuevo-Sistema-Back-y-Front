@@ -5,9 +5,10 @@ import { ROUTES } from '@/config/routes'
 import { Icon } from '@/components/ui/Icon'
 import { cn } from '@/lib/cn'
 
-const itemBase = 'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors'
-const itemIdle = 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/50'
-const itemActive = 'bg-primary/10 text-primary'
+const itemBase = 'flex w-full items-center gap-3 rounded px-3 py-2.5 text-sm font-medium transition-colors'
+const itemIdle = 'text-slate-700 hover:bg-slate-100 hover:text-primary dark:text-slate-300 dark:hover:bg-slate-700/50'
+// Activo: fondo azul suave, negrita y la barra celeste a la izquierda (como el portal de la Provincia).
+const itemActive = 'bg-primary/10 font-semibold text-primary shadow-[inset_3px_0_0_var(--color-celeste)]'
 
 export interface BadgeItem {
   /** Cantidad a mostrar (ej: expedientes pendientes). */
@@ -93,7 +94,7 @@ export function SidebarItem({ item, getBadge }: SidebarItemProps) {
               key={child.key}
               to={child.path}
               className={({ isActive }) =>
-                cn('flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors', isActive ? itemActive : itemIdle)
+                cn('flex items-center gap-2 rounded px-3 py-2 text-sm transition-colors', isActive ? itemActive : itemIdle)
               }
             >
               <Icon name={child.icon} className="text-lg!" />

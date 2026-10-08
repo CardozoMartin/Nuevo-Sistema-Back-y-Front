@@ -38,27 +38,23 @@ export function Sidebar({ open, onClose, flotante = false }: SidebarProps) {
 
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-slate-200 bg-white transition-transform dark:border-slate-800 dark:bg-surface-dark',
+          'fixed inset-y-0 left-0 z-40 flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white transition-transform dark:border-slate-800 dark:bg-surface-dark',
           !flotante && 'lg:static lg:translate-x-0',
           flotante && open && 'shadow-2xl',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <Link to={ROUTES.dashboard} className="flex shrink-0 items-center gap-3 p-6">
-          <div className="rounded-lg bg-primary/10 p-2">
-            <Icon name="water_drop" filled className="text-2xl! text-primary" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-base leading-none font-bold tracking-tight">Sistema DRH</span>
-            <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">Recursos Hídricos · Tucumán</span>
-          </div>
+        {/* Nombre del sistema (la Dirección y el Gobierno están en la barra superior). */}
+        <Link to={ROUTES.dashboard} className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-6 py-4 dark:border-slate-800">
+          <Icon name="water_drop" filled className="text-xl! text-primary" />
+          <span className="text-sm font-bold tracking-wide text-slate-800 uppercase dark:text-white">Sistema DRH</span>
         </Link>
 
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-4 py-2">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-3">
           {NAVIGATION.map((section) => (
             <div key={section.key} className="flex flex-col gap-1">
               {section.title && (
-                <p className="px-3 pt-4 pb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase">
+                <p className="mx-3 mt-4 mb-1 border-b border-slate-200 pb-1.5 text-xs font-bold tracking-wider text-slate-500 uppercase dark:border-slate-700 dark:text-slate-400">
                   {section.title}
                 </p>
               )}

@@ -44,9 +44,9 @@ export function CampanaNotificaciones() {
         onClick={alternar}
         aria-label={noLeidas ? `Notificaciones (${noLeidas} sin leer)` : 'Notificaciones'}
         aria-expanded={abierta}
-        className="relative rounded-lg p-2 text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700/50"
+        className="relative rounded p-2 text-white/90 hover:bg-white/10"
       >
-        <Icon name="notifications" filled={noLeidas > 0} className={cn(noLeidas > 0 && 'text-primary')} />
+        <Icon name="notifications" filled={noLeidas > 0} className={cn(noLeidas > 0 && 'text-celeste')} />
         {noLeidas > 0 && (
           <span className="absolute top-1 right-1 flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] leading-4 font-bold text-white">
             {noLeidas > 9 ? '9+' : noLeidas}

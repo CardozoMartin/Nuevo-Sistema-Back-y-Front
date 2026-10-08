@@ -52,25 +52,27 @@ export function SelectorUsuario() {
   }, [abierto])
 
   return (
-    <div ref={caja} className="relative border-l border-slate-200 pl-3 md:pl-4 dark:border-slate-700">
+    <div ref={caja} className="relative border-l border-white/20 pl-1.5 sm:pl-3 md:pl-4">
       <button
         type="button"
         onClick={() => setAbierto((a) => !a)}
         aria-haspopup="listbox"
         aria-expanded={abierto}
         title="Usuario con el que se actúa (prueba, hasta que haya login)"
-        className="flex items-center gap-3 rounded-lg py-1 pr-1 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+        className="flex items-center gap-3 rounded py-1 pr-1 pl-1 text-left hover:bg-white/10 sm:pl-2"
       >
         <div className="hidden text-right sm:block">
-          <p className="text-sm leading-none font-semibold text-slate-900 dark:text-white">
+          <p className="text-sm leading-none font-semibold text-white">
             {actual ? `${actual.nombre} ${actual.apellido}` : usuarios.isError ? 'Sin conexión' : 'Usuario'}
           </p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{actual ? descripcion(actual) : 'Backend no disponible'}</p>
+          <p className="mt-1 text-xs text-white/70">{actual ? descripcion(actual) : 'Backend no disponible'}</p>
         </div>
-        <div className="flex size-9 items-center justify-center rounded-full bg-primary/20">
-          <Icon name="person" className="text-xl! text-primary" />
+        <div className="flex size-9 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25">
+          <Icon name="person" className="text-xl! text-white" />
         </div>
-        <Icon name="expand_more" className="text-[18px]! text-slate-400" />
+        <span className="hidden sm:flex">
+          <Icon name="expand_more" className="text-[18px]! text-white/70" />
+        </span>
       </button>
 
       {abierto && usuarios.data && (

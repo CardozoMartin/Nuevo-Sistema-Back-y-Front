@@ -9,6 +9,7 @@
   --color-primary: #0b4a6e; /* azul Tucumán: botones, enlaces, selección */
   --color-primary-oscuro: #083a57; /* hover de los botones */
   --color-celeste: #00a7dd; /* acento (detalles, indicadores) */
+  --color-institucional: #0b4a6e; /* barra superior: el azul de la Provincia, también en modo oscuro */
   --color-background-light: #f2f6f9;
   --color-background-dark: #101922;
   --color-surface-dark: #1a2633;

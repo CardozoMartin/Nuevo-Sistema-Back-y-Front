@@ -72,7 +72,7 @@ export const NAVIGATION: NavSection[] = [
           { key: 'pozo-registro', label: 'Registro de pozo', icon: 'water_drop', path: ROUTES.pozo.registro },
           { key: 'pozo-empresas', label: 'Empresas perforadoras', icon: 'engineering', path: ROUTES.pozo.empresas },
           { key: 'pozo-autorizaciones', label: 'Autorizaciones', icon: 'verified_user', path: ROUTES.pozo.autorizaciones },
-          { key: 'pozo-registrados', label: 'Pozos registrados', icon: 'format_list_bulleted', path: ROUTES.pozo.registrados },
+          { key: 'pozo-registrados', label: 'Consulta de pozos', icon: 'manage_search', path: ROUTES.pozo.registrados },
           { key: 'pozo-consulta', label: 'Consulta general', icon: 'travel_explore', path: ROUTES.pozo.consulta },
           { key: 'pozo-bajas', label: 'Baja de pozo', icon: 'do_not_disturb_on', path: ROUTES.pozo.bajas },
         ],

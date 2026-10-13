@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { leerGrados } from '@/lib/coordenadas'
 import { aPosgar, dePosgar, formatearPosgar } from '@/lib/posgar'
 import { formatoArea, formatoDistancia, type ResultadoMedicion, type TipoMedicion } from '../medicion'
 import { BotonIcono, claseFlotante, claseInput } from './ui'
@@ -61,7 +62,7 @@ const leerNumero = (texto: string) => Number(texto.trim().replace(/\s/g, '').rep
 
 /**
  * «Ir a coordenada»: POSGAR 2007 faja 3 (X, Y en metros, como en los planos) o latitud y
- * longitud (GPS, Google Earth). Acepta coma o punto decimal.
+ * longitud (GPS, Google Earth), en decimal o en grados, minutos y segundos. Acepta coma o punto decimal.
  */
 export function IrACoordenada({ onIr, onCerrar }: { onIr: (lat: number, lng: number, texto: string) => void; onCerrar: () => void }) {
   const [sistema, setSistema] = useState<'posgar' | 'grados'>('posgar')
@@ -72,9 +73,10 @@ export function IrACoordenada({ onIr, onCerrar }: { onIr: (lat: number, lng: num
 
   function enviar(e: FormEvent) {
     e.preventDefault()
-    const x = leerNumero(a)
-    const y = leerNumero(b)
-    if (!Number.isFinite(x) || !Number.isFinite(y) || !a.trim() || !b.trim()) return setError('Complete los dos valores con números.')
+    // En grados se acepta decimal o grados, minutos y segundos (27°03'13" S), como en los formularios.
+    const x = posgar ? leerNumero(a) : (leerGrados(a)?.valor ?? NaN)
+    const y = posgar ? leerNumero(b) : (leerGrados(b)?.valor ?? NaN)
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !a.trim() || !b.trim()) return setError(posgar ? 'Complete los dos valores con números.' : `Use grados decimales (-27.0536) o grados, minutos y segundos (27°03'13" S).`)
     const { lat, lng } = posgar ? dePosgar(x, y) : { lat: x, lng: y }
     if (lat < ADMITIDO.latMin || lat > ADMITIDO.latMax || lng < ADMITIDO.lngMin || lng > ADMITIDO.lngMax) {
       return setError(
@@ -113,11 +115,11 @@ export function IrACoordenada({ onIr, onCerrar }: { onIr: (lat: number, lng: num
         <div className="grid grid-cols-2 gap-2">
           <label className="flex flex-col gap-1">
             <span className="text-xs text-slate-500 dark:text-slate-400">{posgar ? 'X (este)' : 'Latitud'}</span>
-            <input value={a} onChange={(e) => setA(e.target.value)} inputMode="decimal" placeholder={posgar ? '3538383' : '-27.3674'} className={cn(claseInput, 'font-mono')} autoFocus />
+            <input value={a} onChange={(e) => setA(e.target.value)} inputMode={posgar ? 'decimal' : 'text'} placeholder={posgar ? '3538383' : '-27.3674'} className={cn(claseInput, 'font-mono')} autoFocus />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-xs text-slate-500 dark:text-slate-400">{posgar ? 'Y (norte)' : 'Longitud'}</span>
-            <input value={b} onChange={(e) => setB(e.target.value)} inputMode="decimal" placeholder={posgar ? '6973558' : '-65.6120'} className={cn(claseInput, 'font-mono')} />
+            <input value={b} onChange={(e) => setB(e.target.value)} inputMode={posgar ? 'decimal' : 'text'} placeholder={posgar ? '6973558' : '-65.6120'} className={cn(claseInput, 'font-mono')} />
           </label>
         </div>
         {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}

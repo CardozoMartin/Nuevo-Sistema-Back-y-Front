@@ -24,6 +24,10 @@ const ACTUACION: Record<string, string> = {
   EVALUACION_TECNICA: 'Evaluación técnica',
   CLAUSURA: 'Registró la clausura física',
   TOMA_CONOCIMIENTO: 'Tomó conocimiento',
+  // Registro de pozo
+  REGISTRO_POZO: 'Registró el pozo',
+  REGISTRO_CONCESION: 'Registró la concesión del pozo',
+  CIERRE: 'Cerró el expediente',
 }
 
 const RESULTADO: Record<string, { texto: string; color: string }> = {
@@ -38,7 +42,7 @@ const RESULTADO: Record<string, { texto: string; color: string }> = {
 /** Dato extra de una actuación que conviene ver (número de concesión, resolución, padrón). */
 function datoDestacado(e: Extract<EntradaHistorial, { tipo: 'ACTUACION' }>): string | null {
   const d = e.datos ?? {}
-  if (e.actuacion === 'NUMERO_CONCESION') return `Concesión N° ${String(d.numero)}`
+  if (e.actuacion === 'NUMERO_CONCESION' || ((e.actuacion === 'REGISTRO_CONCESION' || e.actuacion === 'CIERRE') && d.numero)) return `Concesión N° ${String(d.numero)}`
   if (e.actuacion === 'RESOLUCION') return `Resolución ${String(d.resolucion)} del ${String(d.fecha)}${d.decision === 'RECHAZAR' ? ' (rechaza)' : ''}`
   if (e.actuacion === 'CLAUSURA') return `Acta ${String(d.acta)} del ${String(d.fecha)}`
   if (e.actuacion === 'PADRON') return `Padrón ${String(d.padron)}`

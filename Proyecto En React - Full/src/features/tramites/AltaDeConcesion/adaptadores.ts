@@ -6,6 +6,7 @@
 //
 // Las diferencias son de forma: enumerados en mayúsculas (fisica → FISICA), números como
 // número (no como texto), listas planas (fuentes: string[] en vez de { valor }[]).
+import { coordenadaADto, coordenadaDesdeApi } from '@/lib/coordenadas'
 import type { DomicilioForm } from '../shared/schemas/domicilio'
 import type { TitularForm } from '../shared/schemas/titular'
 import type { AltaBackend } from './backend.types'
@@ -77,19 +78,17 @@ export function inmuebleADto(catastral: PreCargaForm['catastral'], registral: Pr
 }
 
 export function usosADto(u: PreCargaForm['usos']) {
-  const tienePuntoEntrega = u.pecuario.x.trim() !== '' && u.pecuario.y.trim() !== ''
+  const puntoEntrega = coordenadaADto(u.pecuario)
   return {
     caracter: u.caracter ? u.caracter.toUpperCase() : undefined,
     codigoServicio: u.codigoServicio === '' ? undefined : Number(u.codigoServicio),
     periodoInicio: textoONulo(u.periodoInicio),
     periodoFin: textoONulo(u.periodoFin),
-    // POSGAR 2007 faja 3: el backend calcula la latitud/longitud.
-    desague: { x: Number(u.desagueX), y: Number(u.desagueY) },
+    // X/Y POSGAR o latitud/longitud, según lo que se cargó: el backend calcula la otra forma.
+    desague: coordenadaADto(u.desague),
     items: u.items.filter((i) => i.uso).map((i) => ({ uso: i.uso, magnitud: Number(i.magnitud) })),
     // El backend lo pide solo si algún uso lo exige (pecuario); si viene sin necesidad, lo ignora.
-    puntoEntrega: tienePuntoEntrega
-      ? { x: Number(u.pecuario.x), y: Number(u.pecuario.y), referencia: textoONulo(u.pecuario.referencia) }
-      : undefined,
+    puntoEntrega: puntoEntrega ? { ...puntoEntrega, referencia: textoONulo(u.pecuario.referencia) } : undefined,
   }
 }
 
@@ -179,14 +178,9 @@ export function altaAFormulario(a: AltaBackend): PreCargaForm {
           codigoServicio: t(a.usos.codigoServicio),
           periodoInicio: t(a.usos.periodoInicio),
           periodoFin: t(a.usos.periodoFin),
-          desagueX: t(a.usos.desague?.x),
-          desagueY: t(a.usos.desague?.y),
+          desague: coordenadaDesdeApi(a.usos.desague),
           items: a.usos.items.length ? a.usos.items.map((i) => ({ uso: i.uso, magnitud: String(i.magnitud) })) : vacio.usos.items,
-          pecuario: {
-            x: t(a.usos.puntoEntrega?.x),
-            y: t(a.usos.puntoEntrega?.y),
-            referencia: t(a.usos.puntoEntrega?.referencia),
-          },
+          pecuario: { ...coordenadaDesdeApi(a.usos.puntoEntrega), referencia: t(a.usos.puntoEntrega?.referencia) },
         }
       : vacio.usos,
     suministro: a.suministro

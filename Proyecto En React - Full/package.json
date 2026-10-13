@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "concurrently -k -n api,eventos,web -c magenta,yellow,cyan \"npm:mock\" \"npm:mock:events\" \"npm:dev:web\"",
     "dev:web": "vite",
+    "demo": "concurrently -k -n api,eventos,web -c magenta,yellow,cyan \"npm:mock\" \"npm:mock:events\" \"npm:demo:web\"",
+    "demo:web": "vite --mode demo",
     "premock": "node mock-server/build-db.mjs",
     "mock": "json-server mock-server/db.json --port 3001",
     "mock:events": "node mock-server/events.mjs",

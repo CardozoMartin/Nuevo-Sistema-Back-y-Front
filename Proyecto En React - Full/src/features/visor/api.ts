@@ -1,7 +1,7 @@
 // Peticiones del visor. Van al backend real (NestJS + PostGIS): el proxy de Vite manda
 // /api/sig/* al puerto 3000 (ver vite.config.ts). La geometría llega en WGS84, lista para Leaflet.
 import { api } from '@/services/api/client'
-import type { CapaCauces, CapaConcesiones, CapaPozos, ConcesionGeo, Recuadro } from './types'
+import type { CapaCauces, CapaConcesiones, CapaPozos, CapaPuntos, ConcesionGeo, Recuadro } from './types'
 
 export const sigApi = {
   /**
@@ -17,6 +17,12 @@ export const sigApi = {
   /** Pozos (puntos), con la concesión que abastecen. */
   async pozos(recuadro?: Recuadro): Promise<CapaPozos> {
     const { data } = await api.get<CapaPozos>('/sig/pozos', { params: recuadro ? { bbox: recuadro.join(',') } : undefined })
+    return data
+  },
+
+  /** Desagües y puntos de entrega de las concesiones (puntos). */
+  async puntos(recuadro?: Recuadro): Promise<CapaPuntos> {
+    const { data } = await api.get<CapaPuntos>('/sig/puntos', { params: recuadro ? { bbox: recuadro.join(',') } : undefined })
     return data
   },
 

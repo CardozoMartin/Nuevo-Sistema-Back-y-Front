@@ -19,7 +19,7 @@ import { BotonIcono, claseFlotante } from '../components/ui'
 import { armarLeyenda, colorizador } from '../colores'
 import { formatoHa } from '../estilos'
 import { CAPAS_TODAS, filtrar, filtrosIniciales, recuadroDe, type CapasVisor } from '../filtros'
-import { useCapaCauces, useCapaConcesiones, useCapaPozos } from '../hooks'
+import { useCapaCauces, useCapaConcesiones, useCapaPozos, useCapaPuntos } from '../hooks'
 import type { ResultadoMedicion, TipoMedicion } from '../medicion'
 
 type Panel = 'capas' | 'fondos' | 'resultados' | 'archivo' | 'ayuda'
@@ -45,14 +45,15 @@ const CLAVE_FONDO = 'drh_visor_fondo'
  *   - Abajo: barra de estado con el sistema de referencia, la posición del cursor (lat/long y
  *     POSGAR), la escala y el zoom.
  *
- * Las concesiones, los pozos y los ríos salen de PostGIS: son las mismas capas que ve QGIS
- * (sig.v_concesiones, sig.v_pozos y sig.cauce). Todo se guarda en POSGAR 2007 faja 3
+ * Las concesiones, los pozos, los desagües / puntos de entrega y los ríos salen de PostGIS: son
+ * las mismas capas que ve QGIS (sig.v_concesiones, sig.v_pozos, sig.v_puntos y sig.cauce). Todo se guarda en POSGAR 2007 faja 3
  * (EPSG:5345); el mapa web lo recibe en latitud/longitud.
  * La concesión seleccionada queda en la URL (?concesion=ID), así se puede compartir el enlace.
  */
 export default function VisorPage() {
   const { data, isLoading, isError, error, refetch, isFetching } = useCapaConcesiones()
   const capaPozos = useCapaPozos()
+  const capaPuntos = useCapaPuntos()
   const capaCauces = useCapaCauces()
   const [capas, setCapas] = useState<CapasVisor>(CAPAS_TODAS)
   const [encuadre, setEncuadre] = useState<{ recuadro: [number, number, number, number]; clave: number } | null>(null)
@@ -117,6 +118,11 @@ export default function VisorPage() {
     const ids = new Set(visibles.map((f) => f.properties.concesion_id))
     return (capaPozos.data?.features ?? []).filter((p) => p.properties.concesion_id === null || ids.has(p.properties.concesion_id))
   }, [capaPozos.data, visibles])
+  // Desagües y puntos de entrega de las concesiones visibles (mismo criterio que los pozos).
+  const puntos = useMemo(() => {
+    const ids = new Set(visibles.map((c) => c.properties.concesion_id))
+    return (capaPuntos.data?.features ?? []).filter((p) => ids.has(p.properties.concesion_id))
+  }, [capaPuntos.data, visibles])
   const pozosDeFicha = useMemo(() => (capaPozos.data?.features ?? []).filter((p) => p.properties.concesion_id === seleccionada), [capaPozos.data, seleccionada])
 
   function setFondo(id: string) {
@@ -188,7 +194,7 @@ export default function VisorPage() {
         leyenda={leyenda}
         capas={capas}
         onCapas={setCapas}
-        cantidades={{ concesiones: visibles.length, superficieHa: superficie, pozos: pozos.length, cauces: capaCauces.data?.features.length ?? 0 }}
+        cantidades={{ concesiones: visibles.length, superficieHa: superficie, pozos: pozos.length, puntos: puntos.length, cauces: capaCauces.data?.features.length ?? 0 }}
         destinos={destinos}
         onIrA={irA}
       />
@@ -215,6 +221,7 @@ export default function VisorPage() {
           concesiones={visibles}
           colorDe={colorDe}
           pozos={pozos}
+          puntos={puntos}
           cauces={capaCauces.data?.features}
           capas={capas}
           encuadre={encuadre}
@@ -309,10 +316,11 @@ export default function VisorPage() {
             onVistaInicial={() => encuadrar(recuadroDe(todas))}
             pantallaCompleta={pantallaCompleta}
             onPantallaCompleta={alternarPantallaCompleta}
-            actualizando={isFetching || capaPozos.isFetching || capaCauces.isFetching}
+            actualizando={isFetching || capaPozos.isFetching || capaPuntos.isFetching || capaCauces.isFetching}
             onActualizar={() => {
               void refetch()
               void capaPozos.refetch()
+              void capaPuntos.refetch()
               void capaCauces.refetch()
             }}
           />

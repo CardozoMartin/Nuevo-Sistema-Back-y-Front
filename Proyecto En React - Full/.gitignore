@@ -4,6 +4,7 @@ dist
 .env
 .env.*
 !.env.example
+!.env.demo
 *.tsbuildinfo
 
 # Base de la demo (se regenera con npm run mock:reset)

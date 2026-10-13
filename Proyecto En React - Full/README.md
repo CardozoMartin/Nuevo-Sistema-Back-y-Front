@@ -7,6 +7,7 @@ Migración del prototipo HTML de la Dirección de Recursos Hídricos de Tucumán
 ```bash
 npm install
 npm run dev         # API (:3001) + eventos en vivo (:3002) + front (:5173)  ← usar siempre este
+npm run demo        # igual, en MODO DEMO: sin el backend real (ver «Modo demo» abajo)
 npm run dev:web     # solo el front (sin API: las pantallas muestran error de conexión)
 npm run mock        # solo la API simulada (json-server)
 npm run mock:events # solo el servidor de avisos en vivo (SSE)
@@ -62,6 +63,28 @@ src/
 ├── types/                    Tipos de dominio (Expediente, Titular…) y de navegación
 └── styles/index.css          Tailwind + tema (colores del prototipo)
 ```
+
+## Modo demo (sin el backend real)
+
+Algunos módulos ya hablan con el **backend real** (`/backend`, NestJS + PostGIS): Alta de Concesión, Baja de
+Pozo, el visor y la carga de KML (`/api/sig/*`) y el selector de usuario. Para mostrar la app sin levantar
+el backend, `npm run demo` (usa `.env.demo`: `VITE_MODO_DEMO=true`) los responde con un **backend emulado
+en el navegador** (`src/services/demo/`):
+
+- **Cómo:** solo cambia el *adaptador* de axios de los clientes `backend` y `api` (`services/api/*.ts`).
+  Las pantallas, los hooks y los `api.ts` no se tocan: al apagar el modo demo, todo vuelve al backend real.
+- **Qué emula:** las mismas rutas, la misma forma de las respuestas y las reglas principales del backend
+  (cada acción en su etapa, tomar antes de actuar, solo la oficina donde está, expediente único, deuda →
+  espera → pago, observado → corrección → vuelve a la oficina que observó, número y resolución, padrón,
+  polígono duplicado ≥ 90 %, coordenadas en POSGAR o lat/long, baja de pozo con clausura y aviso a Distrito).
+  Lo geográfico (superficie, superposiciones, cauce más cercano) se calcula en el navegador.
+- **Datos de ejemplo:** el padrón demo del backend (159 concesiones con polígono, 46 pozos), los ríos y
+  canales de OpenStreetMap, y trámites en distintas etapas armados recorriendo el circuito (altas en Catastro,
+  Recaudación, Jurídico y Secretaría; bajas de pozo en mesa de entrada, en Jurídico y una de oficio).
+- **Dónde quedan:** en el navegador (`localStorage`). El botón **«Modo demo»** de la barra superior los
+  reinicia. Lo que va a json-server (los demás trámites) sigue igual.
+- **Al agregar una ruta al backend real** que use el front, sumarla al emulador (`services/demo/servidor/`);
+  si falta, el modo demo responde 404 «El modo demo todavía no emula …».
 
 ## API simulada y capa de datos
 

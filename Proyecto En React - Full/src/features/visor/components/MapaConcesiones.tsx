@@ -5,10 +5,10 @@ import type { MultiPolygon } from 'geojson'
 import { ponerFondoVisor } from '@/components/map/fondos'
 import { CENTRO_TUCUMAN, puntoEtiqueta, type LatLng } from '@/lib/geo'
 import { aPosgar, formatearPosgar } from '@/lib/posgar'
-import { COLOR_COMPARACION, COLOR_POZO_A_REVISAR, ZOOM_ETIQUETAS, colorPozo, formatoHa, formatoNumero, nombreEstado, nombreEstadoPozo, tituloConcesion } from '../estilos'
+import { COLOR_COMPARACION, COLOR_POZO_A_REVISAR, COLOR_POZO_OFICIO, DISTANCIA_MAX_PUNTO_M, TIPOS_PUNTO, ZOOM_ETIQUETAS, colorPozo, formatoHa, formatoNumero, nombreEstado, nombreEstadoPozo, tituloConcesion } from '../estilos'
 import type { CapasVisor } from '../filtros'
 import { iniciarMedicion, type ResultadoMedicion, type TipoMedicion } from '../medicion'
-import type { AtributosConcesion, CauceGeo, ConcesionGeo, PozoGeo } from '../types'
+import type { AtributosConcesion, CauceGeo, ConcesionGeo, PozoGeo, PuntoGeo } from '../types'
 
 /** Escala aproximada (1:N) en la latitud del centro, para una pantalla de 96 ppp. */
 function escalaDe(m: L.Map): number {
@@ -71,8 +71,28 @@ function tooltipPozo(p: PozoGeo['properties']) {
   ].filter(Boolean)
   const concesion = p.concesion_numero ? `Concesión ${p.concesion_numero}` : 'Sin concesión'
   const aviso = p.dentro_de_concesion === false ? `<br><span style="color:${COLOR_POZO_A_REVISAR}">⚠ Cae fuera del polígono de su concesión</span>` : ''
-  return `<strong>${p.alias ?? 'Pozo'}</strong> · ${p.id_interno}<br>${concesion} · ${nombreEstadoPozo(p.estado)}${datos.length ? `<br>${datos.join(' · ')}` : ''}${aviso}`
+  const oficio = p.origen === 'OFICIO' ? `<br><span style="color:${COLOR_POZO_OFICIO}">Registrado de oficio</span>` : ''
+  return `<strong>${p.alias ?? 'Pozo'}</strong> · ${p.id_interno}<br>${concesion} · ${nombreEstadoPozo(p.estado)}${datos.length ? `<br>${datos.join(' · ')}` : ''}${oficio}${aviso}`
 }
+
+/** Texto del tooltip de un desagüe o punto de entrega: las dos coordenadas, la cargada primero. */
+function tooltipPunto(p: PuntoGeo['properties']) {
+  const posgar = `POSGAR X ${formatoNumero(p.coord_x, 0)} · Y ${formatoNumero(p.coord_y, 0)}`
+  const grados = `${p.latitud.toFixed(6)}, ${p.longitud.toFixed(6)}`
+  const coordenadas = p.sistema_carga === 'WGS84' ? `${grados}<br>${posgar}` : `${posgar}<br>${grados}`
+  const concesion = p.concesion_numero ? `Concesión ${p.concesion_numero}` : p.expediente ? `Alta en trámite · Exp. ${p.expediente}` : 'Alta en trámite'
+  const lejos = p.distancia_poligono_m !== null && p.distancia_poligono_m > DISTANCIA_MAX_PUNTO_M
+  const aviso = lejos ? `<br><span style="color:${COLOR_POZO_A_REVISAR}">⚠ A ${formatoNumero(p.distancia_poligono_m! / 1000)} km del polígono de su concesión</span>` : ''
+  return `<strong>${TIPOS_PUNTO[p.tipo].nombre}</strong> · ${concesion}${p.referencia ? `<br>${p.referencia}` : ''}<br>${coordenadas}${aviso}`
+}
+
+/** Rombo para los puntos de la sección de usos (los pozos son círculos: no se confunden). */
+const iconoPunto = (color: string, aRevisar: boolean) =>
+  L.divIcon({
+    className: '',
+    iconSize: [14, 14],
+    html: `<span style="display:block;width:14px;height:14px;transform:rotate(45deg) scale(.75);background:${color};border:${aRevisar ? 3 : 2}px solid ${aRevisar ? COLOR_POZO_A_REVISAR : '#fff'};box-shadow:0 0 2px rgba(0,0,0,.5)"></span>`,
+  })
 
 interface Props {
   concesiones: ConcesionGeo[]
@@ -80,6 +100,8 @@ interface Props {
   colorDe: (p: AtributosConcesion) => string
   /** Pozos a dibujar (puntos). Clic en un pozo → selecciona su concesión. */
   pozos?: PozoGeo[]
+  /** Desagües y puntos de entrega (rombos). Clic → selecciona su concesión. */
+  puntos?: PuntoGeo[]
   /** Ríos y canales (líneas). */
   cauces?: CauceGeo[]
   /** Qué capas se ven. */
@@ -117,7 +139,7 @@ interface Props {
  *   Mientras se mide, los clics son vértices: no seleccionan concesiones.
  */
 export function MapaConcesiones(props: Props) {
-  const { concesiones, colorDe, pozos = [], cauces = [], capas, encuadre, seleccionada, onSeleccionar, comparacion } = props
+  const { concesiones, colorDe, pozos = [], puntos = [], cauces = [], capas, encuadre, seleccionada, onSeleccionar, comparacion } = props
   const { fondo, onFondoFalla, medicion, onMedicion, marca, onVista, refCursor } = props
   const contenedor = useRef<HTMLDivElement>(null)
   const mapa = useRef<L.Map | null>(null)
@@ -125,6 +147,7 @@ export function MapaConcesiones(props: Props) {
   const marcadores = useRef<L.LayerGroup | null>(null)
   const capaComparacion = useRef<L.GeoJSON | null>(null)
   const capaPozos = useRef<L.LayerGroup | null>(null)
+  const capaPuntos = useRef<L.LayerGroup | null>(null)
   const capaCauces = useRef<L.GeoJSON | null>(null)
   /** Polígono de Leaflet de cada concesión, para resaltarla y centrarla. */
   const porId = useRef(new Map<number, L.Path>())
@@ -183,6 +206,7 @@ export function MapaConcesiones(props: Props) {
       marcadores.current = null
       capaComparacion.current = null
       capaPozos.current = null
+      capaPuntos.current = null
       capaCauces.current = null
       capaFondo.current = null
       capaEtiquetas.current = null
@@ -263,7 +287,9 @@ export function MapaConcesiones(props: Props) {
       const p = pozo.properties
       const [lng, lat] = pozo.geometry.coordinates
       const aRevisar = p.dentro_de_concesion === false
-      L.circleMarker([lat, lng], { radius: 6, color: aRevisar ? COLOR_POZO_A_REVISAR : '#fff', weight: aRevisar ? 3 : 2, fillColor: colorPozo(p.estado), fillOpacity: 1 })
+      const oficio = p.origen === 'OFICIO'
+      const borde = aRevisar ? COLOR_POZO_A_REVISAR : oficio ? COLOR_POZO_OFICIO : '#fff'
+      L.circleMarker([lat, lng], { radius: oficio ? 7 : 6, color: borde, weight: aRevisar || oficio ? 3 : 2, fillColor: colorPozo(p.estado), fillOpacity: 1 })
         .bindTooltip(tooltipPozo(p))
         .on('click', (e: L.LeafletMouseEvent) => {
           if (midiendo.current) return
@@ -275,6 +301,31 @@ export function MapaConcesiones(props: Props) {
     grupo.addTo(m)
     capaPozos.current = grupo
   }, [pozos, capas.pozos])
+
+  // 2b'. Desagües y puntos de entrega: rombos con el color del tipo. Borde rojo si quedan lejos del polígono.
+  useEffect(() => {
+    const m = mapa.current
+    if (!m) return
+    capaPuntos.current?.remove()
+    capaPuntos.current = null
+    if (!capas.puntos) return
+    const grupo = L.layerGroup()
+    for (const punto of puntos) {
+      const p = punto.properties
+      const [lng, lat] = punto.geometry.coordinates
+      const aRevisar = p.distancia_poligono_m !== null && p.distancia_poligono_m > DISTANCIA_MAX_PUNTO_M
+      L.marker([lat, lng], { icon: iconoPunto(TIPOS_PUNTO[p.tipo].color, aRevisar), keyboard: false })
+        .bindTooltip(tooltipPunto(p), { offset: [8, 0], direction: 'right' })
+        .on('click', (e: L.LeafletMouseEvent) => {
+          if (midiendo.current) return
+          L.DomEvent.stopPropagation(e)
+          seleccionar.current(p.concesion_id)
+        })
+        .addTo(grupo)
+    }
+    grupo.addTo(m)
+    capaPuntos.current = grupo
+  }, [puntos, capas.puntos])
 
   // 2c. Ríos y canales: líneas azules (canales punteados), siempre debajo de las concesiones.
   useEffect(() => {

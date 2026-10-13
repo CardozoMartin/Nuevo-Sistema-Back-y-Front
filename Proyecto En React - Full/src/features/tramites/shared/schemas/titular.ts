@@ -32,7 +32,7 @@ export function getReglaDocumento(tipoPersona: TipoPersona, tipoDocumento: TipoD
   return { label: 'DNI', min: 7, max: 8, placeholder: 'Ej: 30123456' }
 }
 
-function validarDocumento(valor: string, regla: ReglaDocumento): string | null {
+export function validarDocumento(valor: string, regla: ReglaDocumento): string | null {
   const { label, min, max } = regla
   if (!valor) return `Ingrese un ${label}.`
   if (!/^\d+$/.test(valor)) return `El campo ${label} solo permite números.`

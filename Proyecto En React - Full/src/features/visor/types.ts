@@ -78,6 +78,34 @@ export type EstadoPozo = 'EN_USO' | 'FUERA_DE_SERVICIO' | 'PARADO' | 'BAJA'
 export type PozoGeo = Feature<Point, AtributosPozo>
 export type CapaPozos = FeatureCollection<Point, AtributosPozo>
 
+/** Atributos de un desagüe o punto de entrega: columnas de la vista sig.v_puntos del backend. */
+export interface AtributosPunto {
+  punto_id: number
+  tipo: TipoPunto
+  /** En qué sistema se cargó (el otro lo calculó PostGIS). */
+  sistema_carga: 'POSGAR_FAJA3' | 'WGS84'
+  /** POSGAR 07 faja 3. */
+  coord_x: number
+  coord_y: number
+  latitud: number
+  longitud: number
+  referencia: string | null
+  concesion_id: number
+  concesion_numero: string | null
+  concesion_estado: string
+  expediente: string | null
+  titular: string | null
+  departamento: string | null
+  localidad: string | null
+  /** Distancia al polígono de la concesión (0 si cae dentro). null: la concesión no tiene polígono. */
+  distancia_poligono_m: number | null
+}
+
+export type TipoPunto = 'DESAGUE' | 'ENTREGA'
+
+export type PuntoGeo = Feature<Point, AtributosPunto>
+export type CapaPuntos = FeatureCollection<Point, AtributosPunto>
+
 /** Río o canal (tabla sig.cauce del backend). */
 export interface AtributosCauce {
   id: number

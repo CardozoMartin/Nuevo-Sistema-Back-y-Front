@@ -37,7 +37,7 @@ La documentación técnica del backend (puesta en marcha, endpoints, PostGIS, es
 | --- | --- | --- |
 | Base: NestJS, TypeORM, PostgreSQL 17 + PostGIS 3.6 en Docker, health | ✅ Hecho | — |
 | Módulos base: `seguridad`, `personas`, `recaudacion`, `catalogos`, `expedientes`, `concesiones` | ✅ Hecho (sin login) | — |
-| SIG: KML/GeoJSON, validación PostGIS, POSGAR 07, vistas `sig.v_concesiones` / `sig.v_pozos`, cauces, QGIS | ✅ Hecho | ✅ |
+| SIG: KML/GeoJSON, validación PostGIS, POSGAR 07, vistas `sig.v_concesiones` / `sig.v_pozos` / `sig.v_puntos`, cauces, QGIS | ✅ Hecho | ✅ |
 | Migración del padrón (importador, lotes, datos demo) | ✅ Hecho (falta el padrón real) | — |
 | **Alta de Concesión** — circuito completo; tablas con historial y carga reorganizada por pasos (6.1); oficinas como servicios reutilizables, aviso de deuda por correo y N° de concesión pedido a Catastro (6.3); revisión integral: archivo, visor, suministro contra el catálogo, cierre (6.4) | ✅ Hecho | ✅ |
 | Catálogo de suministro de riego (árbol de la DRH) en la base, con validación y vinculación de zonas (6.4) y **ABM con baja lógica** (6.5) | ✅ Hecho (78 zonas por vincular) | ✅ (mock, sin ABM) |

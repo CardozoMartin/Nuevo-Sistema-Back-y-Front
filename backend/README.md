@@ -163,7 +163,7 @@ src/
 │                            inmueble, condiciones, usos, puntos, suministro y polígonos
 │
 │   Trámites (orquestan los módulos base)
-├── sig/                     PostGIS: lectura de KML, validación, capas GeoJSON, vistas sig.v_concesiones y sig.v_pozos
+├── sig/                     PostGIS: lectura de KML, validación, capas GeoJSON, vistas sig.v_concesiones, sig.v_pozos y sig.v_puntos
 ├── tramites/circuito/       Oficinas comunes a todos los trámites: envío, Recaudación, Distrito/Jurídico,
 │                            número de concesión, resolución, cierre (cada trámite aporta su ConfigTramite)
 ├── tramites/alta-concesion/ Alta de Concesión (con su README)

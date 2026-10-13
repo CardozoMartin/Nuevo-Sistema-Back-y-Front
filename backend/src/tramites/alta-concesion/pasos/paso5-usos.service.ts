@@ -8,7 +8,6 @@ import { Punto } from '../../../concesiones/entities/punto.entity.js';
 import { Uso } from '../../../concesiones/entities/uso.entity.js';
 import { Etapa } from '../../../expedientes/expedientes.constantes.js';
 import { GeometriaService } from '../../../sig/geometria.service.js';
-import { SRID_POSGAR, SRID_WGS84 } from '../../../sig/sig.constantes.js';
 import { AltaConcesionService, type AltaEditable } from '../alta-concesion.service.js';
 import type { RespuestaAlta } from '../alta-concesion.respuesta.js';
 import type { CoordenadaDto, UsosDto } from '../dto/usos.dto.js';
@@ -100,26 +99,24 @@ export class UsosAltaService {
   }
 
   /**
-   * Un punto en POSGAR 2007 faja 3 (lo que carga la oficina): se guarda X/Y tal cual, como
-   * geometría, y con la latitud/longitud WGS84 que calcula PostGIS para el mapa web.
+   * Un punto cargado en X/Y POSGAR 2007 faja 3 o en latitud/longitud: se guardan las dos formas
+   * (la cargada tal cual y la que calcula PostGIS) y la geometría, y en qué sistema se cargó.
    */
-  private async guardarPunto(tx: EntityManager, { expediente, concesion }: AltaEditable, tipo: TipoPunto, { x, y }: CoordenadaDto, referencia?: string) {
-    //1.- PostGIS pasa X/Y (POSGAR) a latitud/longitud (WGS84).
-    const [fila] = await tx.query(
-      `SELECT ST_Y(p) AS lat, ST_X(p) AS lon FROM ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), ${SRID_POSGAR}), ${SRID_WGS84}) AS p`,
-      [x, y],
-    );
+  private async guardarPunto(tx: EntityManager, { expediente, concesion }: AltaEditable, tipo: TipoPunto, coordenada: CoordenadaDto, referencia?: string) {
+    //1.- PostGIS calcula la forma que no se cargó (X/Y ↔ latitud/longitud).
+    const p = await this.geometria.normalizarPunto(coordenada, tx);
 
     //2.- Se guarda el punto con las dos coordenadas y la geometría.
     await tx.save(
       tx.create(Punto, {
         concesion,
         tipo,
-        coordX: String(x),
-        coordY: String(y),
-        geom: { type: 'Point', coordinates: [x, y] },
-        latitud: Number(fila.lat).toFixed(6),
-        longitud: Number(fila.lon).toFixed(6),
+        sistemaCarga: p.sistema,
+        coordX: p.x.toFixed(2),
+        coordY: p.y.toFixed(2),
+        geom: { type: 'Point', coordinates: [p.x, p.y] },
+        latitud: p.latitud.toFixed(6),
+        longitud: p.longitud.toFixed(6),
         referencia: referencia ?? null,
         expediente,
         vigente: true,

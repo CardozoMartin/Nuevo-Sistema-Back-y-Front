@@ -16,13 +16,15 @@ export const filtrosIniciales = (): FiltrosVisor => ({ busqueda: '', criterio: '
 export interface CapasVisor {
   concesiones: boolean
   pozos: boolean
+  /** Desagües y puntos de entrega. */
+  puntos: boolean
   cauces: boolean
   /** Número de cada concesión en rojo sobre su polígono (con el mapa acercado). */
   etiquetas: boolean
 }
 
-export const CAPAS_TODAS: CapasVisor = { concesiones: true, pozos: true, cauces: true, etiquetas: true }
-export const CAPAS_NINGUNA: CapasVisor = { concesiones: false, pozos: false, cauces: false, etiquetas: false }
+export const CAPAS_TODAS: CapasVisor = { concesiones: true, pozos: true, puntos: true, cauces: true, etiquetas: true }
+export const CAPAS_NINGUNA: CapasVisor = { concesiones: false, pozos: false, puntos: false, cauces: false, etiquetas: false }
 
 /** Para buscar sin importar mayúsculas ni tildes. */
 export const normalizar = (texto: string) =>

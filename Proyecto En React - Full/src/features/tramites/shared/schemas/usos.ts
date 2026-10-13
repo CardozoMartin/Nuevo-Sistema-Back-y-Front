@@ -1,5 +1,14 @@
 import { z } from 'zod'
-import { validarPosgar } from '@/lib/validaciones'
+import { coordenadaVacia, leerCoordenada, type CoordenadaForm } from '@/lib/coordenadas'
+
+/** Coordenada de un punto: X/Y POSGAR 2007 faja 3 o latitud/longitud (ver lib/coordenadas.ts). */
+const coordenadaSchema = z.object({
+  sistema: z.enum(['posgar', 'grados']),
+  x: z.string().trim(),
+  y: z.string().trim(),
+  latitud: z.string().trim(),
+  longitud: z.string().trim(),
+})
 
 const usoItemSchema = z.object({
   uso: z.string(), // id de /usos
@@ -18,24 +27,22 @@ export function crearUsosSchema(usosConPuntoEntrega: string[]) {
       codigoServicio: z.string(), // id de /codigosServicio
       periodoInicio: z.string(),
       periodoFin: z.string(),
-      /** Coordenadas POSGAR 2007 faja 3 (EPSG:5345), en metros. */
-      desagueX: z.string().trim(),
-      desagueY: z.string().trim(),
+      /** En X/Y POSGAR 2007 faja 3 o en latitud/longitud. */
+      desague: coordenadaSchema,
       items: z.array(usoItemSchema),
       /** Punto de entrega de agua; solo se exige si algún uso lo requiere. */
-      pecuario: z.object({
-        x: z.string().trim(),
-        y: z.string().trim(),
-        referencia: z.string().trim(),
-      }),
+      pecuario: coordenadaSchema.extend({ referencia: z.string().trim() }),
     })
     .superRefine((u, ctx) => {
       const issue = (path: (string | number)[], message: string | null) => {
         if (message) ctx.addIssue({ code: 'custom', path, message })
       }
 
-      issue(['desagueX'], validarPosgar(u.desagueX, 'x', 'del desagüe'))
-      issue(['desagueY'], validarPosgar(u.desagueY, 'y', 'del desagüe'))
+      const coordenada = (campo: 'desague' | 'pecuario', c: CoordenadaForm, contexto: string) => {
+        for (const [eje, msj] of Object.entries(leerCoordenada(c, contexto).errores)) issue([campo, eje], msj ?? null)
+      }
+
+      coordenada('desague', u.desague, 'del desagüe')
 
       if (u.periodoInicio && u.periodoFin && u.periodoFin < u.periodoInicio) {
         issue(['periodoFin'], 'El fin del período no puede ser anterior al inicio.')
@@ -54,8 +61,7 @@ export function crearUsosSchema(usosConPuntoEntrega: string[]) {
       })
 
       if (u.items.some((i) => usosConPuntoEntrega.includes(i.uso))) {
-        issue(['pecuario', 'x'], validarPosgar(u.pecuario.x, 'x', 'del punto de entrega'))
-        issue(['pecuario', 'y'], validarPosgar(u.pecuario.y, 'y', 'del punto de entrega'))
+        coordenada('pecuario', u.pecuario, 'del punto de entrega')
       }
     })
 }
@@ -69,8 +75,7 @@ export const usosVacio = (): UsosForm => ({
   codigoServicio: '',
   periodoInicio: '',
   periodoFin: '',
-  desagueX: '',
-  desagueY: '',
+  desague: coordenadaVacia(),
   items: [usoItemVacio()],
-  pecuario: { x: '', y: '', referencia: '' },
+  pecuario: { ...coordenadaVacia(), referencia: '' },
 })

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Icon } from '@/components/ui/Icon'
 import { cn } from '@/lib/cn'
 import { CRITERIOS, type CriterioColor, type ItemLeyenda as ItemDeLeyenda } from '../colores'
-import { COLOR_POZO_A_REVISAR, ESTADOS_POZO, formatoHa, ZOOM_ETIQUETAS } from '../estilos'
+import { COLOR_POZO_A_REVISAR, COLOR_POZO_OFICIO, ESTADOS_POZO, formatoHa, TIPOS_PUNTO, ZOOM_ETIQUETAS } from '../estilos'
 import { CAPAS_NINGUNA, CAPAS_TODAS, type CapasVisor, type FiltrosVisor } from '../filtros'
 import { Casilla, claseSelect, Interruptor, ItemLeyenda, Subtitulo } from './ui'
 
@@ -20,7 +20,7 @@ interface Props {
   leyenda: ItemDeLeyenda[]
   capas: CapasVisor
   onCapas: (capas: CapasVisor) => void
-  cantidades: { concesiones: number; superficieHa: number; pozos: number; cauces: number }
+  cantidades: { concesiones: number; superficieHa: number; pozos: number; puntos: number; cauces: number }
   destinos: Destino[]
   onIrA: (clave: string) => void
 }
@@ -81,6 +81,7 @@ function GrupoCapa({
  * Catálogo de capas del visor, agrupado por tema (como los visores del IGN):
  *   - Derechos de agua: concesiones, coloreadas por el criterio elegido; la leyenda filtra.
  *   - Aguas subterráneas: pozos, por estado.
+ *   - Desagües y puntos de entrega de las concesiones (sección de usos).
  *   - Hidrografía: ríos y canales.
  * Arriba, «Ir a» un distrito de riego o un departamento.
  */
@@ -200,6 +201,24 @@ export function PanelCapas({ filtros, onFiltrar, leyenda, capas, onCapas, cantid
           <ItemLeyenda
             muestra={<span className="size-3 shrink-0 rounded-full border-[3px] bg-sky-600" style={{ borderColor: COLOR_POZO_A_REVISAR }} />}
             texto="Fuera del polígono de su concesión"
+          />
+          <ItemLeyenda muestra={<span className="size-3 shrink-0 rounded-full border-[3px] bg-sky-600" style={{ borderColor: COLOR_POZO_OFICIO }} />} texto="Registrado de oficio" />
+        </GrupoCapa>
+
+        <GrupoCapa
+          icono="water_drop"
+          color={TIPOS_PUNTO.DESAGUE.color}
+          titulo="Desagües y puntos de entrega"
+          resumen={`${contar(cantidades.puntos, 'punto', 'puntos')} · sección de usos`}
+          activo={capas.puntos}
+          onCambiar={() => onCapas({ ...capas, puntos: !capas.puntos })}
+        >
+          {Object.entries(TIPOS_PUNTO).map(([clave, t]) => (
+            <ItemLeyenda key={clave} muestra={<span className="size-2.5 shrink-0 rotate-45 border-2 border-white shadow ring-1 ring-slate-300" style={{ backgroundColor: t.color }} />} texto={t.nombre} />
+          ))}
+          <ItemLeyenda
+            muestra={<span className="size-2.5 shrink-0 rotate-45 border-[3px]" style={{ borderColor: COLOR_POZO_A_REVISAR, backgroundColor: TIPOS_PUNTO.DESAGUE.color }} />}
+            texto="A más de 1 km del polígono de su concesión"
           />
         </GrupoCapa>
 

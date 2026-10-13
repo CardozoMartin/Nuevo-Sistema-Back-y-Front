@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
+import { dniDeDocumento } from '../comun/validadores/cuit.js';
 import { TipoPersona, type TipoDocumento } from '../concesiones/concesiones.constantes.js';
 import { Persona } from './entities/persona.entity.js';
 
@@ -22,12 +23,37 @@ export class PersonasService {
   constructor(private readonly dataSource: DataSource) {}
 
   /**
-   * Busca una persona por documento y devuelve sus datos, las concesiones de las que es
-   * titular (vigente) y sus deudas pendientes. Es lo que usa el formulario para
-   * autocompletar un titular que ya está cargado. 404 si no existe.
+   * La persona con ese documento o, si es una persona física, la cargada con el documento
+   * equivalente: un DNI encuentra a quien está con su CUIL / CUIT y al revés (el CUIL lleva
+   * el DNI en el medio). Así no se crea dos veces a la misma persona.
+   *
+   * Si hubiera más de una (duplicados de antes), gana la del documento exacto y después la que
+   * tiene CUIL / CUIT (el dato más completo).
+   */
+  async buscarEquivalente(manager: EntityManager, documento: string, tipoPersona?: TipoPersona): Promise<Persona | null> {
+    const dni = tipoPersona === TipoPersona.JURIDICA ? null : dniDeDocumento(documento);
+    const consulta = manager.createQueryBuilder(Persona, 'p').where('p.documento = :documento', { documento });
+    if (dni) {
+      consulta.orWhere(
+        `(p.tipo_persona = :fisica AND
+          CASE WHEN p.documento ~ '^[0-9]{7,8}$' THEN ltrim(p.documento, '0')
+               WHEN p.documento ~ '^(20|23|24|27)[0-9]{9}$' THEN ltrim(substr(p.documento, 3, 8), '0')
+          END = :dni)`,
+        { fisica: TipoPersona.FISICA, dni },
+      );
+    }
+    const encontradas = await consulta.getMany();
+    const prioridad = (p: Persona) => (p.documento === documento ? 0 : p.documento?.length === 11 ? 1 : 2);
+    return encontradas.sort((a, b) => prioridad(a) - prioridad(b) || Number(a.id) - Number(b.id))[0] ?? null;
+  }
+
+  /**
+   * Busca una persona por documento (o su equivalente DNI ↔ CUIL / CUIT) y devuelve sus datos,
+   * las concesiones de las que es titular (vigente) y sus deudas pendientes. Es lo que usa el
+   * formulario para autocompletar un titular que ya está cargado. 404 si no existe.
    */
   async buscarPorDocumento(documento: string) {
-    const persona = await this.dataSource.manager.findOneBy(Persona, { documento });
+    const persona = await this.buscarEquivalente(this.dataSource.manager, documento);
     if (!persona) throw new NotFoundException('No hay ninguna persona cargada con ese documento.');
 
     const concesiones: Record<string, unknown>[] = await this.dataSource.query(
@@ -60,6 +86,8 @@ export class PersonasService {
    *   2. Si existe, se actualizan sus datos con los últimos declarados (el formulario los
    *      precargó desde la ficha, así que lo que llega es lo vigente).
    *   3. Una persona física no puede pasar a ser jurídica ni al revés con el mismo documento.
+   *   4. Si estaba con DNI y ahora llega su CUIL / CUIT, se le guarda el CUIL / CUIT; si
+   *      estaba con CUIL / CUIT y llega el DNI, se queda con el CUIL / CUIT (no se pierde dato).
    */
   async guardar(tx: EntityManager, d: DatosPersona, usuarioId: string): Promise<Persona> {
     const fisica = d.tipoPersona === TipoPersona.FISICA;
@@ -76,8 +104,12 @@ export class PersonasService {
       telefono: d.telefono ?? null,
     };
 
-    const existente = await tx.findOneBy(Persona, { documento: d.documento });
+    const existente = await this.buscarEquivalente(tx, d.documento, d.tipoPersona);
     if (!existente) return tx.save(tx.create(Persona, { ...datos, creadoUsuarioId: usuarioId }));
+    if (existente.documento?.length === 11 && d.documento.length < 11) {
+      datos.documento = existente.documento;
+      datos.tipoDocumento = existente.tipoDocumento!;
+    }
 
     if (existente.tipoPersona !== d.tipoPersona) {
       throw new ConflictException(

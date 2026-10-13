@@ -44,8 +44,12 @@ function pasosDeCarga({ datos }: PiezasAlta) {
   };
 }
 
-/** X/Y POSGAR (lo que cargó la oficina; null en puntos viejos) y latitud/longitud WGS84 (para el mapa). */
+/**
+ * X/Y POSGAR (null en puntos viejos) y latitud/longitud WGS84, con el sistema en que se cargó
+ * (el formulario lo vuelve a mostrar igual).
+ */
 const coordenada = (p: Punto) => ({
+  sistema: p.sistemaCarga,
   x: p.coordX === null ? null : Number(p.coordX),
   y: p.coordY === null ? null : Number(p.coordY),
   latitud: Number(p.latitud),

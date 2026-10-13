@@ -43,6 +43,21 @@ const FEATURE_POZO = `json_build_object(
         'localidad', v.localidad, 'dentro_de_concesion', v.dentro_de_concesion))`;
 
 /**
+ * Un desagüe o punto de entrega como Feature: punto en WGS84 con los atributos de sig.v_puntos.
+ * La geometría sale de la latitud/longitud guardada (la cargada o la calculada al guardar).
+ */
+const FEATURE_PUNTO = `json_build_object(
+    'type', 'Feature',
+    'id', v.punto_id,
+    'geometry', json_build_object('type', 'Point', 'coordinates', json_build_array(v.longitud, v.latitud)),
+    'properties', json_build_object(
+        'punto_id', v.punto_id, 'tipo', v.tipo, 'sistema_carga', v.sistema_carga,
+        'coord_x', v.coord_x, 'coord_y', v.coord_y, 'latitud', v.latitud, 'longitud', v.longitud,
+        'referencia', v.referencia, 'concesion_id', v.concesion_id, 'concesion_numero', v.concesion_numero,
+        'concesion_estado', v.concesion_estado, 'expediente', v.expediente, 'titular', v.titular,
+        'departamento', v.departamento, 'localidad', v.localidad, 'distancia_poligono_m', v.distancia_poligono_m))`;
+
+/**
  * Capas geográficas para la web, en GeoJSON. Todo el armado lo hace PostgreSQL
  * (json_build_object): no se pasa fila por fila por JavaScript.
  *
@@ -79,6 +94,21 @@ export class CapasService {
                 'features', COALESCE(json_agg(${FEATURE_POZO} ORDER BY v.pozo_id), '[]'::json)
               ) AS capa
          FROM sig.v_pozos v
+        WHERE $1::float8 IS NULL
+           OR v.geom && ST_Transform(ST_MakeEnvelope($1, $2, $3, $4, ${SRID_WGS84}), ${SRID_POSGAR})`,
+      recuadro ?? [null, null, null, null],
+    );
+    return fila.capa;
+  }
+
+  /** Desagües y puntos de entrega dentro del recuadro (o todos), como FeatureCollection de puntos. */
+  async puntos(recuadro?: Recuadro): Promise<unknown> {
+    const [fila] = await this.dataSource.query(
+      `SELECT json_build_object(
+                'type', 'FeatureCollection',
+                'features', COALESCE(json_agg(${FEATURE_PUNTO} ORDER BY v.punto_id), '[]'::json)
+              ) AS capa
+         FROM sig.v_puntos v
         WHERE $1::float8 IS NULL
            OR v.geom && ST_Transform(ST_MakeEnvelope($1, $2, $3, $4, ${SRID_WGS84}), ${SRID_POSGAR})`,
       recuadro ?? [null, null, null, null],

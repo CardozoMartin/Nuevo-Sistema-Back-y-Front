@@ -4,6 +4,8 @@
 // módulo que pasa al backend real usa este. En desarrollo, el proxy de Vite manda /backend/*
 // a localhost:3000/api/*. Con todo migrado, queda un solo cliente.
 import axios from 'axios'
+import { adaptadorDemo } from '../demo/adaptador'
+import { MODO_DEMO } from '../demo/modo'
 import { usuarioActualId } from '../sesion'
 import { toApiError } from './errors'
 
@@ -12,6 +14,9 @@ export const backend = axios.create({
   headers: { 'Content-Type': 'application/json' },
   timeout: 20000,
 })
+
+// Modo demo: todo lo del backend real lo responde el emulador del navegador (services/demo).
+if (MODO_DEMO) backend.defaults.adapter = adaptadorDemo(() => true)
 
 // Quién actúa (pases, actuaciones). TODO(login): token de sesión en lugar del encabezado.
 backend.interceptors.request.use((config) => {

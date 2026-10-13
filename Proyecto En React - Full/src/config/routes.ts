@@ -68,6 +68,8 @@ export const ROUTES = {
     root: '/pozo',
     autorizacion: '/pozo/autorizacion',
     registro: '/pozo/registro',
+    /** Registro de pozo en el circuito (Pozos → Catastro → … → cierre). */
+    registroExpediente: (expedienteId: string) => `/pozo/registro/${expedienteId}`,
     /** Padrón de empresas perforadoras. */
     empresas: '/pozo/empresas',
     empresaNueva: '/pozo/empresas/nueva',
@@ -76,6 +78,10 @@ export const ROUTES = {
     /** Revisión de la oficina donde está la empresa (Jurídico o Secretaría General). */
     empresaRevision: (empresaId: string) => `/pozo/empresas/${empresaId}/revision`,
     autorizaciones: '/pozo/autorizaciones',
+    /** Padrón de pozos por origen (de oficio, con autorización, padrón anterior). */
+    registrados: '/pozo/registrados',
+    /** Historial de monitoreos hidráulicos y químicos de un pozo. */
+    monitoreos: (pozoId: string) => `/pozo/registrados/${pozoId}/monitoreos`,
     consulta: '/pozo/consulta',
     /** Baja de pozo (backend real): bajas en trámite, inicio y el expediente en el circuito. */
     /** Buscador de pozos: el punto de entrada de la baja. */

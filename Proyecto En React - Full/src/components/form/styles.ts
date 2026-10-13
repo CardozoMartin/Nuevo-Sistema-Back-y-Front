@@ -16,6 +16,8 @@ export function controlClass({ invalid, iconLeft, iconRight, className }: Contro
     iconLeft ? 'pl-11' : 'pl-4',
     iconRight ? 'pr-10' : 'pr-4',
     'disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500',
+    // Solo lectura (ej: datos que vienen del padrón de personas): se ve como deshabilitado pero se envía.
+    '[&[readonly]]:bg-slate-100 [&[readonly]]:text-slate-600 dark:[&[readonly]]:bg-slate-900 dark:[&[readonly]]:text-slate-400',
     'dark:bg-slate-800 dark:text-white dark:disabled:bg-slate-900 dark:disabled:text-slate-500',
     invalid
       ? 'border-red-500 focus:border-red-500 focus:ring-red-500/20'

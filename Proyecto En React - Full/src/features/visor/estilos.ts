@@ -1,4 +1,4 @@
-import type { EstadoConcesionGeo, EstadoPozo } from './types'
+import type { EstadoConcesionGeo, EstadoPozo, TipoPunto } from './types'
 
 /** Color y nombre de cada estado: los usan el mapa, la lista y la leyenda. */
 export const ESTADOS: Record<EstadoConcesionGeo, { nombre: string; color: string }> = {
@@ -42,6 +42,21 @@ export const nombreEstadoPozo = (estado: string) => ESTADOS_POZO[estado as Estad
 
 /** Borde de un pozo que cae fuera de su concesión (hay que revisar la carga). */
 export const COLOR_POZO_A_REVISAR = '#dc2626'
+
+/** Borde de un pozo registrado de oficio (sin autorización previa): se diferencia del resto. */
+export const COLOR_POZO_OFICIO = '#d97706'
+
+/** Color y nombre de cada tipo de punto de la sección de usos (se dibujan como rombos). */
+export const TIPOS_PUNTO: Record<TipoPunto, { nombre: string; color: string }> = {
+  DESAGUE: { nombre: 'Desagüe', color: '#7c3aed' },
+  ENTREGA: { nombre: 'Punto de entrega (pecuario)', color: '#059669' },
+}
+
+/**
+ * Más lejos que esto del polígono de su concesión, el punto se marca para revisar (suele ser
+ * una coordenada mal tipeada). Mismo valor que el backend (DISTANCIA_MAX_PUNTO_M).
+ */
+export const DISTANCIA_MAX_PUNTO_M = 1000
 
 export const formatoNumero = (n: number, decimales = 1) => n.toLocaleString('es-AR', { maximumFractionDigits: decimales })
 

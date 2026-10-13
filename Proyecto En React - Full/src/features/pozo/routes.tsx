@@ -8,7 +8,14 @@ export const pozoRoutes: RouteObject[] = [
     children: [
       { index: true, lazy: lazyPage(() => import('./pages/PozoInicioPage')) },
       { path: 'autorizacion', handle: { crumb: 'Autorización de pozo' }, lazy: lazyPage(() => import('./pages/AutorizacionPozoPage')) },
-      { path: 'registro', handle: { crumb: 'Registro de pozo' }, lazy: lazyPage(() => import('./pages/RegistroPozoPage')) },
+      {
+        path: 'registro',
+        handle: { crumb: 'Alta de pozo' },
+        children: [
+          { index: true, lazy: lazyPage(() => import('./AltaDePozo/pages/AltaPozoPage')) },
+          { path: ':expedienteId', handle: { crumb: 'Expediente' }, lazy: lazyPage(() => import('./CircuitoPozo/pages/CircuitoPozoPage')) },
+        ],
+      },
       {
         path: 'empresas',
         handle: { crumb: 'Empresas perforadoras' },
@@ -20,6 +27,14 @@ export const pozoRoutes: RouteObject[] = [
         ],
       },
       { path: 'autorizaciones', handle: { crumb: 'Autorizaciones' }, lazy: lazyPage(() => import('./pages/AutorizacionesPage')) },
+      {
+        path: 'registrados',
+        handle: { crumb: 'Pozos registrados' },
+        children: [
+          { index: true, lazy: lazyPage(() => import('./Padron/pages/PozosRegistradosPage')) },
+          { path: ':pozoId/monitoreos', handle: { crumb: 'Monitoreos' }, lazy: lazyPage(() => import('./Monitoreos/pages/MonitoreosPozoPage')) },
+        ],
+      },
       { path: 'consulta', handle: { crumb: 'Consulta general' }, lazy: lazyPage(() => import('./pages/ConsultaGeneralPage')) },
       {
         path: 'bajas',

@@ -62,6 +62,15 @@ export class SigController {
   }
 
   /**
+   * GET /api/sig/puntos?bbox=oeste,sur,este,norte
+   * Desagües y puntos de entrega vigentes, como puntos GeoJSON WGS84. Sin bbox devuelve todos.
+   */
+  @Get('puntos')
+  puntos(@Query('bbox') bbox?: string) {
+    return this.capas.puntos(CapasService.leerRecuadro(bbox));
+  }
+
+  /**
    * GET /api/sig/cauces?bbox=oeste,sur,este,norte
    * Ríos y canales (líneas simplificadas, WGS84). Sin bbox devuelve todos.
    */

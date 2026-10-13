@@ -30,8 +30,13 @@ con la concesión actualizada al final. El Alta se volvió a probar después de 
 | Reubicación | ⏳ **Próximo** (placeholder) |
 | Permisos | ⏳ Placeholder |
 | **Pozo — Empresas perforadoras** (alta, modificación, baja/reactivación; alta/baja/modificación de máquinas) | ✅ Hecho |
-| Pozo (autorización, registro, consulta) | ⏳ Placeholder |
+| **Pozo — Alta de pozo de oficio** (8 pestañas del prototipo, coordenadas unificadas, monitoreos con fecha) — PROTOTIPO en modo demo (`npm run demo`) | 🟡 Prototipo |
+| **Pozo — Pozos registrados** (padrón por origen: de oficio / con autorización / padrón anterior; marca «De oficio» en listas, ficha y visor) — PROTOTIPO en modo demo | 🟡 Prototipo |
+| **Pozo — Circuito del registro** (Pozos → Catastro: concesión, N° y caudales → Distrito → Recaudación → Jurídico → Secretaría: resolución → Pozos: cierre y concesión vigente) — PROTOTIPO en modo demo | 🟡 Prototipo |
+| **Pozo — Historial de monitoreos** (hidráulicos y químicos por fecha, cambios contra el anterior, informe por fecha, evolución hidráulica) — PROTOTIPO en modo demo | 🟡 Prototipo |
+| Pozo (autorización, consulta) | ⏳ Placeholder |
 | **Búsqueda Catastro + historial de expedientes y concesiones** | ✅ Hecho |
+| **Modo demo** (`npm run demo`): backend emulado en el navegador para Alta de Concesión, Baja de Pozo, visor y alta de pozo | ✅ Hecho |
 | Búsqueda general, Visor, Configuración | ⏳ Placeholder |
 | Login / roles | ❌ No empezado (preparado con `TODO(login)`) |
 | Dashboard con KPIs | ❌ Hoy solo accesos a módulos |

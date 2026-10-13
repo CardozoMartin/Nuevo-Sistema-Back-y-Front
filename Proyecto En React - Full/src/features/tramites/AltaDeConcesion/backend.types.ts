@@ -75,10 +75,13 @@ export interface AltaBackend {
     codigoServicio: number | null
     periodoInicio: string | null
     periodoFin: string | null
-    /** X/Y POSGAR 2007 faja 3 (null en puntos cargados antes) y latitud/longitud WGS84. */
-    desague: { x: number | null; y: number | null; latitud: number; longitud: number } | null
+    /**
+     * X/Y POSGAR 2007 faja 3 (null en puntos cargados antes) y latitud/longitud WGS84, con el
+     * sistema en que se cargó (POSGAR_FAJA3 o WGS84).
+     */
+    desague: { sistema: string; x: number | null; y: number | null; latitud: number; longitud: number } | null
     items: { uso: string; nombre: string; unidad: string; magnitud: number; dotacion: number; caudal: number }[]
-    puntoEntrega: { x: number | null; y: number | null; latitud: number; longitud: number; referencia: string | null } | null
+    puntoEntrega: { sistema: string; x: number | null; y: number | null; latitud: number; longitud: number; referencia: string | null } | null
     caudalCalculado: number
   } | null
   suministro: {

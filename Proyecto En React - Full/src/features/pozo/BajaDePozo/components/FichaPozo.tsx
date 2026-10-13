@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { ROUTES } from '@/config/routes'
 import { Icon } from '@/components/ui/Icon'
 import { cn } from '@/lib/cn'
+import { MarcaOrigen } from '../../Padron/components/MarcaOrigen'
 import { ESTADO_POZO, formatoNumero } from '../estilos'
 import type { PozoBackend } from '../types'
 
@@ -25,7 +26,12 @@ export function FichaPozo({ pozo }: { pozo: PozoBackend }) {
         <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', ESTADO_POZO[pozo.estado].color)}>{ESTADO_POZO[pozo.estado].texto}</span>
       </div>
       <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-4">
-        <Dato etiqueta="Tipo" valor={pozo.tipoPozo} />
+        <div>
+          <dt className="text-xs font-semibold tracking-wide text-slate-400 uppercase">Origen</dt>
+          <dd className="mt-0.5">
+            <MarcaOrigen origen={pozo.origen} />
+          </dd>
+        </div>
         <Dato etiqueta="Profundidad" valor={pozo.profundidadM !== null ? `${formatoNumero(pozo.profundidadM)} m` : null} />
         <Dato etiqueta="Caudal" valor={pozo.caudalLps !== null ? `${formatoNumero(pozo.caudalLps)} l/s (${formatoNumero(pozo.caudalM3h ?? 0)} m³/h)` : null} />
         <Dato etiqueta="Jurisdicción DRH" valor={pozo.jurisdiccionDrh ? 'Sí' : 'No'} />

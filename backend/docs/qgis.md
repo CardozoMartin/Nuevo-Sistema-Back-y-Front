@@ -66,6 +66,29 @@ Un punto por pozo (no incluye los anulados). Clave única: **`pozo_id`**.
 
 Para encontrar los pozos a revisar: filtro `"dentro_de_concesion" = false`.
 
+## 3 bis bis. La capa `sig.v_puntos`
+
+El desagüe y el punto de entrega (uso pecuario) vigentes de cada concesión, uno por fila (no
+incluye las concesiones anuladas ni denegadas). Clave única: **`punto_id`**.
+
+| Campo | Qué es |
+|-------|--------|
+| `tipo` | `DESAGUE` o `ENTREGA` |
+| `sistema_carga` | En qué se cargó: `POSGAR_FAJA3` (X/Y en metros) o `WGS84` (latitud/longitud en grados) |
+| `coord_x`, `coord_y` | Coordenadas POSGAR 07 (si se cargó en grados, las calculó PostGIS) |
+| `latitud`, `longitud` | Grados decimales WGS84 (si se cargó en X/Y, las calculó PostGIS) |
+| `referencia` | Descripción del lugar (ej: «Laguna El Bordo — potrero norte») |
+| `concesion_id`, `concesion_numero`, `expediente`, `titular` | Concesión a la que pertenece |
+| `distancia_poligono_m` | Distancia al polígono de la concesión (0 si cae dentro; vacío si no hay polígono) |
+
+Para encontrar los puntos a revisar (suele ser una coordenada mal tipeada): filtro `"distancia_poligono_m" > 1000`.
+
+**Criterio de coordenadas.** Todos los puntos que se cargan a mano (desagüe, punto de entrega y,
+más adelante, pozos) se aceptan en X/Y POSGAR 2007 faja 3 o en latitud/longitud. Las
+geográficas POSGAR 07 (ej: «Latitud -27.05362983°, Longitud -65.23122447°») y las WGS84 difieren
+menos de 1 m, así que se toman como iguales. Se guardan siempre las dos formas, y la geometría en
+EPSG:5345.
+
 ## 3 ter. La capa `sig.cauce`
 
 Ríos y canales (líneas, EPSG:5345): `nombre` (vacío en arroyos y acequias sin nombre), `tipo`

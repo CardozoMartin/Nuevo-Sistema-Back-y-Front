@@ -1,6 +1,7 @@
 import { Check, Column, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, type Relation } from 'typeorm';
 import type { Point } from 'geojson';
 import { Expediente } from '../../expedientes/entities/expediente.entity.js';
+import { SistemaCoordenadas } from '../../sig/kml/sistema-coordenadas.js';
 import { TipoPunto } from '../concesiones.constantes.js';
 import { Concesion } from './concesion.entity.js';
 import { FilaVersionada } from './fila-versionada.js';
@@ -9,9 +10,10 @@ import { FilaVersionada } from './fila-versionada.js';
  * Punto con coordenadas declarado en la sección de usos (con_punto): el desagüe y, si algún
  * uso lo exige, el punto de entrega del agua. Uno vigente de cada tipo por concesión.
  *
- * La oficina carga X/Y en POSGAR 2007 faja 3 (EPSG:5345): se guardan tal cual (coord_x,
- * coord_y), como geometría (geom, para QGIS y búsquedas por zona) y PostGIS calcula la
- * latitud/longitud WGS84 que usa el mapa web.
+ * Se puede cargar en X/Y POSGAR 2007 faja 3 (EPSG:5345, lo habitual en la oficina) o en
+ * latitud/longitud (grados). Sea cual sea, se guardan siempre las dos formas, calculadas por
+ * PostGIS: X/Y (coord_x, coord_y y geom, para QGIS y búsquedas por zona) y la latitud/longitud
+ * WGS84 que usa el mapa web. `sistema_carga` recuerda en cuál se cargó, para volver a mostrarlo igual.
  */
 @Entity('con_punto')
 @Index('uk_punto_vigente', ['concesion', 'tipo'], { unique: true, where: 'vigente' })
@@ -28,7 +30,11 @@ export class Punto extends FilaVersionada {
   @Column({ type: 'enum', enum: TipoPunto, enumName: 'con_tipo_punto' })
   tipo: TipoPunto;
 
-  /** POSGAR 2007 faja 3, en metros: lo que cargó la oficina. */
+  /** En qué sistema se cargó: el valor de ese sistema es el original, el otro es calculado. */
+  @Column({ name: 'sistema_carga', type: 'enum', enum: SistemaCoordenadas, enumName: 'con_sistema_coordenadas', default: SistemaCoordenadas.POSGAR_FAJA3 })
+  sistemaCarga: SistemaCoordenadas;
+
+  /** POSGAR 2007 faja 3, en metros (NULL solo en puntos viejos, anteriores a guardar las dos formas). */
   @Column({ name: 'coord_x', type: 'decimal', precision: 12, scale: 2, nullable: true })
   coordX: string | null;
 
@@ -40,7 +46,7 @@ export class Punto extends FilaVersionada {
   @Column({ type: 'geometry', spatialFeatureType: 'Point', srid: 5345, nullable: true, select: false })
   geom: Point | null;
 
-  /** WGS84 en grados decimales (6 decimales ≈ 10 cm), calculados por PostGIS desde X/Y. */
+  /** WGS84 en grados decimales (6 decimales ≈ 10 cm). */
   @Column({ type: 'decimal', precision: 9, scale: 6 })
   latitud: string;
 

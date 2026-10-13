@@ -338,11 +338,11 @@ function datosAltaDemo({ titular, ubicacion, coordenadas, hectareas, usoId, caud
     registral: { libro: String(100 + i), folio: String(300 + i * 7), anio: String(1990 + (i % 30)), matricula: `M-${4000 + i}`, serie: '' },
     usos: {
       caracter: 'permanente', codigoServicio: String(1 + (i % 5)), periodoInicio: '2026-01-01', periodoFin: '2030-12-31',
-      desagueLatitud: lat.toFixed(6), desagueLongitud: lng.toFixed(6),
+      desague: { sistema: 'grados', x: '', y: '', latitud: lat.toFixed(6), longitud: lng.toFixed(6) },
       items: [{ uso: usoId, magnitud }],
       pecuario: uso.requierePuntoEntrega
-        ? { latitud: lat.toFixed(6), longitud: lng.toFixed(6), referencia: 'Represa del potrero norte' }
-        : { latitud: '', longitud: '', referencia: '' },
+        ? { sistema: 'grados', x: '', y: '', latitud: lat.toFixed(6), longitud: lng.toFixed(6), referencia: 'Represa del potrero norte' }
+        : { sistema: 'posgar', x: '', y: '', latitud: '', longitud: '', referencia: '' },
     },
     suministro: suministroDemo(ubicacion, caudal),
   }

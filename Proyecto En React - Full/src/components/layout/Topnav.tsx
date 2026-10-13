@@ -5,6 +5,7 @@ import { useTheme } from '@/hooks/useTheme'
 import { Icon } from '@/components/ui/Icon'
 import { cn } from '@/lib/cn'
 import { CampanaNotificaciones } from '@/features/notificaciones/components/CampanaNotificaciones'
+import { IndicadorDemo } from './IndicadorDemo'
 import { SelectorUsuario } from './SelectorUsuario'
 
 interface TopnavProps {
@@ -52,6 +53,7 @@ export function Topnav({ onOpenSidebar, menuSiempre = false }: TopnavProps) {
         </div>
 
         <div className="flex items-center gap-1 md:gap-3">
+          <IndicadorDemo />
           <CampanaNotificaciones />
           <button
             type="button"

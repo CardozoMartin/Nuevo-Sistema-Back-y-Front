@@ -14,6 +14,28 @@ export interface GeometriaNormalizada {
   avisos: string[];
 }
 
+/**
+ * Un punto cargado a mano (desagüe, punto de entrega, pozo), en uno de los dos sistemas que
+ * se aceptan: X/Y POSGAR 2007 faja 3 (metros) o latitud/longitud (grados decimales).
+ */
+export interface CoordenadaCargada {
+  x?: number | null;
+  y?: number | null;
+  latitud?: number | null;
+  longitud?: number | null;
+}
+
+/** El punto con sus dos formas: la cargada (tal cual) y la calculada por PostGIS. */
+export interface PuntoNormalizado {
+  sistema: SistemaCoordenadas;
+  /** POSGAR 2007 faja 3, en metros (2 decimales = 1 cm). */
+  x: number;
+  y: number;
+  /** WGS84, en grados (6 decimales ≈ 10 cm). */
+  latitud: number;
+  longitud: number;
+}
+
 /** Otra concesión cuyo polígono vigente se superpone con el analizado. */
 export interface Superposicion {
   concesionId: string;
@@ -50,6 +72,8 @@ export function avisoLejosDelCauce(analisis: Pick<AnalisisGeometria, 'cauceCerca
   const nombre = c.nombre ?? (c.tipo === 'CANAL' ? 'un canal sin nombre' : 'un cauce sin nombre');
   return `El polígono está a ${(c.distanciaM / 1000).toLocaleString('es-AR', { maximumFractionDigits: 1 })} km del río o canal más cercano (${nombre}). Las concesiones van a la vera de los cauces: verifique la ubicación.`;
 }
+
+const redondear = (n: number | string, decimales: number) => Number(Number(n).toFixed(decimales));
 
 /** Traducción de los motivos de invalidez que devuelve GEOS (ST_IsValidDetail). */
 const MOTIVOS: [RegExp, string][] = [
@@ -196,6 +220,30 @@ export class GeometriaService {
       superposiciones,
       cauceCercano: cauce ? { nombre: cauce.nombre, tipo: cauce.tipo, distanciaM: Math.round(Number(cauce.m)) } : null,
     };
+  }
+
+  /**
+   * Un punto cargado a mano en X/Y POSGAR o en latitud/longitud → las dos formas, para
+   * guardarlas juntas. La conversión la hace PostGIS (la misma que usa QGIS). Es el criterio
+   * único para todos los puntos del sistema: desagüe, punto de entrega y pozos.
+   */
+  async normalizarPunto(c: CoordenadaCargada, tx: EntityManager = this.dataSource.manager): Promise<PuntoNormalizado> {
+    const tieneXY = c.x != null || c.y != null;
+    const tieneGrados = c.latitud != null || c.longitud != null;
+
+    //1.- Se valida que venga un solo sistema y completo.
+    if (tieneXY && tieneGrados) throw new BadRequestException('Cargue la coordenada en X/Y POSGAR o en latitud/longitud, no en las dos.');
+    if (tieneGrados ? c.latitud == null || c.longitud == null : c.x == null || c.y == null) {
+      throw new BadRequestException('Falta una de las dos coordenadas del punto.');
+    }
+
+    //2.- PostGIS calcula la otra forma.
+    if (tieneGrados) {
+      const [f] = await tx.query(`SELECT ST_X(p) AS x, ST_Y(p) AS y FROM ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), ${SRID_WGS84}), ${SRID_POSGAR}) AS p`, [c.longitud, c.latitud]);
+      return { sistema: SistemaCoordenadas.WGS84, x: redondear(f.x, 2), y: redondear(f.y, 2), latitud: redondear(c.latitud!, 6), longitud: redondear(c.longitud!, 6) };
+    }
+    const [f] = await tx.query(`SELECT ST_Y(p) AS lat, ST_X(p) AS lon FROM ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), ${SRID_POSGAR}), ${SRID_WGS84}) AS p`, [c.x, c.y]);
+    return { sistema: SistemaCoordenadas.POSGAR_FAJA3, x: c.x!, y: c.y!, latitud: redondear(f.lat, 6), longitud: redondear(f.lon, 6) };
   }
 
   /**

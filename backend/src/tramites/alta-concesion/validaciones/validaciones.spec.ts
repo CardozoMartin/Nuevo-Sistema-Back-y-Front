@@ -40,6 +40,14 @@ describe('Paso 2: titulares', () => {
     expect(() => exigirDocumentosSinRepetir([{ documento: '20123456789' }, { documento: '27301112225' }])).not.toThrow();
     expect(() => exigirDocumentosSinRepetir([{ documento: '23456789' }, { documento: '23456789' }])).toThrow('El documento 23456789 está cargado en más de un titular.');
   });
+
+  it('rechaza un DNI y el CUIL que lo contiene (es la misma persona)', () => {
+    expect(() => exigirDocumentosSinRepetir([{ documento: '12345678' }, { documento: '20123456786' }])).toThrow(
+      'Los documentos 12345678 y 20123456786 son de la misma persona: está cargada en más de un titular.',
+    );
+    // Un CUIT de persona jurídica no lleva DNI: no se confunde con uno.
+    expect(() => exigirDocumentosSinRepetir([{ documento: '12345678' }, { documento: '30123456781' }])).not.toThrow();
+  });
 });
 
 describe('Paso 4: inmueble', () => {

@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/Icon'
 import { IconButton } from '@/components/ui/IconButton'
 import { useDominio } from '@/hooks/useDominio'
 import { decimalPositivo } from '@/lib/mascaras'
+import { CoordenadaFields } from './CoordenadaFields'
 import { caudalDeUso, caudalTotal, redondear2 } from '../dotacion'
 import { opcionesDe } from '../opciones'
 import { usoItemVacio } from '../schemas/usos'
@@ -46,23 +47,7 @@ export function UsosFields({ prefix, onCaudalTotalChange }: Props) {
         <FormSelectField name={n('codigoServicio')} label="Código de servicio" placeholder="Seleccione…" options={opcionesDe(codigosServicio)} />
         <FormTextField name={n('periodoInicio')} label="Inicio del período" type="date" />
         <FormTextField name={n('periodoFin')} label="Fin del período" type="date" />
-        <FormMaskedField
-          name={n('desagueX')}
-          label="Desagüe: X POSGAR (este)"
-          required
-          mask={decimalPositivo}
-          inputMode="decimal"
-          placeholder="Ej: 3577293.45"
-          hint="POSGAR 2007 faja 3 (EPSG:5345), en metros."
-        />
-        <FormMaskedField
-          name={n('desagueY')}
-          label="Desagüe: Y POSGAR (norte)"
-          required
-          mask={decimalPositivo}
-          inputMode="decimal"
-          placeholder="Ej: 7035340.12"
-        />
+        <CoordenadaFields name={n('desague')} titulo="Desagüe" required className="md:col-span-2" />
       </div>
 
       <div className="flex flex-col gap-3">
@@ -150,23 +135,7 @@ export function UsosFields({ prefix, onCaudalTotalChange }: Props) {
             </div>
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <FormMaskedField
-              name={n('pecuario.x')}
-              label="Punto de entrega: X POSGAR (este)"
-              required
-              mask={decimalPositivo}
-              inputMode="decimal"
-              placeholder="Ej: 3577293.45"
-              hint="POSGAR 2007 faja 3 (EPSG:5345), en metros."
-            />
-            <FormMaskedField
-              name={n('pecuario.y')}
-              label="Punto de entrega: Y POSGAR (norte)"
-              required
-              mask={decimalPositivo}
-              inputMode="decimal"
-              placeholder="Ej: 7035340.12"
-            />
+            <CoordenadaFields name={n('pecuario')} titulo="Punto de entrega" required className="md:col-span-2" />
             <FormTextField
               name={n('pecuario.referencia')}
               label="Referencia del punto de entrega"

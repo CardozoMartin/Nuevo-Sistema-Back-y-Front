@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { sigApi } from './api'
+import { leerTemas, type ServicioWms } from './capasWms'
 
 export const sigKeys = {
   all: ['sig'] as const,
@@ -42,4 +43,9 @@ export function useCapaPuntos() {
 /** Ríos y canales: cambian muy poco (se recargan con «npm run sig:cauces» en el backend). */
 export function useCapaCauces() {
   return useQuery({ queryKey: sigKeys.cauces(), queryFn: () => sigApi.cauces(), staleTime: Infinity })
+}
+
+/** Capas que ofrece un servicio WMS de otro organismo (se lee una vez por sesión). */
+export function useTemasWms(servicio: ServicioWms) {
+  return useQuery({ queryKey: [...sigKeys.all, 'wms', servicio.id], queryFn: () => leerTemas(servicio), staleTime: Infinity, retry: 1 })
 }

@@ -6,7 +6,7 @@
 --  ni modificar nada.
 --
 --  Se puede ejecutar varias veces (es idempotente). Uso:
---    docker exec -i drh-postgres psql -U drh -d drh_sistema -v clave="'LA_CLAVE'" < sql/rol-lector-sig.sql
+--    docker exec -i drh-postgres psql -U drh -d <DB_NAME del .env> -v clave="'LA_CLAVE'" < sql/rol-lector-sig.sql
 -- ============================================================================
 
 -- 1. El rol (si ya existe, solo se le actualiza la clave).
@@ -16,7 +16,7 @@ SELECT format('CREATE ROLE drh_lector_sig LOGIN PASSWORD %s', :'clave')
 ALTER ROLE drh_lector_sig WITH LOGIN PASSWORD :clave;
 
 -- 2. Puede conectarse a la base, pero no crear nada en public.
-GRANT CONNECT ON DATABASE drh_sistema TO drh_lector_sig;
+GRANT CONNECT ON DATABASE :"DBNAME" TO drh_lector_sig;  -- la base en la que se ejecuta (-d)
 REVOKE CREATE ON SCHEMA public FROM drh_lector_sig;
 
 -- 3. Lectura de todo lo que hay (y lo que se agregue después) en el esquema sig.

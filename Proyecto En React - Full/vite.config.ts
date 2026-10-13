@@ -31,6 +31,14 @@ export default defineConfig({
         target: 'http://localhost:3000',
         rewrite: (path) => path.replace(/^\/backend/, '/api'),
       },
+      // WMS de la Dirección General de Catastro (IDET): solo http y sin CORS, así que el navegador
+      // no lo puede pedir directo (se bloquea en https y no deja leer la consulta con un clic).
+      // En producción hace falta el mismo proxy en el servidor web. Ver features/visor/capasWms.ts.
+      '/ext/catastro': {
+        target: 'http://200.49.89.203',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ext\/catastro/, '/geoserver/dgct'),
+      },
       '/api': {
         target: 'http://localhost:3001',
         rewrite: (path) => path.replace(/^\/api/, ''),

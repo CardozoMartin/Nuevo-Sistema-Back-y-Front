@@ -1,11 +1,12 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { MultiPolygon } from 'geojson'
+import type { Geometry, MultiPolygon } from 'geojson'
 import { ponerFondoVisor } from '@/components/map/fondos'
 import { CENTRO_TUCUMAN, puntoEtiqueta, type LatLng } from '@/lib/geo'
 import { aPosgar, formatearPosgar } from '@/lib/posgar'
 import { COLOR_COMPARACION, COLOR_POZO_A_REVISAR, COLOR_POZO_OFICIO, DISTANCIA_MAX_PUNTO_M, TIPOS_PUNTO, ZOOM_ETIQUETAS, colorPozo, formatoHa, formatoNumero, nombreEstado, nombreEstadoPozo, tituloConcesion } from '../estilos'
+import { capaFija, capasActivas, consultar, SERVICIOS_WMS, type EstadoWms, type ObjetoConsultado, type ServicioWms } from '../capasWms'
 import type { CapasVisor } from '../filtros'
 import { iniciarMedicion, type ResultadoMedicion, type TipoMedicion } from '../medicion'
 import type { AtributosConcesion, CauceGeo, ConcesionGeo, PozoGeo, PuntoGeo } from '../types'
@@ -86,6 +87,21 @@ function tooltipPunto(p: PuntoGeo['properties']) {
   return `<strong>${TIPOS_PUNTO[p.tipo].nombre}</strong> · ${concesion}${p.referencia ? `<br>${p.referencia}` : ''}<br>${coordenadas}${aviso}`
 }
 
+const escapar = (texto: string) => texto.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+
+/** Contenido del globo de la consulta a otros organismos: un bloque por objeto encontrado. */
+function htmlConsulta(objetos: ObjetoConsultado[]) {
+  return objetos
+    .map(({ nombre, datos }) => {
+      const filas = datos.map(([campo, valor]) => `<tr><td style="padding:1px 8px 1px 0;color:#64748b;vertical-align:top">${escapar(campo)}</td><td style="padding:1px 0;font-weight:600">${escapar(valor)}</td></tr>`).join('')
+      return `<div style="margin-bottom:6px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:#a16207">${escapar(nombre)}</div>${filas ? `<table style="font-size:13px">${filas}</table>` : '<div style="color:#64748b">Sin datos cargados</div>'}</div>`
+    })
+    .join('')
+}
+
+/** Color del resaltado de lo consultado (el de las parcelas de Catastro, más grueso). */
+const COLOR_CONSULTA = '#facc15'
+
 /** Rombo para los puntos de la sección de usos (los pozos son círculos: no se confunden). */
 const iconoPunto = (color: string, aRevisar: boolean) =>
   L.divIcon({
@@ -106,6 +122,8 @@ interface Props {
   cauces?: CauceGeo[]
   /** Qué capas se ven. */
   capas: CapasVisor
+  /** Capas WMS de otros organismos que se ven. Clic en el mapa → consulta las que se pueden consultar. */
+  wms: EstadoWms
   /** Pedido de encuadre (ir a un distrito o departamento). `clave` cambia en cada pedido. */
   encuadre?: { recuadro: [number, number, number, number]; clave: number } | null
   seleccionada: number | null
@@ -139,7 +157,7 @@ interface Props {
  *   Mientras se mide, los clics son vértices: no seleccionan concesiones.
  */
 export function MapaConcesiones(props: Props) {
-  const { concesiones, colorDe, pozos = [], puntos = [], cauces = [], capas, encuadre, seleccionada, onSeleccionar, comparacion } = props
+  const { concesiones, colorDe, pozos = [], puntos = [], cauces = [], capas, wms, encuadre, seleccionada, onSeleccionar, comparacion } = props
   const { fondo, onFondoFalla, medicion, onMedicion, marca, onVista, refCursor } = props
   const contenedor = useRef<HTMLDivElement>(null)
   const mapa = useRef<L.Map | null>(null)
@@ -149,6 +167,12 @@ export function MapaConcesiones(props: Props) {
   const capaPozos = useRef<L.LayerGroup | null>(null)
   const capaPuntos = useRef<L.LayerGroup | null>(null)
   const capaCauces = useRef<L.GeoJSON | null>(null)
+  /** Capa WMS de cada tema de otro organismo (clave «servicio|capa»): una por tema, así una capa rota no apaga las demás. */
+  const capasWms = useRef(new Map<string, L.TileLayer.WMS>())
+  const wmsActual = useRef(wms)
+  wmsActual.current = wms
+  /** Consulta en curso o mostrada: el globo, lo resaltado y el pedido (para cancelarlo). */
+  const consulta = useRef<{ globo: L.Popup | null; resaltado: L.GeoJSON | null; control: AbortController | null }>({ globo: null, resaltado: null, control: null })
   /** Polígono de Leaflet de cada concesión, para resaltarla y centrarla. */
   const porId = useRef(new Map<number, L.Path>())
   const encuadrada = useRef(false)
@@ -176,9 +200,12 @@ export function MapaConcesiones(props: Props) {
     const m = L.map(contenedor.current, { preferCanvas: true, zoomControl: false }).setView(CENTRO_TUCUMAN, 9)
     L.control.zoom({ position: 'bottomright', zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar' }).addTo(m)
     m.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noreferrer">Leaflet</a>')
-    // Clic fuera de un polígono: quita la selección (salvo que se esté midiendo).
-    m.on('click', () => {
-      if (!midiendo.current) seleccionar.current(null)
+    // Clic fuera de un polígono: quita la selección (salvo que se esté midiendo) y consulta las
+    // capas de otros organismos que se ven (ej: padrón y nomenclatura de la parcela de Catastro).
+    m.on('click', (e: L.LeafletMouseEvent) => {
+      if (midiendo.current) return
+      seleccionar.current(null)
+      void consultarWms(e)
     })
     // Posición del cursor en latitud/longitud y en POSGAR 07 (la que usa la oficina).
     m.on('mousemove', (e: L.LeafletMouseEvent) => {
@@ -208,6 +235,9 @@ export function MapaConcesiones(props: Props) {
       capaPozos.current = null
       capaPuntos.current = null
       capaCauces.current = null
+      capasWms.current.clear()
+      consulta.current.control?.abort()
+      consulta.current = { globo: null, resaltado: null, control: null }
       capaFondo.current = null
       capaEtiquetas.current = null
       porId.current.clear()
@@ -349,6 +379,106 @@ export function MapaConcesiones(props: Props) {
     geo.bringToBack()
     capaCauces.current = geo
   }, [cauces, capas.cauces])
+
+  // 2c'. Servicios WMS de otros organismos: imágenes del servidor de origen, encima del mapa
+  //      base (zIndex) y debajo de las capas vectoriales de la DRH (que van en otro panel).
+  //      Los primeros servicios de la lista van arriba (Catastro: las parcelas sobre los cultivos).
+  useEffect(() => {
+    const m = mapa.current
+    if (!m) return
+    const pedidas = new Map(capasActivas(wms).map((c) => [`${c.servicio.id}|${c.capa}`, c]))
+    for (const [clave, capa] of capasWms.current) {
+      if (pedidas.has(clave)) continue
+      capa.remove()
+      capasWms.current.delete(clave)
+    }
+    for (const [clave, { servicio, capa }] of pedidas) {
+      if (capasWms.current.has(clave)) continue
+      const fija = capaFija(servicio, capa)
+      const nueva = L.tileLayer
+        .wms(servicio.url, {
+          layers: capa,
+          format: 'image/png',
+          transparent: true,
+          version: '1.3.0',
+          opacity: servicio.opacidad ?? 0.75,
+          zIndex: 10 + SERVICIOS_WMS.length - SERVICIOS_WMS.indexOf(servicio),
+          minZoom: fija?.minZoom ?? 0,
+          maxZoom: 21,
+          attribution: servicio.fuente,
+          // Parámetro extra del pedido (Leaflet lo agrega a la URL): estilo propio de la capa.
+          ...(fija?.estilo ? { SLD_BODY: fija.estilo } : {}),
+        })
+        .addTo(m)
+      capasWms.current.set(clave, nueva)
+    }
+  }, [wms])
+
+  /** Quita el globo y el resaltado de la consulta anterior, y cancela la que esté en curso. */
+  function limpiarConsulta() {
+    const c = consulta.current
+    c.control?.abort()
+    c.resaltado?.remove()
+    if (c.globo) mapa.current?.closePopup(c.globo)
+    consulta.current = { globo: null, resaltado: null, control: null }
+  }
+
+  /**
+   * Consulta (GetFeatureInfo) las capas que se ven de los servicios consultables, en el punto del
+   * clic. Muestra los datos en un globo y resalta lo encontrado. Solo usa refs: se llama desde el
+   * evento de clic, que se registra una sola vez.
+   */
+  async function consultarWms(e: L.LeafletMouseEvent) {
+    const m = mapa.current
+    if (!m) return
+    limpiarConsulta()
+    const porServicio = new Map<ServicioWms, string[]>()
+    for (const { servicio, capa } of capasActivas(wmsActual.current)) {
+      const minZoom = capaFija(servicio, capa)?.minZoom ?? 0
+      if (servicio.consultable && m.getZoom() >= minZoom) porServicio.set(servicio, [...(porServicio.get(servicio) ?? []), capa])
+    }
+    if (!porServicio.size) return
+
+    const limites = m.getBounds()
+    const so = L.CRS.EPSG3857.project(limites.getSouthWest())
+    const ne = L.CRS.EPSG3857.project(limites.getNorthEast())
+    const tamanio = m.getSize()
+    const punto = { bbox: [so.x, so.y, ne.x, ne.y] as [number, number, number, number], ancho: tamanio.x, alto: tamanio.y, x: e.containerPoint.x, y: e.containerPoint.y }
+    const control = new AbortController()
+    const globo = L.popup({ maxWidth: 340, autoPanPaddingTopLeft: [440, 80] }).setLatLng(e.latlng).setContent('<span style="color:#64748b">Consultando…</span>').openOn(m)
+    globo.on('remove', () => {
+      if (consulta.current.globo !== globo) return
+      consulta.current.control?.abort()
+      consulta.current.resaltado?.remove()
+      consulta.current = { globo: null, resaltado: null, control: null }
+    })
+    consulta.current = { globo, resaltado: null, control }
+
+    try {
+      const respuestas = await Promise.allSettled([...porServicio].map(([servicio, capas]) => consultar(servicio, capas, punto, control.signal)))
+      if (control.signal.aborted) return
+      const objetos = respuestas.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
+      const fallidos = [...porServicio.keys()].filter((_, i) => respuestas[i].status === 'rejected')
+      if (!objetos.length && !fallidos.length) {
+        m.closePopup(globo)
+        return
+      }
+      const aviso = fallidos.map((s) => `<div style="color:#b91c1c;font-size:12px">${escapar(s.servidor)} no respondió la consulta.</div>`).join('')
+      globo.setContent(htmlConsulta(objetos) + aviso)
+      const geometrias = objetos.map((o) => o.geometria).filter((g): g is Geometry => g !== null)
+      if (geometrias.length) {
+        consulta.current.resaltado = L.geoJSON(geometrias, {
+          // La geometría viene en EPSG:3857 (la del pedido), con una tercera coordenada en 0.
+          coordsToLatLng: (c) => L.CRS.EPSG3857.unproject(L.point(c[0], c[1])),
+          pointToLayer: (_, latlng) => L.circleMarker(latlng, { radius: 8 }),
+          style: { color: COLOR_CONSULTA, weight: 4, fillColor: COLOR_CONSULTA, fillOpacity: 0.15 },
+          interactive: false,
+        }).addTo(m)
+      }
+    } catch {
+      if (!control.signal.aborted) globo.setContent('<span style="color:#b91c1c">No se pudo hacer la consulta.</span>')
+    }
+  }
 
   // 2d. «Ir a»: encuadrar el distrito o departamento elegido.
   useEffect(() => {

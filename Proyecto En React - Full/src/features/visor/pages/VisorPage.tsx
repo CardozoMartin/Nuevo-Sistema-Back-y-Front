@@ -16,6 +16,7 @@ import { PanelCapas, type Destino } from '../components/PanelCapas'
 import { PanelFondos } from '../components/PanelFondos'
 import { PanelResultados } from '../components/PanelResultados'
 import { BotonIcono, claseFlotante } from '../components/ui'
+import { ESTADO_WMS_INICIAL, type EstadoWms } from '../capasWms'
 import { armarLeyenda, colorizador } from '../colores'
 import { formatoHa } from '../estilos'
 import { CAPAS_TODAS, filtrar, filtrosIniciales, recuadroDe, type CapasVisor } from '../filtros'
@@ -56,6 +57,7 @@ export default function VisorPage() {
   const capaPuntos = useCapaPuntos()
   const capaCauces = useCapaCauces()
   const [capas, setCapas] = useState<CapasVisor>(CAPAS_TODAS)
+  const [wms, setWms] = useState<EstadoWms>(ESTADO_WMS_INICIAL)
   const [encuadre, setEncuadre] = useState<{ recuadro: [number, number, number, number]; clave: number } | null>(null)
   const [parametros, setParametros] = useSearchParams()
   const [filtros, setFiltros] = useState(filtrosIniciales)
@@ -197,6 +199,8 @@ export default function VisorPage() {
         cantidades={{ concesiones: visibles.length, superficieHa: superficie, pozos: pozos.length, puntos: puntos.length, cauces: capaCauces.data?.features.length ?? 0 }}
         destinos={destinos}
         onIrA={irA}
+        wms={wms}
+        onWms={setWms}
       />
     )
   else if (panel === 'fondos') contenido = <PanelFondos fondo={fondo} onFondo={setFondo} />
@@ -224,6 +228,7 @@ export default function VisorPage() {
           puntos={puntos}
           cauces={capaCauces.data?.features}
           capas={capas}
+          wms={wms}
           encuadre={encuadre}
           seleccionada={seleccionada}
           onSeleccionar={seleccionar}

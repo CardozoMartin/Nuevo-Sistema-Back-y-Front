@@ -110,6 +110,12 @@ El front siempre llama a `/api/...`; el proxy de Vite lo redirige a `localhost:3
 backend real cambia el target del proxy (o `VITE_API_URL`) y, si hiciera falta, las funciones de
 `api.ts` de cada módulo — los hooks y las pantallas no se tocan.
 
+El visor muestra además capas WMS de otros organismos (`features/visor/capasWms.ts`). Las del Ministerio
+de Producción se piden directo (https, con CORS). Las de **Catastro** (`http://200.49.89.203/geoserver/dgct`)
+son solo http y sin CORS, así que van por el proxy **`/ext/catastro`** de `vite.config.ts`.
+**En producción el servidor web tiene que tener ese mismo proxy** (`/ext/catastro/*` → `http://200.49.89.203/geoserver/dgct/*`);
+sin él no se ven las capas de Catastro ni funciona la consulta de parcelas con un clic.
+
 **Capas, siempre en este orden:**
 
 1. `services/api/client.ts` — instancia axios. Todos los errores salen como `ApiError` con un mensaje listo para mostrar.

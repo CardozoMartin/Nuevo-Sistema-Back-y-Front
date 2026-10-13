@@ -10,7 +10,7 @@ que exportar nada.
 |-------|--------------------|
 | Host | `localhost` (o la IP del servidor) |
 | Puerto | `5433` |
-| Base de datos | `drh_sistema` |
+| Base de datos | la de `DB_NAME` en `backend/.env` (por defecto `drh_sistema`) |
 | Usuario | `drh_lector_sig` |
 | Clave | la que se definió al crear el usuario (en desarrollo: `lector_dev`) |
 
@@ -18,7 +18,7 @@ El usuario `drh_lector_sig` **solo puede leer** el esquema `sig`. No ve las tabl
 ni puede modificar nada. Se crea o actualiza con:
 
 ```bash
-docker exec -i drh-postgres psql -U drh -d drh_sistema -v clave="'LA_CLAVE'" < sql/rol-lector-sig.sql
+docker exec -i drh-postgres psql -U drh -d <DB_NAME del .env> -v clave="'LA_CLAVE'" < sql/rol-lector-sig.sql
 ```
 
 ## 2. Conectar QGIS (una sola vez)

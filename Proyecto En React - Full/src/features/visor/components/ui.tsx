@@ -22,13 +22,27 @@ export function Subtitulo({ children, acciones }: { children: ReactNode; accione
   )
 }
 
-/** Fila con casilla: un valor de la leyenda que se puede apagar. */
-export function Casilla({ marcada, onCambiar, muestra, texto, cantidad }: { marcada: boolean; onCambiar: () => void; muestra: ReactNode; texto: string; cantidad?: number }) {
+/** Fila con casilla: un valor de la leyenda que se puede apagar (o, sin `tachar`, una capa de un catálogo). */
+export function Casilla({
+  marcada,
+  onCambiar,
+  muestra,
+  texto,
+  cantidad,
+  tachar = true,
+}: {
+  marcada: boolean
+  onCambiar: () => void
+  muestra: ReactNode
+  texto: string
+  cantidad?: number
+  tachar?: boolean
+}) {
   return (
     <label className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50">
       <input type="checkbox" checked={marcada} onChange={onCambiar} className="size-4 shrink-0 rounded border-slate-300 accent-primary" />
       {muestra}
-      <span className={cn('min-w-0 flex-1 truncate', marcada ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 line-through')}>{texto}</span>
+      <span className={cn('min-w-0 flex-1 truncate', marcada ? 'text-slate-700 dark:text-slate-200' : tachar ? 'text-slate-400 line-through' : 'text-slate-500 dark:text-slate-400')}>{texto}</span>
       {cantidad !== undefined && <span className="text-xs text-slate-400 tabular-nums">{cantidad.toLocaleString('es-AR')}</span>}
     </label>
   )

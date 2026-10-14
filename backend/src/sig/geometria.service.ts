@@ -133,6 +133,22 @@ export class GeometriaService {
   }
 
   /**
+   * Junta las partes de un MultiPolygon que comparten linderos (parcelas vecinas de una misma
+   * concesión). PostGIS no acepta un MultiPolygon con dos partes que comparten un borde; unidas,
+   * la superficie es la misma. Sirve en cualquier sistema de coordenadas (no transforma nada).
+   * Devuelve la geometría y cuántas partes quedaron.
+   */
+  async unirPartes(geometria: MultiPolygon, tx: EntityManager = this.dataSource.manager): Promise<{ geometria: MultiPolygon; partes: number }> {
+    if (geometria.coordinates.length < 2) return { geometria, partes: geometria.coordinates.length };
+    const [fila] = await tx.query(
+      `SELECT ST_AsGeoJSON(u, 10)::json AS geojson, ST_NumGeometries(u) AS partes
+         FROM (SELECT ST_Multi(ST_UnaryUnion(ST_GeomFromGeoJSON($1))) AS u) x`,
+      [JSON.stringify(geometria)],
+    );
+    return { geometria: fila.geojson as MultiPolygon, partes: Number(fila.partes) };
+  }
+
+  /**
    * Geometría en un sistema declarado por el archivo, distinto de POSGAR 2007 y de WGS84.
    *   1. Tiene que ser un sistema que PostGIS conozca (spatial_ref_sys).
    *   2. Se transforma a WGS84 con el cambio de datum que corresponda (Campo Inchauspe → ~225 m).

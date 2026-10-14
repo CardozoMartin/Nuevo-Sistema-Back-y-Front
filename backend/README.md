@@ -27,6 +27,10 @@ docker exec -it drh-postgres psql -U drh -d drh_sistema   # consola SQL
 npm run test:e2e            # pruebas e2e (con la base levantada)
 npm run db:tablas           # docs/tablas.md: estructura de cada tabla (columnas, claves, índices, CHECKs)
 npm run db:sql              # docs/esquema.sql: el SQL exacto de la base
+
+# Capa de concesiones de QGIS (GeoJSON con polígonos + datos) → padrón del sistema
+node scripts/sig/capa-qgis-a-padron.mjs capa.geojson datos/qgis/capa.padron.json --distrito I
+npm run migracion -- importar datos/qgis/capa.padron.json --nombre "Capa QGIS …"
 ```
 
 Cómo se generan las tablas a partir de las entidades: sección 8 de [PROCESOS_BACKEND.md](../PROCESOS_BACKEND.md).

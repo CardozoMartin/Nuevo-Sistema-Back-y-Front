@@ -62,7 +62,7 @@ type ResultadoFila =
  *   1. Si ya fue importada (mig_registro_origen), se omite: la importación es repetible.
  *   2. Concesión VIGENTE, origen MIGRACION, con su número de otorgamiento.
  *   3. Titulares (texto libre de la planilla → denominación, tipo de persona y documento).
- *   4. Inmueble con la ubicación administrativa y la cuenca.
+ *   4. Inmueble con la ubicación administrativa, la cuenca y los padrones (Rentas y Catastro).
  *   5. Uso con su caudal (magnitud × dotación) → caudal asignado de la concesión.
  *   6. Suministro (fuente, sistema, canales, desagüe).
  *   7. Polígono, si la fila lo trae: PostGIS lo valida; si es inválido se importa la
@@ -189,8 +189,11 @@ export class ImportadorService {
     }
     const avisos: string[] = [];
 
-    // Paso 2: concesión.
+    // Paso 2: concesión. Una fila con el polígono y nada más (capa de QGIS sin los datos del
+    //   padrón) se importa igual, marcada para completar: así el polígono queda asociado al número.
     const propietario = N.texto(fila.propietariosActuales);
+    const soloPoligono = !!fila.geometria && !N.texto(fila.titulares) && !N.texto(fila.uso) && !N.texto(fila.fuente);
+    if (soloPoligono) avisos.push('Solo trae el polígono: faltan los datos de la concesión.');
     const concesion = await tx.save(
       tx.create(Concesion, {
         numero: clave,
@@ -203,9 +206,11 @@ export class ImportadorService {
             : null,
         expediente: null,
         situacionLegal: null,
-        observaciones: propietario
-          ? `Propietario actual informado en el padrón: ${propietario}.`
-          : null,
+        observaciones: soloPoligono
+          ? 'Importada solo con el polígono: faltan los datos de la concesión.'
+          : propietario
+            ? `Propietario actual informado en el padrón: ${propietario}.`
+            : null,
         creadoUsuarioId: USUARIO_SISTEMA,
       }),
     );
@@ -215,7 +220,7 @@ export class ImportadorService {
     //     titular de varias concesiones queda una sola vez);
     //   - sin documento no hay con qué compararla: se crea una persona nueva.
     const titulares = N.titulares(fila, avisos);
-    if (!titulares.length) avisos.push('La fila no tiene titulares.');
+    if (!titulares.length && !soloPoligono) avisos.push('La fila no tiene titulares.');
     for (const [orden, t] of titulares.entries()) {
       const existente = t.documento ? await tx.findOneBy(Persona, { documento: t.documento }) : null;
       const persona =
@@ -237,7 +242,15 @@ export class ImportadorService {
     //   Lo que no está en el catálogo queda vacío y se avisa; el texto original sigue en
     //   mig_registro_origen (la fila completa de la planilla).
     const ubicacion = this.ubicacionDelCatalogo(fila, indice, avisos);
-    await tx.save(tx.create(Inmueble, { concesion, ...ubicacion, vigente: true }));
+    await tx.save(
+      tx.create(Inmueble, {
+        concesion,
+        ...ubicacion,
+        padron: N.texto(fila.padronRentas),
+        matriculaCatastral: N.texto(fila.padronCatastro),
+        vigente: true,
+      }),
+    );
 
     // Paso 5: uso y caudal.
     const codigoUso = N.codigoUso(fila.uso);
@@ -301,8 +314,13 @@ export class ImportadorService {
     if (fila.geometria) {
       try {
         await tx.transaction(async (sp) => {
+          // Varias parcelas de la concesión: las que comparten linderos se unen en una.
+          const recibida = N.aMultiPolygon(fila.geometria!);
+          const unidas = await this.geometria.unirPartes(recibida, sp);
+          if (unidas.partes < recibida.coordinates.length)
+            avisos.push(`Se unieron parcelas vecinas: ${recibida.coordinates.length} partes → ${unidas.partes}.`);
           // El polígono puede venir en POSGAR 2007 faja 3 o en lat/long: se lleva a WGS84.
-          const { geometria } = await this.geometria.normalizar(N.aMultiPolygon(fila.geometria!), sp);
+          const { geometria } = await this.geometria.normalizar(unidas.geometria, sp);
           await this.geometria.analizar(geometria, concesion.id, sp);
           await this.poligonos.insertar(sp, {
             concesionId: concesion.id,
@@ -358,7 +376,7 @@ export class ImportadorService {
   private ubicacionDelCatalogo(fila: FilaPadron, indice: IndiceUbicaciones, avisos: string[]) {
     const nombres = {
       departamento: N.textoConDato(fila.departamento),
-      localidad: N.textoConDato(fila.localidad),
+      localidad: N.localidad(fila.departamento, fila.localidad),
       distrito: N.distrito(fila.distrito),
       cuenca: N.textoConDato(fila.cuenca),
     };

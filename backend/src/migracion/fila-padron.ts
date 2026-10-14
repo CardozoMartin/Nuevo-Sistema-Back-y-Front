@@ -33,6 +33,15 @@ export interface FilaPadron {
   uso?: string | null;
   /** «Cantidad»: magnitud del uso (ha para riego, cabezas para pecuario…). */
   cantidad?: number | null;
+  /** Padrón de Rentas del inmueble (capas de QGIS de Catastro: «Padron_Ren»). */
+  padronRentas?: string | number | null;
+  /** Padrón de Catastro (capas de QGIS: «Padron_Cat») → matrícula catastral del inmueble. */
+  padronCatastro?: string | number | null;
+  /**
+   * Cómo figura la persona en la capa de QGIS («TITULAR», «PROPIETARIO ACTUAL», «OTRO TITULAR»).
+   * En todos los casos es el titular vigente hoy: se guarda solo para la trazabilidad.
+   */
+  tipoTitular?: string | null;
   localidad?: string | null;
   departamento?: string | null;
   distrito?: string | null;
@@ -45,7 +54,10 @@ export interface FilaPadron {
   canalCuarto?: string | null;
   canalQuinto?: string | null;
   desague?: string | null;
-  /** No está en la planilla: polígono en GeoJSON WGS84 (datos de prueba o relevamientos). */
+  /**
+   * No está en la planilla: polígono de la concesión (datos de prueba o capas de QGIS), en WGS84
+   * o en POSGAR 2007 faja 3 (se reconoce por las coordenadas). Varias parcelas → MultiPolygon.
+   */
   geometria?: Polygon | MultiPolygon | null;
   /** No está en la planilla: pozos que abastecen a la concesión (datos de prueba o relevamientos). */
   pozos?: FilaPozo[] | null;
@@ -80,6 +92,28 @@ export function texto(valor: unknown): string | null {
 export function textoConDato(valor: unknown): string | null {
   const t = texto(valor);
   return t && /^\(SIN .*\)$/i.test(t) ? null : t;
+}
+
+/**
+ * Localidades que el padrón escribe distinto que el catálogo, por departamento.
+ * Solo las equivalencias confirmadas por la DRH; las dudosas (ej: «ZARATE», que puede ser
+ * ZARATE NORTE o ZÁRATE SUR) quedan sin localidad y con aviso.
+ */
+const EQUIVALENCIAS_LOCALIDAD: Record<string, Record<string, string>> = {
+  TRANCAS: {
+    TRANCAS: 'VILLA DE TRANCAS',
+    'EL UNQUILLAR': 'UNQUILLAL',
+    'VILLA VIEJO': 'VILLA VIEJA',
+    'LEOCADIO PAZ': 'LEOCADIO PAEZ',
+    'LAS TIPAS': 'LAS TIPAS DE COLALAO',
+  },
+};
+
+/** Localidad de la fila con el nombre del catálogo (aplica las equivalencias del departamento). */
+export function localidad(departamento: unknown, valor: unknown): string | null {
+  const t = textoConDato(valor)?.toUpperCase();
+  if (!t) return null;
+  return EQUIVALENCIAS_LOCALIDAD[textoConDato(departamento)?.toUpperCase() ?? '']?.[t] ?? t;
 }
 
 /** «DISTRITO III» → «III» (el sistema guarda el número romano, igual que el frontend). */

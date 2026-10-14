@@ -18,7 +18,8 @@ const ALTA = TipoTramite.ALTA_CONCESION;
  * se llama a cada oficina con el alta y se devuelve el alta actualizada.
  *
  *   Catastro            enviar ─────────────────────────────────────► Recaudación
- *   Recaudación         SIN_DEUDA (apto) ► Distrito  |  CON_DEUDA (no apto) ► EN ESPERA hasta que pague
+ *   Recaudación         por cada concesión otorgada de los titulares: ¿tiene deuda? (sí / no)
+ *                       ninguna ► Distrito  |  alguna ► EN ESPERA hasta que se levante la deuda
  *                       notificarDeuda: correo a los titulares con deuda
  *   Distrito            APTO ► Jurídico   |  OBSERVADO ► Catastro corrige  |  NO_APTO ► RECHAZADO
  *   Jurídico            APTO ► Secretaría |  OBSERVADO ► Catastro corrige  |  NO_APTO ► RECHAZADO
@@ -46,6 +47,11 @@ export class AltaCircuitoService {
   async reenviar(id: string, datos: ObservacionesDto, usuarioId: string): Promise<RespuestaAlta> {
     await this.envio.reenviar(ALTA, id, datos, usuarioId);
     return this.alta.obtener(id);
+  }
+
+  /** Concesiones otorgadas de los titulares y si tienen deuda (lo que verifica Recaudación). */
+  antecedentesDeuda(id: string) {
+    return this.recaudacion.antecedentes(ALTA, id);
   }
 
   async verificarDeuda(id: string, datos: VerificacionDeudaDto, usuarioId: string): Promise<RespuestaAlta> {

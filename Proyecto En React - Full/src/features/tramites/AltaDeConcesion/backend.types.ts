@@ -130,6 +130,40 @@ export type EntradaHistorial =
       datos: Record<string, unknown> | null
     }
 
+/** GET /tramites/alta-concesion/:id/recaudacion: lo que verifica Recaudación. */
+export interface AntecedentesDeuda {
+  titulares: { personaId: string; nombre: string; documento: string | null }[]
+  /** Concesiones otorgadas de los titulares, con todos sus titulares y si tienen deuda (sí / no). */
+  concesiones: {
+    id: string
+    numero: string | null
+    departamento: string | null
+    localidad: string | null
+    titulares: { personaId: string; nombre: string }[]
+    /** Cuáles de los titulares del alta son titulares de esta concesión. */
+    deTitulares: string[]
+    tieneDeuda: boolean
+  }[]
+  /** Deudas pendientes registradas sin concesión (de antes). */
+  otrasDeudas: { id: string; personaId: string; detalle: string }[]
+}
+
+/** GET /expedientes/disponibilidad: si el número está libre o de qué trámite es. */
+export interface DisponibilidadExpediente {
+  /** El número completo, normalizado («123/332-2026»). */
+  numero: string
+  disponible: boolean
+  expediente: {
+    id: string
+    tipoTramite: string
+    tipoTramiteNombre: string
+    estado: EstadoExpedienteBackend
+    etapaNombre: string
+    oficinaNombre: string
+    fechaIngreso: string
+  } | null
+}
+
 export interface ExpedienteEnBandeja {
   id: string
   numero: string

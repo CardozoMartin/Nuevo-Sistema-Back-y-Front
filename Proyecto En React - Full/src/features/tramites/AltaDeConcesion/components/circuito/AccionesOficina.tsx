@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from 'react'
-import { useQueries } from '@tanstack/react-query'
 import { useNavigate } from 'react-router'
 import { ROUTES } from '@/config/routes'
 import { Alert } from '@/components/feedback/States'
@@ -12,7 +11,7 @@ import { mensajeDeError } from '@/services/api/errors'
 import { useUsuarioActualId } from '@/services/sesion'
 import { altaConcesionApi, type ResultadoDictamen } from '../../api'
 import type { AltaBackend } from '../../backend.types'
-import { altaKeys, useAccionAlta, useCancelarDeuda, useTomar } from '../../hooks'
+import { useAccionAlta, useAntecedentesDeuda, useCancelarDeuda, useTomar } from '../../hooks'
 
 const hoy = () => new Date().toISOString().slice(0, 10)
 
@@ -62,98 +61,145 @@ export function Opciones<T extends string>({ valor, onChange, opciones }: { valo
 // Recaudación
 // ---------------------------------------------------------------------------
 
-function AccionRecaudacion({ alta }: { alta: AltaBackend }) {
-  const [resultado, setResultado] = useState<'SIN_DEUDA' | 'CON_DEUDA' | ''>('')
-  const [deuda, setDeuda] = useState({ personaId: alta.titulares[0]?.personaId ?? '', detalle: '', monto: '' })
+/** «Sin deuda» / «Con deuda» de una concesión. */
+function SiNoDeuda({ valor, onChange, concesion }: { valor: boolean; onChange: (v: boolean) => void; concesion: string }) {
+  const opcion = (tieneDeuda: boolean, texto: string, icono: string, activa: string) => (
+    <button
+      type="button"
+      onClick={() => onChange(tieneDeuda)}
+      aria-pressed={valor === tieneDeuda}
+      aria-label={`${texto} (concesión ${concesion})`}
+      className={cn(
+        'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
+        valor === tieneDeuda ? activa : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700',
+      )}
+    >
+      <Icon name={icono} className="text-[18px]!" />
+      {texto}
+    </button>
+  )
+  return (
+    <div className="inline-flex shrink-0 gap-1 rounded-lg border border-slate-200 p-1 dark:border-slate-700">
+      {opcion(false, 'Sin deuda', 'check_circle', 'bg-green-50 text-green-700 ring-1 ring-green-500 dark:bg-green-500/10 dark:text-green-300')}
+      {opcion(true, 'Con deuda', 'payments', 'bg-amber-50 text-amber-700 ring-1 ring-amber-500 dark:bg-amber-500/10 dark:text-amber-300')}
+    </div>
+  )
+}
+
+/**
+ * Recaudación: las concesiones otorgadas de los titulares del alta (tener otra concesión solo se
+ * informa) y, por cada una, si tiene deuda. La deuda queda ligada a la concesión y a todos sus
+ * titulares. Ninguna con deuda: pasa a Distrito. Alguna: el expediente queda en espera; mientras
+ * espera se puede volver a responder (ej: marcar que ya no tiene deuda) y entonces sigue.
+ */
+function AccionRecaudacion({ alta, enEspera }: { alta: AltaBackend; enEspera: boolean }) {
+  const antecedentes = useAntecedentesDeuda(alta.id)
+  /** Lo que cambió el usuario; lo demás queda como está registrado. */
+  const [cambios, setCambios] = useState<Record<string, boolean>>({})
   const [observaciones, setObservaciones] = useState('')
   const accion = useAccionAlta(alta.id, altaConcesionApi.recaudacion)
+  const cancelar = useCancelarDeuda(alta.id)
+  const [comprobante, setComprobante] = useState<Record<string, string>>({})
+
+  if (antecedentes.isPending) return <p className="text-sm text-slate-500">Buscando las concesiones de los titulares…</p>
+  if (antecedentes.isError) return <Alert>No se pudieron consultar las concesiones de los titulares: {mensajeDeError(antecedentes.error)}</Alert>
+
+  const { titulares, concesiones, otrasDeudas } = antecedentes.data
+  const respuesta = (c: (typeof concesiones)[number]) => cambios[c.id] ?? c.tieneDeuda
+  const conDeuda = concesiones.filter(respuesta).length
+  const nombreDe = (personaId: string) => titulares.find((t) => t.personaId === personaId)?.nombre ?? personaId
+  const quedaEnEspera = conDeuda > 0 || otrasDeudas.length > 0
 
   function enviar() {
     accion.mutate({
-      resultado: resultado as 'SIN_DEUDA' | 'CON_DEUDA',
-      deudas: resultado === 'CON_DEUDA' && deuda.detalle ? [{ personaId: deuda.personaId, detalle: deuda.detalle, monto: deuda.monto ? Number(deuda.monto) : undefined }] : undefined,
+      concesiones: concesiones.map((c) => ({ concesionId: c.id, tieneDeuda: respuesta(c) })),
       observaciones: observaciones || undefined,
     })
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-sm text-slate-600 dark:text-slate-300">¿Alguno de los titulares tiene deuda con la DRH?</p>
-      <Opciones
-        valor={resultado}
-        onChange={setResultado}
-        opciones={[
-          { valor: 'SIN_DEUDA', texto: 'Sin deuda', icono: 'check_circle', color: 'border-green-500 bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300' },
-          { valor: 'CON_DEUDA', texto: 'Con deuda', icono: 'payments', color: 'border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' },
-        ]}
-      />
-      {resultado === 'CON_DEUDA' && (
-        <div className="grid gap-3 rounded-lg bg-amber-50/60 p-3 sm:grid-cols-3 dark:bg-amber-500/5">
-          <Campo etiqueta="Titular que debe">
-            <select value={deuda.personaId} onChange={(e) => setDeuda({ ...deuda, personaId: e.target.value })} className={controlClass({})}>
-              {alta.titulares.map((t) => (
-                <option key={t.personaId} value={t.personaId}>
-                  {t.tipoPersona === 'JURIDICA' ? t.razonSocial : `${t.apellido}, ${t.nombre}`}
-                </option>
-              ))}
-            </select>
-          </Campo>
-          <Campo etiqueta="Qué debe">
-            <input value={deuda.detalle} onChange={(e) => setDeuda({ ...deuda, detalle: e.target.value })} placeholder="Ej: canon 2025 impago" className={controlClass({})} />
-          </Campo>
-          <Campo etiqueta="Monto ($)">
-            <input type="number" min={0} value={deuda.monto} onChange={(e) => setDeuda({ ...deuda, monto: e.target.value })} className={controlClass({})} />
-          </Campo>
-          <p className="text-xs text-amber-800 sm:col-span-3 dark:text-amber-300">
-            El expediente queda en espera en Recaudación hasta que se registre el pago. La deuda queda a nombre del titular.
-          </p>
+      {enEspera && (
+        <Alert tone="info">
+          El expediente está en espera por deuda. Cuando ya no la tenga, marque la concesión «Sin deuda» y confirme: el expediente se reanuda y pasa a Distrito.
+        </Alert>
+      )}
+
+      <div>
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Se verifica si los titulares del alta tienen otras concesiones otorgadas y si alguna tiene deuda. La deuda queda ligada a la concesión y a todos sus
+          titulares.
+        </p>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Titulares del alta: {titulares.map((t) => t.nombre).join(' · ') || 'sin titulares cargados'}</p>
+      </div>
+
+      {concesiones.length === 0 ? (
+        <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-200">
+          <Icon name="check_circle" filled />
+          Los titulares no tienen otras concesiones otorgadas: no hay deudas de concesiones que verificar.
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {concesiones.map((c) => (
+            <li key={c.id} className={cn('flex flex-wrap items-center gap-3 rounded-lg border p-3', respuesta(c) ? 'border-amber-300 bg-amber-50/50 dark:border-amber-500/40 dark:bg-amber-500/5' : 'border-slate-200 dark:border-slate-700')}>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Concesión {c.numero ? `N° ${c.numero}` : `id ${c.id}`}
+                  {(c.localidad || c.departamento) && <span className="font-normal text-slate-500 dark:text-slate-400"> · {[c.localidad, c.departamento].filter(Boolean).join(', ')}</span>}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Titulares:{' '}
+                  {c.titulares.map((t, i) => (
+                    <span key={t.personaId}>
+                      {i > 0 && ' · '}
+                      <span className={c.deTitulares.includes(t.personaId) ? 'font-semibold text-slate-700 dark:text-slate-200' : undefined}>{t.nombre}</span>
+                    </span>
+                  ))}
+                </p>
+                <p className="text-xs text-slate-400">De {c.deTitulares.map(nombreDe).join(' y ')}, titular del alta.</p>
+              </div>
+              <SiNoDeuda valor={respuesta(c)} onChange={(v) => setCambios({ ...cambios, [c.id]: v })} concesion={c.numero ?? c.id} />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {otrasDeudas.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Deudas registradas antes, sin concesión</p>
+          {otrasDeudas.map((d) => (
+            <div key={d.id} className="flex flex-wrap items-center gap-3">
+              <p className="min-w-0 flex-1 text-sm text-slate-600 dark:text-slate-300">
+                {nombreDe(d.personaId)} · {d.detalle}
+              </p>
+              <input
+                placeholder="N° de recibo / comprobante"
+                value={comprobante[d.id] ?? ''}
+                onChange={(e) => setComprobante({ ...comprobante, [d.id]: e.target.value })}
+                className={controlClass({ className: 'w-56 py-2' })}
+              />
+              <Button size="sm" iconLeft="paid" loading={cancelar.isPending && cancelar.variables?.deudaId === d.id} onClick={() => cancelar.mutate({ deudaId: d.id, comprobante: comprobante[d.id] || undefined })}>
+                Registrar pago
+              </Button>
+            </div>
+          ))}
+          {cancelar.error && <Alert>{mensajeDeError(cancelar.error)}</Alert>}
         </div>
       )}
+
       <Observaciones valor={observaciones} onChange={setObservaciones} />
+      {quedaEnEspera && (
+        <p className="text-xs text-amber-800 dark:text-amber-300">
+          {conDeuda > 0 ? `${conDeuda === 1 ? 'Una concesión tiene' : `${conDeuda} concesiones tienen`} deuda` : 'Quedan deudas registradas'}: el expediente queda en espera en
+          Recaudación hasta que se levante.
+        </p>
+      )}
       {accion.error && <Alert>{mensajeDeError(accion.error)}</Alert>}
       <div>
-        <Button iconRight="send" disabled={!resultado || (resultado === 'CON_DEUDA' && !deuda.detalle)} loading={accion.isPending} onClick={enviar}>
-          {resultado === 'CON_DEUDA' ? 'Registrar deuda y pausar' : 'Sin deuda: pasar a Distrito'}
+        <Button iconRight={quedaEnEspera ? 'pause_circle' : 'send'} loading={accion.isPending} onClick={enviar}>
+          {quedaEnEspera ? (enEspera ? 'Guardar: sigue en espera' : 'Registrar deuda y dejar en espera') : 'Sin deuda: pasar a Distrito'}
         </Button>
       </div>
-    </div>
-  )
-}
-
-/** Expediente en espera por deuda: las deudas pendientes de los titulares, para registrar el pago. */
-function DeudasPendientes({ alta }: { alta: AltaBackend }) {
-  const consultas = useQueries({
-    queries: alta.titulares.map((t) => ({ queryKey: altaKeys.deudas(t.personaId), queryFn: () => altaConcesionApi.deudas(t.personaId) })),
-  })
-  const pendientes = consultas.flatMap((c) => c.data ?? []).filter((d) => d.estado === 'PENDIENTE')
-  const cancelar = useCancelarDeuda(alta.id)
-  const [comprobante, setComprobante] = useState<Record<string, string>>({})
-
-  return (
-    <div className="flex flex-col gap-3">
-      <Alert tone="info">El expediente está en espera: se reanuda solo cuando ningún titular tiene deudas pendientes.</Alert>
-      {pendientes.map((d) => (
-        <div key={d.id} className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">{d.persona.nombre}</p>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-              {d.detalle}
-              {d.monto !== null && ` · $ ${d.monto.toLocaleString('es-AR')}`}
-            </p>
-          </div>
-          <input
-            placeholder="N° de recibo / comprobante"
-            value={comprobante[d.id] ?? ''}
-            onChange={(e) => setComprobante({ ...comprobante, [d.id]: e.target.value })}
-            className={controlClass({ className: 'w-56 py-2' })}
-          />
-          <Button size="sm" iconLeft="paid" loading={cancelar.isPending && cancelar.variables?.deudaId === d.id} onClick={() => cancelar.mutate({ deudaId: d.id, comprobante: comprobante[d.id] || undefined })}>
-            Registrar pago
-          </Button>
-        </div>
-      ))}
-      {!pendientes.length && consultas.every((c) => c.isSuccess) && <p className="text-sm text-slate-500">No quedan deudas pendientes.</p>}
-      {cancelar.error && <Alert>{mensajeDeError(cancelar.error)}</Alert>}
     </div>
   )
 }
@@ -412,7 +458,7 @@ export function AccionesOficina({ alta }: { alta: AltaBackend }) {
         </div>
       )
     case 'RECAUDACION':
-      return circuito.estado === 'EN_ESPERA' ? <DeudasPendientes alta={alta} /> : <AccionRecaudacion alta={alta} />
+      return <AccionRecaudacion alta={alta} enEspera={circuito.estado === 'EN_ESPERA'} />
     case 'DISTRITO':
       return <AccionDictamen alta={alta} oficina="distrito" />
     case 'JURIDICO':

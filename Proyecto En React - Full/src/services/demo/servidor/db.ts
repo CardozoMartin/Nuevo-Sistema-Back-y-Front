@@ -47,6 +47,8 @@ export type PersonaDemo = Omit<TitularBackend, 'personaId'> & { id: string }
 export interface DeudaDemo {
   id: string
   personaId: string
+  /** Concesión que tiene la deuda (las de antes, sin concesión, son de la persona). */
+  concesionId?: string | null
   detalle: string
   monto: number | null
   estado: 'PENDIENTE' | 'CANCELADA'

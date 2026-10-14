@@ -142,7 +142,7 @@ export function EtapaCierreCambio({ expediente }: { expediente: Expediente }) {
             </div>
           </FormSection>
 
-          <TitularesDomiciliosFields tituloTitular="Titular 1" contactoObligatorio />
+          <TitularesDomiciliosFields tituloTitular="Titular 1" />
 
           <div className="flex gap-3 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm dark:border-sky-500/30 dark:bg-sky-500/10">
             <Icon name="info" className="text-sky-600" />

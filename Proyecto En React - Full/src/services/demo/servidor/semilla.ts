@@ -191,7 +191,7 @@ async function tramitesDeEjemplo(db: Db) {
     const url = `/tramites/alta-concesion/${alta.id}`
     const { departamento, localidad, distrito } = ej.lugar
     await llamar('2', 'PUT', `${url}/titulares`, {
-      titulares: [{ tipoPersona: 'FISICA', tipoDocumento: 'DNI', ...ej.titular, fechaNacimiento: '1975-05-10', email: `${ej.titular.apellido.toLowerCase()}@ejemplo.com` }],
+      titulares: [{ tipoPersona: 'FISICA', tipoDocumento: 'DNI', ...ej.titular, fechaNacimiento: '1975-05-10', email: `${ej.titular.apellido.toLowerCase()}@ejemplo.com`, telefono: '(0381) 452-6393' }],
       domicilios: [{ calle: 'Av. San Martín', numero: String(100 + Number(ej.numero)), departamento, localidad, distrito }],
     })
     const ubicacion = new FormData()
@@ -212,7 +212,7 @@ async function tramitesDeEjemplo(db: Db) {
     if (ej.hasta === 'recaudacion') continue
 
     await llamar('3', 'POST', `/expedientes/${alta.id}/tomar`)
-    await llamar('3', 'POST', `${url}/recaudacion`, { resultado: 'SIN_DEUDA' })
+    await llamar('3', 'POST', `${url}/recaudacion`, { concesiones: [] })
     await llamar('4', 'POST', `/expedientes/${alta.id}/tomar`)
     await llamar('4', 'POST', `${url}/distrito`, { resultado: 'APTO', observaciones: 'Hay disponibilidad en el canal.' })
     if (ej.hasta === 'juridico') continue

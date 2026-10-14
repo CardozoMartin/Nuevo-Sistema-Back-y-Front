@@ -1,9 +1,9 @@
 // Mecánica del expediente, común a todos los trámites (como backend/src/expedientes):
 // crear, tomar, pasar a otra oficina, registrar lo que resolvió cada oficina, historial y bandejas.
 // Mismas reglas: cada acción en su etapa, solo la oficina donde está y tomar antes de actuar.
-import type { ExpedienteEnBandeja } from '@/features/tramites/AltaDeConcesion/backend.types'
+import type { DisponibilidadExpediente, ExpedienteEnBandeja } from '@/features/tramites/AltaDeConcesion/backend.types'
 import { ahora, nuevoId, type Db, type ExpedienteDemo, type OficinaDemo, type UsuarioDemo } from './db'
-import { error403, error404, error409, type Ruta } from './http'
+import { error400, error403, error404, error409, type Ruta } from './http'
 
 export const NOMBRE_OFICINA: Record<OficinaDemo, string> = {
   catastro: 'Catastro',
@@ -210,8 +210,43 @@ export function circuitoDe(db: Db, e: ExpedienteDemo) {
 /** Titular que se muestra en las bandejas (lo define cada trámite). */
 export type TitularDeExpediente = (db: Db, e: ExpedienteDemo) => string | null
 
+const NOMBRE_TIPO_TRAMITE: Record<ExpedienteDemo['tipoTramite'], string> = {
+  ALTA_CONCESION: 'Alta de concesión',
+  BAJA_POZO: 'Baja de pozo',
+  REGISTRO_POZO: 'Registro de pozo',
+}
+
 export function rutasExpedientes(titularDe: TitularDeExpediente): Ruta[] {
   return [
+    [
+      'GET',
+      '/expedientes/disponibilidad',
+      ({ db, query }): DisponibilidadExpediente => {
+        // Mismas reglas que el backend (NumeroExpedienteQuery y ExpedientesService.disponibilidad).
+        if (!/^\d{1,6}$/.test(query.numero ?? '')) throw error400('Ingrese el número de expediente (hasta 6 dígitos).')
+        if (!/^\d{1,4}$/.test(query.reparticion ?? '')) throw error400('Ingrese la repartición (hasta 4 dígitos).')
+        const anio = Number(query.anio)
+        if (!Number.isInteger(anio)) throw error400('Ingrese el año del expediente.')
+        const numero = String(Number(query.numero))
+        const reparticion = String(Number(query.reparticion))
+        const e = db.expedientes.find((x) => Number(x.numero) === Number(numero) && Number(x.reparticion) === Number(reparticion) && x.anio === anio)
+        return {
+          numero: `${numero}/${reparticion}-${anio}`,
+          disponible: !e,
+          expediente: e
+            ? {
+                id: e.id,
+                tipoTramite: e.tipoTramite,
+                tipoTramiteNombre: NOMBRE_TIPO_TRAMITE[e.tipoTramite],
+                estado: e.estado,
+                etapaNombre: NOMBRE_ETAPA[e.etapa] ?? e.etapa,
+                oficinaNombre: NOMBRE_OFICINA[e.oficina],
+                fechaIngreso: e.fechaIngreso,
+              }
+            : null,
+        }
+      },
+    ],
     [
       'POST',
       '/expedientes/:id/tomar',

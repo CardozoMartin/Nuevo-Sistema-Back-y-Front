@@ -1,6 +1,6 @@
 // Pruebas de las reglas del circuito y del texto del aviso de deuda (sin base: npm test).
 import { armarAvisoDeuda } from '../aviso-deuda.js';
-import { destinoTrasVerificarDeuda, exigirFechaDelAnio, exigirMotivoSiNoEsApto, normalizarNumerosConcesion, personasSinVerificar } from './circuito.validaciones.js';
+import { destinoTrasVerificarDeuda, exigirFechaDelAnio, exigirMotivoSiNoEsApto, normalizarNumerosConcesion, personasSinVerificar, respuestasDeDeuda } from './circuito.validaciones.js';
 
 describe('Distrito y Jurídico', () => {
   it('observado y no apto llevan motivo; apto no', () => {
@@ -74,5 +74,36 @@ describe('Recaudación: titulares que cambiaron al corregir', () => {
     expect(destinoTrasVerificarDeuda(correccion, { id: '25', datos: null }, 'DISTRITO')).toBe('DISTRITO');
     // Una corrección común (sin cambio de titulares) tampoco.
     expect(destinoTrasVerificarDeuda({ id: '30', datos: { respondeA: '29' } }, { id: '10', datos: null }, 'DISTRITO')).toBe('DISTRITO');
+  });
+});
+
+describe('Recaudación: deuda de las concesiones de los titulares', () => {
+  const concesiones = [
+    { id: '10', numero: '1234' },
+    { id: '11', numero: null },
+  ];
+
+  it('devuelve la respuesta de cada concesión', () => {
+    const r = respuestasDeDeuda(concesiones, [
+      { concesionId: '10', tieneDeuda: true },
+      { concesionId: '11', tieneDeuda: false },
+    ]);
+    expect(r.get('10')).toBe(true);
+    expect(r.get('11')).toBe(false);
+  });
+
+  it('sin concesiones no hay nada que responder', () => {
+    expect(respuestasDeDeuda([], []).size).toBe(0);
+  });
+
+  it('exige responder todas, una vez cada una y ninguna ajena', () => {
+    expect(() => respuestasDeDeuda(concesiones, [{ concesionId: '10', tieneDeuda: false }])).toThrow('id 11');
+    expect(() => respuestasDeDeuda(concesiones, [{ concesionId: '99', tieneDeuda: false }])).toThrow('no es de los titulares');
+    expect(() =>
+      respuestasDeDeuda(concesiones, [
+        { concesionId: '10', tieneDeuda: false },
+        { concesionId: '10', tieneDeuda: true },
+      ]),
+    ).toThrow('más de una vez');
   });
 });

@@ -15,6 +15,7 @@ import {
   formatearNumeroExpediente,
   NOMBRE_ETAPA,
   NOMBRE_OFICINA,
+  NOMBRE_TIPO_TRAMITE,
   Oficina,
   OFICINA_DE_ETAPA,
   ResultadoActuacion,
@@ -60,6 +61,7 @@ export interface ActuacionInput {
 /**
  * El expediente y su circuito, comunes a todos los trámites:
  *
+ *   disponibilidad  dice si un número de expediente está libre (antes de empezar un trámite).
  *   abrir       registra el expediente en papel (lo tiene tomado la oficina donde empieza).
  *   tomar       la oficina donde está el expediente lo recibe: queda registrado quién y cuándo.
  *   pasar       lo envía a la etapa siguiente (o lo devuelve): nuevo movimiento.
@@ -81,6 +83,30 @@ export class ExpedientesService {
   // ---------------------------------------------------------------------------
   // Apertura
   // ---------------------------------------------------------------------------
+
+  /**
+   * ¿El número de expediente está libre? Se consulta antes de empezar un trámite, para no
+   * cargar todo y enterarse al final. Si ya está registrado, devuelve de qué trámite es y
+   * dónde está. Mismo criterio que abrir(): 0123 y 123 son el mismo número.
+   */
+  async disponibilidad(input: { numero: string; reparticion: string; anio: number }) {
+    const numero = String(Number(input.numero));
+    const reparticion = String(Number(input.reparticion));
+    const e = await this.dataSource.manager.findOneBy(Expediente, { numero, reparticion, anio: input.anio });
+    return {
+      numero: formatearNumeroExpediente(numero, reparticion, input.anio),
+      disponible: !e,
+      expediente: e && {
+        id: e.id,
+        tipoTramite: e.tipoTramite,
+        tipoTramiteNombre: NOMBRE_TIPO_TRAMITE[e.tipoTramite],
+        estado: e.estado,
+        etapaNombre: NOMBRE_ETAPA[e.etapa],
+        oficinaNombre: NOMBRE_OFICINA[e.oficinaActual],
+        fechaIngreso: e.fechaIngreso,
+      },
+    };
+  }
 
   /**
    * Registra en el sistema un expediente que ya existe en papel:

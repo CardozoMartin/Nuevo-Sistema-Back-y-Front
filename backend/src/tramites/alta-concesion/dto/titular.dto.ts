@@ -1,7 +1,8 @@
 // Un titular de la concesión. Las reglas cambian según sea persona física o jurídica.
-import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, Matches, MaxLength, ValidateIf } from 'class-validator';
 import { DocumentoValido } from '../../../comun/validadores/documento.js';
 import { NoEsFechaFutura } from '../../../comun/validadores/fechas.js';
+import { EsTelefono } from '../../../comun/validadores/telefono.js';
 import { Texto } from '../../../comun/validadores/texto.js';
 import { TipoDocumento, TipoPersona } from '../../../concesiones/concesiones.constantes.js';
 
@@ -55,17 +56,19 @@ export class TitularDto {
   @NoEsFechaFutura()
   fechaConstitucion?: string;
 
-  // --- Contacto (opcional) ---
+  // --- Contacto (obligatorio: por ahí llegan los avisos del trámite) ---
 
-  @IsOptional()
+  // class-validator corre los decoradores de abajo hacia arriba: «Ingrese…» va último para que sea
+  // el primer mensaje (stopAtFirstError) cuando el dato no vino.
   @Texto()
-  @IsEmail({}, { message: 'Ingrese un correo electrónico válido.' })
   @MaxLength(150)
-  email?: string;
+  @IsEmail({}, { message: 'Ingrese un correo electrónico válido.' })
+  @IsNotEmpty({ message: 'Ingrese el correo electrónico del titular.' })
+  email: string;
 
-  @IsOptional()
   @Texto()
-  @IsString()
   @MaxLength(30)
-  telefono?: string;
+  @EsTelefono()
+  @IsNotEmpty({ message: 'Ingrese el teléfono de contacto del titular.' })
+  telefono: string;
 }

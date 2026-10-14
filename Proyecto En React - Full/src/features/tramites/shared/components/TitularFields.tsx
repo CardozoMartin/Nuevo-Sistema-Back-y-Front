@@ -3,7 +3,8 @@ import { useFormContext, useWatch } from 'react-hook-form'
 import { FormNumericField, FormSelectField, FormTextField } from '@/components/form'
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
-import { buscarPersona, personaAFormulario, type PersonaPadron } from '../personas'
+import { claveDeDocumento } from '@/lib/validaciones'
+import { buscarPersona, nombreDePersona, personaAFormulario, type ResultadoPersona } from '../personas'
 import {
   documentoConFormato,
   getReglaDocumento,
@@ -20,16 +21,68 @@ const CAMPOS_PADRON = ['apellido', 'nombre', 'fechaNacimiento', 'razonSocial', '
 /** Los que identifican a la persona: si vinieron del padrón quedan bloqueados, para no escribirla distinto. */
 type CampoIdentidad = 'apellido' | 'nombre' | 'fechaNacimiento' | 'razonSocial' | 'fechaConstitucion'
 
+const pesos = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
+
 interface Props {
   /** Path del titular dentro del formulario (ej: 'titulares.0'). */
   prefix: string
-  /** Correo y teléfono obligatorios (ej: carga final del titular, prototipo CatastroFinalizacion.html). */
-  contactoObligatorio?: boolean
 }
 
-/** Campos de un titular. Cambian según sea persona física o jurídica. */
-export function TitularFields({ prefix, contactoObligatorio }: Props) {
-  const { control, getValues, setValue, getFieldState, trigger } = useFormContext()
+/** Documento de la persona encontrada, con formato («CUIL: 20-12345678-6»). */
+function documentoDe({ persona: p }: ResultadoPersona) {
+  if (!p.documento) return 'Sin documento cargado'
+  const juridica = p.tipoPersona === 'JURIDICA'
+  return documentoConFormato({ tipoPersona: juridica ? 'juridica' : 'fisica', tipoDocumento: (p.tipoDocumento ?? 'DNI').toLowerCase() as TipoDocumento, documento: p.documento })
+}
+
+/** Concesiones y deudas de la persona encontrada (lo que conviene saber antes de cargarla). */
+function Antecedentes({ resultado }: { resultado: ResultadoPersona }) {
+  const { concesiones, deudasPendientes } = resultado
+  const totalDeuda = deudasPendientes.reduce((acc, d) => acc + (d.monto ?? 0), 0)
+  return (
+    <ul className="mt-2 flex flex-col gap-1 text-slate-600 dark:text-slate-300">
+      <li className="flex gap-1.5">
+        <Icon name="water_drop" className="text-[16px]! text-slate-400" />
+        {concesiones.length ? (
+          <span>
+            Titular de {concesiones.length === 1 ? 'una concesión' : `${concesiones.length} concesiones`}:{' '}
+            {concesiones
+              .slice(0, 3)
+              .map((c) => `${c.numero ? `N° ${c.numero}` : `en trámite (exp. ${c.expediente ?? 's/n'})`}${c.localidad ? ` · ${c.localidad}` : ''}`)
+              .join(' — ')}
+            {concesiones.length > 3 && ` y ${concesiones.length - 3} más`}.
+          </span>
+        ) : (
+          <span>No es titular de ninguna concesión.</span>
+        )}
+      </li>
+      {deudasPendientes.length > 0 && (
+        <li className="flex gap-1.5 font-medium text-red-700 dark:text-red-300">
+          <Icon name="error" className="text-[16px]!" />
+          <span>
+            Tiene {deudasPendientes.length === 1 ? 'una deuda pendiente' : `${deudasPendientes.length} deudas pendientes`}
+            {totalDeuda > 0 && ` por ${pesos.format(totalDeuda)}`}. Recaudación la revisa antes de seguir con el trámite.
+          </span>
+        </li>
+      )}
+    </ul>
+  )
+}
+
+/**
+ * Campos de un titular. Cambian según sea persona física o jurídica.
+ *
+ * Al escribir un documento válido (DNI, CUIL o CUIT) se lo busca en el padrón de personas. Una
+ * persona física se encuentra también por el documento equivalente (su DNI si está con CUIL y
+ * al revés):
+ *   - Si ya está cargada, se muestra quién es (concesiones y deudas) y se pregunta si se cargan
+ *     sus datos. Mientras no se responda, los datos que la identifican quedan bloqueados: no se
+ *     puede cargar un documento existente con otro nombre.
+ *   - Si no está, se avisa que se va a cargar como persona nueva.
+ *   - Si ya figura como otro titular de este mismo trámite, se avisa enseguida.
+ */
+export function TitularFields({ prefix }: Props) {
+  const { control, getValues, setValue, getFieldState, trigger, setFocus } = useFormContext()
   const n = (campo: string) => `${prefix}.${campo}`
 
   const [tipoPersona, tipoDocumento, documento] = useWatch({ control, name: [n('tipoPersona'), n('tipoDocumento'), n('documento')] }) as [
@@ -39,83 +92,149 @@ export function TitularFields({ prefix, contactoObligatorio }: Props) {
   ]
   const regla = getReglaDocumento(tipoPersona, tipoDocumento)
   const esJuridica = tipoPersona === 'juridica'
+  const doc = documento ?? ''
+  const docValido = !validarDocumento(doc, regla)
+
+  // --- Misma persona en otro titular de este trámite -------------------------------------
+  const [lista, indice] = prefix.split('.')
+  const otros = (useWatch({ control, name: lista }) as TitularForm[] | undefined) ?? []
+  const repetidoEn = docValido ? otros.findIndex((t, i) => i !== Number(indice) && !!t?.documento && claveDeDocumento(t.documento) === claveDeDocumento(doc)) : -1
 
   // --- Búsqueda en el padrón de personas ---------------------------------------------
-  const [encontrada, setEncontrada] = useState<PersonaPadron | null>(null)
+  /** Persona cargada con este documento, a la espera de que el usuario diga si usa sus datos. */
+  const [propuesta, setPropuesta] = useState<{ resultado: ResultadoPersona; doc: string } | null>(null)
+  /** Persona cuyos datos se cargaron (aceptada). */
+  const [encontrada, setEncontrada] = useState<ResultadoPersona | null>(null)
   /** Documento con el que se encontró (puede ser el DNI de alguien cargado con CUIL, o al revés). */
   const [buscadoCon, setBuscadoCon] = useState('')
+  /** Documento que se buscó y no está en el padrón. */
+  const [nueva, setNueva] = useState('')
   const [buscando, setBuscando] = useState(false)
   const [corrigiendo, setCorrigiendo] = useState(false)
   // Lo que ya estaba al montar (un borrador que se retoma) no se vuelve a buscar.
-  const ultimaBusqueda = useRef(`${regla.label}:${documento ?? ''}`)
+  const ultimaBusqueda = useRef(`${regla.label}:${doc}`)
 
   useEffect(() => {
-    const doc = documento ?? ''
     const clave = `${regla.label}:${doc}`
     if (clave === ultimaBusqueda.current) return
     ultimaBusqueda.current = clave
 
-    //1.- Si cambió el documento de una persona encontrada, sus datos ya no corresponden: se limpian.
+    //1.- Cambió el documento: lo que se había encontrado (o propuesto) ya no corresponde.
+    setPropuesta(null)
+    setNueva('')
     if (encontrada && buscadoCon !== doc) {
       for (const campo of CAMPOS_PADRON) setValue(n(campo), '')
       setEncontrada(null)
       setCorrigiendo(false)
     }
-    if (validarDocumento(doc, regla) || (encontrada && buscadoCon === doc)) return
+    if (!docValido || (encontrada && buscadoCon === doc)) return
 
-    //2.- Documento válido: si la persona ya está cargada, se completa el formulario; si no, nada.
+    //2.- Documento válido: si la persona ya está cargada se propone usar sus datos; si no, es nueva.
     let vigente = true
     setBuscando(true)
-    void buscarPersona(doc).then((persona) => {
+    void buscarPersona(doc).then((resultado) => {
       if (!vigente) return
       setBuscando(false)
-      if (!persona) return
-      const datos = personaAFormulario(persona)
-      for (const [campo, valor] of Object.entries(datos)) setValue(n(campo), valor, { shouldDirty: true })
-      void trigger(CAMPOS_PADRON.map(n))
-      setEncontrada(persona)
-      setBuscadoCon(doc)
-      setCorrigiendo(false)
+      if (resultado) setPropuesta({ resultado, doc })
+      else setNueva(doc)
     })
     return () => {
       vigente = false
       setBuscando(false)
     }
     // Se busca solo cuando cambia el documento o su tipo (no al cambiar los demás datos).
-  }, [documento, regla.label])
+  }, [doc, regla.label])
 
-  /** Dato que vino del padrón: se muestra bloqueado (salvo que el usuario elija corregirlo). */
-  const bloqueado = (campo: CampoIdentidad) => !!encontrada && !corrigiendo && !!(personaAFormulario(encontrada) as Partial<TitularForm>)[campo]
+  /** «Sí, cargar sus datos»: se completa el formulario con la ficha de la persona. */
+  function usarDatos() {
+    if (!propuesta) return
+    const datos = personaAFormulario(propuesta.resultado.persona)
+    for (const [campo, valor] of Object.entries(datos)) setValue(n(campo), valor, { shouldDirty: true })
+    void trigger(CAMPOS_PADRON.map(n))
+    setEncontrada(propuesta.resultado)
+    setBuscadoCon(propuesta.doc)
+    setPropuesta(null)
+    setCorrigiendo(false)
+  }
+
+  /** «No, revisar el documento»: se borra el documento para escribirlo de nuevo. */
+  function revisarDocumento() {
+    setPropuesta(null)
+    setValue(n('documento'), '', { shouldValidate: false })
+    setFocus(n('documento'))
+  }
+
+  /** Dato bloqueado: esperando la respuesta, o porque vino del padrón (salvo que se elija corregirlo). */
+  const bloqueado = (campo: CampoIdentidad) =>
+    !!propuesta || (!!encontrada && !corrigiendo && !!(personaAFormulario(encontrada.persona) as Partial<TitularForm>)[campo])
 
   /** Al cambiar el tipo, el documento se recorta al nuevo largo máximo y se revalida si ya tenía error. */
-  function ajustarDocumento(persona: TipoPersona, doc: TipoDocumento) {
-    const { max } = getReglaDocumento(persona, doc)
+  function ajustarDocumento(persona: TipoPersona, tipoDoc: TipoDocumento) {
+    const { max } = getReglaDocumento(persona, tipoDoc)
     const actual: string = getValues(n('documento')) ?? ''
     if (actual.length > max) setValue(n('documento'), actual.slice(0, max))
     if (getFieldState(n('documento')).isTouched) void trigger(n('documento'))
   }
 
+  let ayudaDocumento: string | undefined = regla.label === 'DNI' ? undefined : 'Sin guiones.'
+  if (buscando) ayudaDocumento = 'Buscando en el padrón de personas…'
+  else if (nueva && nueva === doc && repetidoEn < 0) ayudaDocumento = 'No está en el padrón de personas: se cargará como persona nueva.'
+
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+      {repetidoEn >= 0 && (
+        <div role="alert" className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 md:col-span-2 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+          <Icon name="group_off" />
+          <p>
+            <span className="font-semibold">Esta persona ya está cargada en este trámite</span> ({repetidoEn === 0 ? 'primer titular' : `titular adicional ${repetidoEn}`}). Un DNI y el
+            CUIL / CUIT que lo contiene son la misma persona: revise el documento o quite uno de los titulares.
+          </p>
+        </div>
+      )}
+
+      {propuesta && repetidoEn < 0 && (
+        <div role="alertdialog" aria-label="Persona ya cargada" className="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm md:col-span-2 dark:border-amber-500/40 dark:bg-amber-500/10">
+          <div className="flex items-start gap-3">
+            <Icon name="person_search" className="text-amber-700 dark:text-amber-300" />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-slate-800 dark:text-slate-100">Ya hay una persona cargada con este documento.</p>
+              <p className="mt-1 text-slate-700 dark:text-slate-200">
+                <strong>{nombreDePersona(propuesta.resultado.persona)}</strong> · {documentoDe(propuesta.resultado)}
+                {propuesta.resultado.persona.tipoPersona === 'JURIDICA' ? ' · persona jurídica' : ''}
+              </p>
+              <Antecedentes resultado={propuesta.resultado} />
+              <p className="mt-3 font-medium text-slate-800 dark:text-slate-100">¿Desea cargar sus datos en este titular?</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 sm:pl-9">
+            <Button size="sm" iconLeft="how_to_reg" onClick={usarDatos}>
+              Sí, cargar sus datos
+            </Button>
+            <Button size="sm" variant="secondary" iconLeft="edit" onClick={revisarDocumento}>
+              No, revisar el documento
+            </Button>
+          </div>
+        </div>
+      )}
+
       {encontrada && (
         <div role="status" className="flex flex-wrap items-start gap-3 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm md:col-span-2 dark:border-sky-500/30 dark:bg-sky-500/10">
           <Icon name="how_to_reg" className="text-sky-700 dark:text-sky-300" />
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-slate-800 dark:text-slate-100">Esta persona ya está cargada en el sistema.</p>
+            <p className="font-semibold text-slate-800 dark:text-slate-100">Se cargaron los datos de {nombreDePersona(encontrada.persona)}.</p>
             <p className="text-slate-600 dark:text-slate-300">
-              Se completaron sus datos.
-              {encontrada.documento && encontrada.documento !== buscadoCon && encontrada.tipoDocumento && (
+              {encontrada.persona.documento && encontrada.persona.documento !== buscadoCon && (
                 <>
-                  {' '}
-                  Figura con {documentoConFormato({ tipoPersona: 'fisica', tipoDocumento: encontrada.tipoDocumento.toLowerCase() as TipoDocumento, documento: encontrada.documento })}
-                  {encontrada.documento.length === 11 ? ' (se mantiene ese dato).' : ' (se actualiza con el documento ingresado).'}
+                  Figura con {documentoDe(encontrada)}
+                  {encontrada.persona.documento.length === 11 ? ' (se mantiene ese dato).' : ' (se actualiza con el documento ingresado).'}{' '}
                 </>
               )}
-              {encontrada.denominacion && !encontrada.apellido && !encontrada.razonSocial && (
-                <> En el padrón anterior figura como «{encontrada.denominacion}»: complete los datos que faltan.</>
+              {encontrada.persona.denominacion && !encontrada.persona.apellido && !encontrada.persona.razonSocial && (
+                <>En el padrón anterior figura como «{encontrada.persona.denominacion}»: complete los datos que faltan. </>
               )}
-              {corrigiendo && ' Los cambios actualizan la ficha de la persona en todos sus trámites.'}
+              {corrigiendo && 'Los cambios actualizan la ficha de la persona en todos sus trámites.'}
             </p>
+            <Antecedentes resultado={encontrada} />
           </div>
           {!corrigiendo && (
             <Button size="sm" variant="secondary" iconLeft="edit" onClick={() => setCorrigiendo(true)}>
@@ -124,6 +243,7 @@ export function TitularFields({ prefix, contactoObligatorio }: Props) {
           )}
         </div>
       )}
+
       <FormSelectField
         name={n('tipoPersona')}
         label="Tipo de persona"
@@ -138,21 +258,14 @@ export function TitularFields({ prefix, contactoObligatorio }: Props) {
           onValueChange={(v) => ajustarDocumento(tipoPersona, v as TipoDocumento)}
         />
       )}
-      <FormNumericField
-        name={n('documento')}
-        label={regla.label}
-        required
-        maxLength={regla.max}
-        placeholder={regla.placeholder}
-        hint={buscando ? 'Buscando en el padrón de personas…' : regla.label === 'DNI' ? undefined : 'Sin guiones.'}
-      />
+      <FormNumericField name={n('documento')} label={regla.label} required maxLength={regla.max} placeholder={regla.placeholder} hint={ayudaDocumento} />
       <FormTextField
         name={n('correo')}
         label="Correo electrónico"
-        required={contactoObligatorio}
+        required
         type="email"
         placeholder="nombre@ejemplo.com"
-        hint={contactoObligatorio ? 'Se enviarán notificaciones del trámite a esta dirección.' : undefined}
+        hint="Se enviarán notificaciones del trámite a esta dirección."
       />
 
       {esJuridica ? (
@@ -168,7 +281,7 @@ export function TitularFields({ prefix, contactoObligatorio }: Props) {
         </>
       )}
 
-      <FormTextField name={n('telefono')} label="Teléfono de contacto" required={contactoObligatorio} type="tel" placeholder="(0381) 123-4567" />
+      <FormTextField name={n('telefono')} label="Teléfono de contacto" required type="tel" placeholder="(0381) 123-4567" />
     </div>
   )
 }

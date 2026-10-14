@@ -71,13 +71,19 @@ El **historial del expediente** es la unión ordenada de pases y actuaciones: `G
 
 ### Recaudación (`etapa RECAUDACION`)
 
-`POST /:id/recaudacion`:
+Se verifica si los titulares del alta tienen **otras concesiones otorgadas** (VIGENTES) y si alguna
+tiene **deuda**. Tener otra concesión solo se informa; lo único que frena el alta es la deuda. Por
+ahora la deuda es **sí / no** (sin monto) y queda ligada **a la concesión y a todos sus titulares
+vigentes** (una fila de `rec_deuda` por titular, con `concesion_id`).
 
-- **Sin deuda** (`{ "resultado": "SIN_DEUDA" }`): pasa a **Distrito**. Se rechaza si algún titular tiene
-  deudas pendientes registradas.
-- **Con deuda** (`{ "resultado": "CON_DEUDA", "deudas": [{ "personaId", "detalle", "monto" }] }`): las
-  deudas quedan registradas **en la persona** y el expediente queda **EN ESPERA** en Recaudación.
-  No es un rechazo: queda en espera **sin plazo** hasta que pague.
+- `GET /:id/recaudacion`: los titulares del alta, sus concesiones otorgadas (con todos sus titulares y
+  `tieneDeuda`) y las deudas de antes registradas sin concesión.
+- `POST /:id/recaudacion` (`{ "concesiones": [{ "concesionId", "tieneDeuda" }], "observaciones"? }`): una
+  respuesta por **cada** concesión del GET (vacío si no tienen otras). El resultado sale de las respuestas:
+  - **Ninguna con deuda:** pasa a **Distrito**.
+  - **Alguna con deuda:** se registra la deuda (concesión + titulares) y el expediente queda **EN ESPERA**
+    en Recaudación, **sin plazo**. No es un rechazo. En espera, Recaudación puede volver a responder: si
+    marca que la concesión ya no tiene deuda, se cancela y el expediente se reanuda y pasa a Distrito.
 - **Aviso por correo:** `POST /:id/recaudacion/notificar-deuda` (`{ "observaciones" }` opcional) manda a cada
   titular con deuda pendiente un correo con el detalle de SUS deudas. Los que no tienen correo cargado se
   informan en la respuesta. Cada envío queda en `not_email` (`GET /api/expedientes/:id/emails`) y en el

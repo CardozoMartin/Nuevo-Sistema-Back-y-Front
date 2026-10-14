@@ -58,3 +58,12 @@ export const claveDeDocumento = (documento: string) => {
   const dni = dniDeDocumento(documento)
   return dni ? `DNI:${dni}` : documento
 }
+
+/**
+ * Teléfono: solo números, espacios, guiones, paréntesis y «+», con entre 7 y 15 números
+ * («(0381) 452-6393», «+54 9 381 123-4567»). Igual que en el backend (comun/validadores/telefono.ts).
+ */
+export function esTelefonoValido(valor: string): boolean {
+  const digitos = valor.replace(/\D/g, '').length
+  return /^[\d\s()+-]+$/.test(valor) && digitos >= 7 && digitos <= 15
+}

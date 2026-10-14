@@ -77,7 +77,7 @@ La documentación técnica del backend (puesta en marcha, endpoints, PostGIS, es
 | --- | --- | --- |
 | `seguridad/` | `seg_oficina`, `seg_usuario` | Oficinas y usuarios de prueba; `@UsuarioActual` lee `X-Usuario-Id` |
 | `personas/` | `per_persona` | Titulares únicos por documento; `GET /api/personas?documento=` |
-| `recaudacion/` | `rec_deuda` | Deudas de la persona; cancelar reanuda los expedientes en espera |
+| `recaudacion/` | `rec_deuda` | Deudas de las concesiones y sus titulares (sí / no); cancelar reanuda los expedientes en espera |
 | `catalogos/` | `cat_situacion_legal`, `cat_documento_requerido`, `cat_tipo_uso` | Situaciones legales con su documentación y tipos de uso con dotación (con seed) |
 | `expedientes/` | `exp_expediente`, `exp_movimiento`, `exp_actuacion`, `exp_resolucion`, `exp_documentacion_presentada` | Circuito común: tomar, pasar, actuar, historial, bandejas |
 | `concesiones/` | `con_concesion`, `con_titular`, `con_domicilio`, `con_inmueble`, `con_uso`, `con_suministro`, `con_poligono`, `con_punto` | La concesión y sus partes; polígono vigente + histórico; caudal; duplicados |

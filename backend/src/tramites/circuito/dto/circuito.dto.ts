@@ -1,7 +1,7 @@
 // Lo que manda cada oficina al actuar sobre un expediente. Los comparten todos los trámites
 // (alta de concesión, baja de pozo, y los que vengan).
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Texto } from '../../../comun/validadores/texto.js';
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -12,34 +12,25 @@ export class ObservacionesDto {
   observaciones?: string;
 }
 
-/** Una deuda detectada por Recaudación: de qué titular (persona) y qué debe. */
-export class DeudaDto {
-  @Matches(/^\d+$/, { message: 'Indique la persona (id de per_persona, ver titulares del alta).' })
-  personaId: string;
+/** Lo que Recaudación verificó de una concesión otorgada de los titulares: si tiene deuda o no. */
+export class DeudaConcesionDto {
+  @Matches(/^\d+$/, { message: 'Indique la concesión (id de con_concesion, ver GET …/recaudacion).' })
+  concesionId: string;
 
-  @Texto()
-  @MaxLength(500)
-  @IsNotEmpty({ message: 'Detalle qué se debe.' })
-  detalle: string;
-
-  @IsOptional()
-  @Min(0, { message: 'El monto no puede ser negativo.' })
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'El monto tiene que ser un número.' })
-  monto?: number;
+  @IsBoolean({ message: 'Indique si la concesión tiene deuda (true o false).' })
+  tieneDeuda: boolean;
 }
 
-/** Recaudación: ¿los titulares tienen deuda? */
+/**
+ * Recaudación: por cada concesión otorgada de los titulares (GET …/recaudacion), si tiene deuda
+ * o no. Vacío si los titulares no tienen otras concesiones. El resultado sale de las respuestas.
+ */
 export class VerificacionDeudaDto {
-  @IsIn(['SIN_DEUDA', 'CON_DEUDA'], { message: 'El resultado debe ser SIN_DEUDA o CON_DEUDA.' })
-  resultado: 'SIN_DEUDA' | 'CON_DEUDA';
-
-  /** Con CON_DEUDA: las deudas nuevas que se detectaron (pueden no venir si ya estaban registradas). */
-  @IsOptional()
   @ValidateNested({ each: true })
-  @Type(() => DeudaDto)
-  @ArrayMaxSize(50)
-  @IsArray()
-  deudas?: DeudaDto[];
+  @Type(() => DeudaConcesionDto)
+  @ArrayMaxSize(500)
+  @IsArray({ message: 'Indique, por cada concesión de los titulares, si tiene deuda: { concesiones: [{ concesionId, tieneDeuda }] }.' })
+  concesiones: DeudaConcesionDto[];
 
   @IsOptional() @Texto() @IsString() @MaxLength(2000)
   observaciones?: string;

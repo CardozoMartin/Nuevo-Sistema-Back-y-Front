@@ -5,9 +5,9 @@
 //
 // Las respuestas tienen la forma de AltaBackend (alta-concesion.respuesta.ts del backend).
 import dominio from '../../../../mock-server/seed/dominio.json'
-import type { AltaBackend, DeudaBackend } from '@/features/tramites/AltaDeConcesion/backend.types'
+import type { AltaBackend, AntecedentesDeuda, DeudaBackend } from '@/features/tramites/AltaDeConcesion/backend.types'
 import { LIMITES_TUCUMAN } from '@/lib/coordenadas'
-import { claveDeDocumento, dniDeDocumento } from '@/lib/validaciones'
+import { claveDeDocumento, dniDeDocumento, esTelefonoValido } from '@/lib/validaciones'
 import { RANGO_POSGAR_TUCUMAN } from '@/lib/validaciones'
 import { aPosgar, dePosgar } from '@/lib/posgar'
 import { ahora, hoy, nuevoId, type AltaDemo, type Db, type ExpedienteDemo, type PersonaDemo, type PuntoDemo, type UsuarioDemo } from './db'
@@ -208,6 +208,11 @@ function titulares({ db, usuario, ruta, cuerpo }: Peticion) {
   //1.- Persona única por documento: si ya existe, se usa la misma y se actualizan sus datos.
   alta.titulares = d.titulares.map((t) => {
     const documento = exigirTexto(t.documento, 'Ingrese el documento de cada titular.')
+    // Contacto obligatorio, como en el backend (TitularDto).
+    const email = exigirTexto(t.email, 'Ingrese el correo electrónico del titular.')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw error400('Ingrese un correo electrónico válido.')
+    const telefono = exigirTexto(t.telefono, 'Ingrese el teléfono de contacto del titular.')
+    if (!esTelefonoValido(telefono)) throw error400('Ingrese un teléfono válido (entre 7 y 15 números, con código de área).')
     const datos: Omit<PersonaDemo, 'id'> = {
       tipoPersona: t.tipoPersona === 'JURIDICA' ? 'JURIDICA' : 'FISICA',
       tipoDocumento: (t.tipoDocumento as PersonaDemo['tipoDocumento']) ?? 'DNI',
@@ -217,8 +222,8 @@ function titulares({ db, usuario, ruta, cuerpo }: Peticion) {
       fechaNacimiento: t.fechaNacimiento || null,
       razonSocial: t.razonSocial ?? null,
       fechaConstitucion: t.fechaConstitucion || null,
-      email: t.email ?? null,
-      telefono: t.telefono ?? null,
+      email,
+      telefono,
     }
     const existente = personaEquivalente(db, documento, datos.tipoPersona)
     // Si estaba con CUIL / CUIT y llega el DNI, se queda con el CUIL / CUIT (no se pierde dato).
@@ -399,33 +404,98 @@ function reenviar(p: Peticion) {
   return armarAlta(db, e.id)
 }
 
+/** Nombre de una persona del demo. */
+const nombreDePersona = (p: PersonaDemo) => (p.tipoPersona === 'JURIDICA' ? (p.razonSocial ?? '') : `${p.apellido}, ${p.nombre}`)
+
+/**
+ * Concesiones otorgadas (VIGENTES) de estas personas, salvo la del expediente, con sus titulares
+ * y si tienen deuda. Como RecaudacionService.concesionesDe del backend: las del sistema toman los
+ * titulares de su alta; las migradas, de su documento.
+ */
+function concesionesDeTitulares(db: Db, personaIds: string[], expedienteId: string): AntecedentesDeuda['concesiones'] {
+  const claves = new Map(db.personas.map((p) => [claveDeDocumento(p.documento ?? ''), p]))
+  return db.concesiones
+    .filter((c) => c.estado === 'VIGENTE' && c.expedienteId !== expedienteId)
+    .map((c) => {
+      const deAlta = c.expedienteId ? db.altas[c.expedienteId] : undefined
+      const migrada = c.migrada?.documento ? claves.get(claveDeDocumento(c.migrada.documento)) : undefined
+      const titulares = deAlta
+        ? deAlta.titulares.flatMap((id) => {
+            const p = db.personas.find((x) => x.id === id)
+            return p ? [{ personaId: p.id, nombre: nombreDePersona(p) }] : []
+          })
+        : migrada
+          ? [{ personaId: migrada.id, nombre: nombreDePersona(migrada) }]
+          : []
+      return {
+        id: c.id,
+        numero: c.numero,
+        departamento: deAlta?.ubicacion?.departamento ?? c.migrada?.departamento ?? null,
+        localidad: deAlta?.ubicacion?.localidad ?? c.migrada?.localidad ?? null,
+        titulares,
+        deTitulares: titulares.map((t) => t.personaId).filter((id) => personaIds.includes(id)),
+        tieneDeuda: db.deudas.some((d) => d.concesionId === c.id && d.estado === 'PENDIENTE'),
+      }
+    })
+    .filter((c) => c.deTitulares.length > 0)
+}
+
+function antecedentesDeuda({ db, ruta }: Peticion): AntecedentesDeuda {
+  const { e, alta } = exigirAlta(db, ruta.id)
+  return {
+    titulares: alta.titulares.flatMap((id) => {
+      const p = db.personas.find((x) => x.id === id)
+      return p ? [{ personaId: p.id, nombre: nombreDePersona(p), documento: p.documento }] : []
+    }),
+    concesiones: concesionesDeTitulares(db, alta.titulares, e.id),
+    otrasDeudas: pendientesDe(db, alta.titulares)
+      .filter((d) => !d.concesionId)
+      .map((d) => ({ id: d.id, personaId: d.personaId, detalle: d.detalle })),
+  }
+}
+
+/**
+ * Recaudación responde, por cada concesión otorgada de los titulares, si tiene deuda (como el
+ * backend: la deuda queda en la concesión y en todos sus titulares). Ninguna con deuda: pasa a
+ * Distrito. Alguna: queda en espera; en espera se puede volver a responder.
+ */
 function recaudacion(p: Peticion) {
   const { db, usuario, ruta } = p
   const { e, alta } = exigirAlta(db, ruta.id)
   exigirActuar(e, usuario, ['RECAUDACION'])
-  if (e.estado === 'EN_ESPERA') throw error409('El expediente está en espera por deuda: se reanuda cuando se registre el pago.')
-  const d = cuerpoDe<{ resultado?: string; deudas?: { personaId: string; detalle: string; monto?: number }[] }>(p)
-  if (d.resultado === 'SIN_DEUDA') {
-    //1.- Sin deuda: se controla que ningún titular tenga deudas registradas.
-    const pendientes = pendientesDe(db, alta.titulares)
-    if (pendientes.length) throw error409('Hay titulares con deudas pendientes registradas: no se puede dar el «sin deuda».')
-    alta.verificados = [...alta.titulares]
-    actuar(db, e, usuario, 'VERIFICACION_DEUDA', 'SIN_DEUDA', observaciones(p))
-    const destino = e.vuelveA ?? 'DISTRITO'
-    e.vuelveA = null
-    pasar(db, e, destino, usuario, { dictamen: 'APROBADO', observaciones: observaciones(p) })
-  } else if (d.resultado === 'CON_DEUDA') {
-    //2.- Con deuda: queda registrada en la persona y el expediente, en espera (sin plazo).
-    if (!d.deudas?.length) throw error400('Cargue la deuda: titular y detalle.')
-    for (const x of d.deudas) {
-      if (!alta.titulares.includes(x.personaId)) throw error400('La deuda tiene que ser de un titular del alta.')
-      db.deudas.push({ id: nuevoId(db), personaId: x.personaId, detalle: exigirTexto(x.detalle, 'Ingrese el detalle de la deuda.'), monto: x.monto ?? null, estado: 'PENDIENTE', creadoEn: ahora(), canceladoEn: null, comprobantePago: null })
+  const d = cuerpoDe<{ concesiones?: { concesionId: string; tieneDeuda: boolean }[] }>(p)
+  if (!Array.isArray(d.concesiones)) throw error400('Indique, por cada concesión de los titulares, si tiene deuda.')
+  const concesiones = concesionesDeTitulares(db, alta.titulares, e.id)
+  const respuestas = new Map(d.concesiones.map((r) => [r.concesionId, r.tieneDeuda]))
+  if (d.concesiones.some((r) => !concesiones.some((c) => c.id === r.concesionId))) throw error400('Hay concesiones que no son de los titulares de este expediente.')
+  const faltan = concesiones.filter((c) => !respuestas.has(c.id))
+  if (faltan.length) throw error400(`Indique si tienen deuda las concesiones ${faltan.map((c) => `N° ${c.numero ?? c.id}`).join(', ')}.`)
+
+  //1.- Lo respondido: deuda nueva (una por titular) o deuda que se levanta.
+  for (const c of concesiones) {
+    const tiene = respuestas.get(c.id)
+    if (tiene && !c.tieneDeuda) {
+      for (const t of c.titulares) {
+        db.deudas.push({ id: nuevoId(db), personaId: t.personaId, concesionId: c.id, detalle: `Deuda de la concesión N° ${c.numero ?? c.id}`, monto: null, estado: 'PENDIENTE', creadoEn: ahora(), canceladoEn: null, comprobantePago: null })
+      }
     }
-    actuar(db, e, usuario, 'VERIFICACION_DEUDA', 'CON_DEUDA', observaciones(p), { deudas: d.deudas })
-    e.estado = 'EN_ESPERA'
-  } else {
-    throw error400('El resultado debe ser SIN_DEUDA o CON_DEUDA.')
+    if (!tiene && c.tieneDeuda) {
+      for (const x of db.deudas.filter((x) => x.concesionId === c.id && x.estado === 'PENDIENTE')) Object.assign(x, { estado: 'CANCELADA', canceladoEn: ahora() })
+    }
   }
+
+  //2.- ¿Queda alguna deuda pendiente de los titulares?
+  if (pendientesDe(db, alta.titulares).length) {
+    actuar(db, e, usuario, 'VERIFICACION_DEUDA', 'CON_DEUDA', observaciones(p), { concesionesConDeuda: concesiones.filter((c) => respuestas.get(c.id)).map((c) => c.id) })
+    e.estado = 'EN_ESPERA'
+    return armarAlta(db, e.id)
+  }
+  e.estado = 'EN_TRAMITE'
+  alta.verificados = [...alta.titulares]
+  actuar(db, e, usuario, 'VERIFICACION_DEUDA', 'SIN_DEUDA', observaciones(p))
+  const destino = e.vuelveA ?? 'DISTRITO'
+  e.vuelveA = null
+  pasar(db, e, destino, usuario, { dictamen: 'APROBADO', observaciones: observaciones(p) })
   return armarAlta(db, e.id)
 }
 
@@ -559,6 +629,7 @@ export const rutasAlta: Ruta[] = [
   ['PUT', `${ALTA}/:id/suministro`, suministro],
   ['POST', `${ALTA}/:id/enviar`, enviar],
   ['POST', `${ALTA}/:id/reenviar`, reenviar],
+  ['GET', `${ALTA}/:id/recaudacion`, antecedentesDeuda],
   ['POST', `${ALTA}/:id/recaudacion`, recaudacion],
   ['POST', `${ALTA}/:id/distrito`, dictamen('distrito')],
   ['POST', `${ALTA}/:id/juridico`, dictamen('juridico')],

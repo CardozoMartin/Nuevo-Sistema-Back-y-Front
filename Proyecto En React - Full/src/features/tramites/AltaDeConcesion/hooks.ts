@@ -15,6 +15,8 @@ export const altaKeys = {
   bandejas: () => [...altaKeys.all, 'bandeja'] as const,
   bandeja: (oficina: OficinaBackend) => [...altaKeys.bandejas(), oficina] as const,
   deudas: (personaId: string) => [...altaKeys.all, 'deudas', personaId] as const,
+  /** Bajo la clave del alta: se refresca con cada acción sobre el alta. */
+  antecedentesDeuda: (id: string) => [...altaKeys.alta(id), 'recaudacion'] as const,
 }
 
 // --- Consultas ---------------------------------------------------------------------
@@ -47,10 +49,21 @@ function useAlActualizar(id: string) {
   const qc = useQueryClient()
   return (alta?: AltaBackend) => {
     if (alta) qc.setQueryData(altaKeys.alta(id), alta)
-    else void qc.invalidateQueries({ queryKey: altaKeys.alta(id) })
+    else void qc.invalidateQueries({ queryKey: altaKeys.alta(id), exact: true })
+    void qc.invalidateQueries({ queryKey: altaKeys.antecedentesDeuda(id) })
     void qc.invalidateQueries({ queryKey: altaKeys.historial(id) })
     void qc.invalidateQueries({ queryKey: altaKeys.bandejas() })
   }
+}
+
+/** Concesiones otorgadas de los titulares del alta y si tienen deuda (pantalla de Recaudación). */
+export function useAntecedentesDeuda(id: string) {
+  return useQuery({ queryKey: altaKeys.antecedentesDeuda(id), queryFn: () => altaConcesionApi.antecedentesDeuda(id) })
+}
+
+/** Consulta si el número de expediente está libre (no se cachea: puede cambiar en cualquier momento). */
+export function useVerificarExpediente() {
+  return useMutation({ mutationFn: altaConcesionApi.disponibilidad })
 }
 
 export function useIniciarAlta() {

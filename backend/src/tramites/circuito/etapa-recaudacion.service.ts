@@ -1,15 +1,16 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Dictamen, EstadoExpediente, Etapa, formatearNumeroExpediente, ResultadoActuacion, SIGUIENTE_ETAPA, TipoActuacion, type TipoTramite } from '../../expedientes/expedientes.constantes.js';
+import { Expediente } from '../../expedientes/entities/expediente.entity.js';
 import { ExpedientesService } from '../../expedientes/expedientes.service.js';
 import { NotificacionesService, type EmailRegistrado } from '../../notificaciones/notificaciones.service.js';
 import { TipoEmail } from '../../notificaciones/notificaciones.constantes.js';
 import { nombrePersona } from '../../personas/entities/persona.entity.js';
-import { RecaudacionService } from '../../recaudacion/recaudacion.service.js';
+import { RecaudacionService, type ConcesionConDeuda } from '../../recaudacion/recaudacion.service.js';
 import { armarAvisoDeuda } from './aviso-deuda.js';
 import type { NotificarDeudaDto, VerificacionDeudaDto } from './dto/circuito.dto.js';
 import { RegistroTramitesService } from './registro-tramites.service.js';
-import { destinoTrasVerificarDeuda } from './validaciones/circuito.validaciones.js';
+import { destinoTrasVerificarDeuda, respuestasDeDeuda } from './validaciones/circuito.validaciones.js';
 
 /** Resultado de notificar la deuda: a quién se mandó y quién no tiene correo. */
 export interface ResultadoAvisoDeuda {
@@ -17,15 +18,30 @@ export interface ResultadoAvisoDeuda {
   sinCorreo: string[];
 }
 
+/** Lo que Recaudación tiene que verificar de un expediente (GET …/recaudacion). */
+export interface AntecedentesDeuda {
+  /** Titulares del trámite. */
+  titulares: { personaId: string; nombre: string; documento: string | null }[];
+  /** Concesiones otorgadas de esos titulares, con todos sus titulares y si tienen deuda. */
+  concesiones: (ConcesionConDeuda & { deTitulares: string[] })[];
+  /** Deudas pendientes de los titulares registradas sin concesión (antes de este modelo). */
+  otrasDeudas: { id: string; personaId: string; detalle: string }[];
+}
+
 /**
- * Recaudación: ¿las personas del trámite deben algo (Rentas u otra concesión)?
+ * Recaudación: ¿los titulares del trámite tienen otras concesiones otorgadas con deuda?
  *
- *   SIN_DEUDA (apto)     pasa a Distrito (o, si llegó porque cambiaron los titulares al corregir,
- *                        vuelve a la oficina que había observado).
- *   CON_DEUDA (no apto)  NO se rechaza: las deudas quedan registradas en la persona y el
- *                        expediente queda EN ESPERA en Recaudación, sin plazo. Cuando se cancelan
- *                        (POST /api/deudas/:id/cancelar) se reanuda solo y Recaudación lo pasa.
- *   notificarDeuda       manda un correo a cada persona con deuda pendiente.
+ *   antecedentes    las concesiones otorgadas de los titulares (tener otra concesión solo se
+ *                   informa) y si cada una tiene deuda. Por ahora la deuda es sí / no, sin monto.
+ *   verificarDeuda  Recaudación responde, por cada concesión, si tiene deuda. La deuda queda
+ *                   ligada a la concesión y a todos sus titulares vigentes.
+ *                     - Ninguna con deuda: pasa a Distrito (o, si llegó porque cambiaron los
+ *                       titulares al corregir, vuelve a la oficina que había observado).
+ *                     - Alguna con deuda: NO se rechaza; el expediente queda EN ESPERA en
+ *                       Recaudación, sin plazo. Recaudación puede volver a responder (ej: «ya no
+ *                       tiene deuda») o se cancela la deuda (POST /api/deudas/:id/cancelar), y
+ *                       entonces se reanuda.
+ *   notificarDeuda  manda un correo a cada titular con deuda pendiente.
  */
 @Injectable()
 export class EtapaRecaudacionService {
@@ -37,62 +53,77 @@ export class EtapaRecaudacionService {
     private readonly registro: RegistroTramitesService,
   ) {}
 
+  async antecedentes(tipo: TipoTramite, expedienteId: string): Promise<AntecedentesDeuda> {
+    return this.dataSource.transaction(async (tx) => {
+      // Solo lectura: no se bloquea el expediente.
+      const expediente = await tx.findOneBy(Expediente, { id: expedienteId, tipoTramite: tipo });
+      if (!expediente) throw new NotFoundException('No se encontró el expediente.');
+      const personas = await this.registro.de(tipo).personasAVerificar(tx, expediente);
+      const ids = personas.map((p) => p.id);
+      const concesiones = await this.recaudacion.concesionesDe(tx, ids, expediente.id);
+      const pendientes = await this.recaudacion.pendientesDe(tx, ids);
+      return {
+        titulares: personas.map((p) => ({ personaId: p.id, nombre: nombrePersona(p), documento: p.documento })),
+        concesiones: concesiones.map((c) => ({ ...c, deTitulares: c.titulares.map((t) => t.personaId).filter((id) => ids.includes(id)) })),
+        otrasDeudas: pendientes.filter((d) => !d.concesion).map((d) => ({ id: d.id, personaId: d.persona.id, detalle: d.detalle })),
+      };
+    });
+  }
+
   async verificarDeuda(tipo: TipoTramite, expedienteId: string, datos: VerificacionDeudaDto, usuarioId: string): Promise<void> {
     await this.dataSource.transaction(async (tx) => {
-      //1.- Si está en espera por deuda no se puede dar otro resultado: se reanuda al pagar.
-      const expediente = await this.expedientes.bloquear(tx, expedienteId, tipo);
-      if (expediente.estado === EstadoExpediente.EN_ESPERA) {
-        throw new ConflictException('El expediente está en espera por deuda: se reanuda cuando se cancelan las deudas pendientes.');
-      }
+      //1.- Recaudación tiene que tener tomado el expediente, en su etapa. Si está en espera por
+      //    deuda también puede actuar: por ejemplo, para registrar que ya no la tiene.
+      const { expediente, usuario } = await this.expedientes.bloquearParaActuar(tx, expedienteId, tipo, [Etapa.RECAUDACION], usuarioId, [
+        EstadoExpediente.EN_TRAMITE,
+        EstadoExpediente.EN_ESPERA,
+      ]);
 
-      //2.- Recaudación tiene que tener tomado el expediente, en su etapa.
-      const usuario = await this.expedientes.exigirParaActuar(expediente, [Etapa.RECAUDACION], usuarioId);
-
-      //3.- Las personas a verificar (las define el trámite) y sus deudas pendientes.
+      //2.- Los titulares del trámite y sus concesiones otorgadas: hay que responder por todas.
       const personas = await this.registro.de(tipo).personasAVerificar(tx, expediente);
       const personaIds = personas.map((p) => p.id);
+      const concesiones = await this.recaudacion.concesionesDe(tx, personaIds, expediente.id);
+      const respuestas = respuestasDeDeuda(concesiones, datos.concesiones);
+
+      //3.- Se registra lo respondido: primero las deudas nuevas y después las que se levantan
+      //    (así, al cancelar, no se reanuda un expediente que sigue con otra deuda).
+      for (const c of concesiones.filter((c) => respuestas.get(c.id))) await this.recaudacion.marcarDeuda(tx, c, expediente, usuario);
+      for (const c of concesiones.filter((c) => !respuestas.get(c.id) && c.tieneDeuda)) await this.recaudacion.quitarDeuda(tx, c, usuario);
+      const conDeuda = concesiones.filter((c) => respuestas.get(c.id)).map((c) => ({ id: c.id, numero: c.numero }));
+
+      //4.- ¿Queda alguna deuda pendiente de los titulares (de estas concesiones o de antes)?
       const pendientes = await this.recaudacion.pendientesDe(tx, personaIds);
+      const actual = await this.expedientes.bloquear(tx, expediente.id, tipo); // quitarDeuda pudo reanudarlo
 
-      if (datos.resultado === 'SIN_DEUDA') {
-        //4.- Apto: se valida que no queden deudas registradas y pasa a Distrito.
-        if (pendientes.length) {
-          const quienes = [...new Set(pendientes.map((d) => nombrePersona(d.persona)))].join(', ');
-          throw new ConflictException(`Hay deudas pendientes registradas de: ${quienes}. Cancélelas antes de dar el visto bueno.`);
-        }
-        //4.1.- ¿A dónde sigue? Distrito, o la oficina que observó si vino por un cambio de titulares.
-        const correccion = await this.expedientes.ultimaActuacion(tx, expediente.id, [TipoActuacion.CORRECCION]);
-        const ultimoSinDeuda = await this.expedientes.ultimaActuacion(tx, expediente.id, [TipoActuacion.VERIFICACION_DEUDA], ResultadoActuacion.SIN_DEUDA);
-        const destino = destinoTrasVerificarDeuda(correccion, ultimoSinDeuda, SIGUIENTE_ETAPA[Etapa.RECAUDACION]!);
-
-        //4.2.- Queda registrado A QUIÉNES se verificó (si después cambian, se vuelve a verificar).
-        await this.expedientes.actuar(tx, expediente, {
+      if (pendientes.length) {
+        //5.- Con deuda: queda en espera en Recaudación (o sigue en espera), tomado por el mismo usuario.
+        await this.expedientes.actuar(tx, actual, {
           tipo: TipoActuacion.VERIFICACION_DEUDA,
-          resultado: ResultadoActuacion.SIN_DEUDA,
+          resultado: ResultadoActuacion.CON_DEUDA,
           usuario,
           observaciones: datos.observaciones,
-          datos: { personas: personaIds },
+          datos: { concesionesConDeuda: conDeuda, deudas: pendientes.map((d) => ({ id: d.id, personaId: d.persona.id, concesionId: d.concesion?.id ?? null })) },
         });
-        await this.expedientes.pasar(tx, expediente, { etapa: destino, usuario, dictamen: Dictamen.APTO, observaciones: datos.observaciones });
+        if (actual.estado !== EstadoExpediente.EN_ESPERA) await this.expedientes.cambiarEstado(tx, actual, EstadoExpediente.EN_ESPERA, usuario);
         return;
       }
 
-      //5.- No apto (con deuda): las deudas nuevas tienen que ser de personas de este trámite.
-      const nuevas = datos.deudas ?? [];
-      const ajenas = nuevas.filter((d) => !personaIds.includes(d.personaId));
-      if (ajenas.length) throw new BadRequestException(`Las personas ${ajenas.map((d) => d.personaId).join(', ')} no son parte de este expediente.`);
-      if (!nuevas.length && !pendientes.length) throw new BadRequestException('Indique las deudas que se detectaron (deudas: [{ personaId, detalle, monto }]).');
+      //6.- Sin deuda: si estaba en espera se reanuda, y pasa a Distrito (o a la oficina que observó
+      //    si vino por un cambio de titulares).
+      if (actual.estado === EstadoExpediente.EN_ESPERA) await this.expedientes.cambiarEstado(tx, actual, EstadoExpediente.EN_TRAMITE, usuario);
+      const correccion = await this.expedientes.ultimaActuacion(tx, actual.id, [TipoActuacion.CORRECCION]);
+      const ultimoSinDeuda = await this.expedientes.ultimaActuacion(tx, actual.id, [TipoActuacion.VERIFICACION_DEUDA], ResultadoActuacion.SIN_DEUDA);
+      const destino = destinoTrasVerificarDeuda(correccion, ultimoSinDeuda, SIGUIENTE_ETAPA[Etapa.RECAUDACION]!);
 
-      //6.- Se registran las deudas (son de la persona) y el expediente queda en espera en
-      //    Recaudación, tomado por el mismo usuario.
-      const registradas = await this.recaudacion.registrar(tx, expediente, nuevas, usuario);
-      await this.expedientes.actuar(tx, expediente, {
+      //6.1.- Queda registrado A QUIÉNES y QUÉ concesiones se verificó (si cambian, se vuelve a verificar).
+      await this.expedientes.actuar(tx, actual, {
         tipo: TipoActuacion.VERIFICACION_DEUDA,
-        resultado: ResultadoActuacion.CON_DEUDA,
+        resultado: ResultadoActuacion.SIN_DEUDA,
         usuario,
         observaciones: datos.observaciones,
-        datos: { deudas: [...registradas, ...pendientes].map((d) => ({ id: d.id, personaId: d.persona.id, detalle: d.detalle })) },
+        datos: { personas: personaIds, concesiones: concesiones.map((c) => c.id) },
       });
-      await this.expedientes.cambiarEstado(tx, expediente, EstadoExpediente.EN_ESPERA, usuario);
+      await this.expedientes.pasar(tx, actual, { etapa: destino, usuario, dictamen: Dictamen.APTO, observaciones: datos.observaciones });
     });
   }
 

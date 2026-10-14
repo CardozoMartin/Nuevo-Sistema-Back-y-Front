@@ -1,7 +1,7 @@
 // Datos de un titular (persona física o jurídica). Lo reutilizan todos los trámites
 // que cargan titulares: alta, cambio de titularidad, permisos, etc.
 import { z } from 'zod'
-import { esCuitValido, esFechaFutura } from '@/lib/validaciones'
+import { esCuitValido, esFechaFutura, esTelefonoValido } from '@/lib/validaciones'
 
 export const TIPOS_PERSONA = [
   { value: 'fisica', label: 'Persona Física' },
@@ -48,8 +48,9 @@ export const titularSchema = z
     tipoPersona: z.enum(['fisica', 'juridica']),
     tipoDocumento: z.enum(['dni', 'cuil', 'cuit']),
     documento: z.string().trim(),
-    correo: z.union([z.literal(''), z.email('Ingrese un correo electrónico válido.')]),
-    telefono: z.string().trim(),
+    // Contacto: obligatorio siempre (por ahí llegan los avisos del trámite).
+    correo: z.string().trim().min(1, 'Ingrese el correo electrónico.').pipe(z.email('Ingrese un correo electrónico válido.')),
+    telefono: z.string().trim().min(1, 'Ingrese el teléfono de contacto.').refine(esTelefonoValido, 'Ingrese un teléfono válido (entre 7 y 15 números, con código de área).'),
     // Persona física
     apellido: z.string().trim(),
     nombre: z.string().trim(),

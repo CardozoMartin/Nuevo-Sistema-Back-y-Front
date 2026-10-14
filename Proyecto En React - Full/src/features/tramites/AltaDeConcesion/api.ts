@@ -7,7 +7,9 @@
 import { backend } from '@/services/api/backend'
 import type {
   AltaBackend,
+  AntecedentesDeuda,
   DeudaBackend,
+  DisponibilidadExpediente,
   EntradaHistorial,
   ExpedienteEnBandeja,
   OficinaBackend,
@@ -30,6 +32,9 @@ export const altaConcesionApi = {
   // --- Catálogos y consultas ---------------------------------------------------
   situacionesLegales: () => datos(backend.get<SituacionLegalBackend[]>('/catalogos/situaciones-legales')),
   obtener: (id: string) => datos(backend.get<AltaBackend>(`${ALTA}/${id}`)),
+  /** ¿El número de expediente está libre? Se consulta antes de cargar el resto del inicio. */
+  disponibilidad: (expediente: { numero: string; reparticion: string; anio: number }) =>
+    datos(backend.get<DisponibilidadExpediente>('/expedientes/disponibilidad', { params: expediente })),
 
   // --- Catastro: carga (una sección por PUT) -------------------------------------
   iniciar: (dto: IniciarAltaDto) => datos(backend.post<AltaBackend>(ALTA, dto)),
@@ -43,7 +48,10 @@ export const altaConcesionApi = {
   // --- Circuito ------------------------------------------------------------------
   enviar: (id: string, observaciones?: string) => datos(backend.post<AltaBackend>(`${ALTA}/${id}/enviar`, { observaciones })),
   reenviar: (id: string, observaciones?: string) => datos(backend.post<AltaBackend>(`${ALTA}/${id}/reenviar`, { observaciones })),
-  recaudacion: (id: string, dto: { resultado: 'SIN_DEUDA' | 'CON_DEUDA'; deudas?: { personaId: string; detalle: string; monto?: number }[]; observaciones?: string }) =>
+  /** Concesiones otorgadas de los titulares y si tienen deuda (lo que verifica Recaudación). */
+  antecedentesDeuda: (id: string) => datos(backend.get<AntecedentesDeuda>(`${ALTA}/${id}/recaudacion`)),
+  /** Por cada concesión otorgada de los titulares, si tiene deuda. Ninguna: pasa a Distrito; alguna: queda en espera. */
+  recaudacion: (id: string, dto: { concesiones: { concesionId: string; tieneDeuda: boolean }[]; observaciones?: string }) =>
     datos(backend.post<AltaBackend>(`${ALTA}/${id}/recaudacion`, dto)),
   dictaminar: (id: string, oficina: 'distrito' | 'juridico', dto: { resultado: ResultadoDictamen; observaciones?: string }) =>
     datos(backend.post<AltaBackend>(`${ALTA}/${id}/${oficina}`, dto)),

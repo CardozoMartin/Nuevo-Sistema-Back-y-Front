@@ -57,3 +57,21 @@ export function destinoTrasVerificarDeuda<E extends string>(correccion: Actuacio
   if (ultimoSinDeuda && BigInt(ultimoSinDeuda.id) > BigInt(correccion.id)) return siguiente;
   return correccion.datos.vuelveA as E;
 }
+
+/**
+ * Recaudación responde, por cada concesión otorgada de los titulares, si tiene deuda: tiene que
+ * responder todas, una sola vez cada una, y ninguna ajena al expediente. Devuelve la respuesta
+ * de cada concesión (id → tiene deuda).
+ */
+export function respuestasDeDeuda(concesiones: { id: string; numero: string | null }[], respuestas: { concesionId: string; tieneDeuda: boolean }[]): Map<string, boolean> {
+  const ids = new Set(concesiones.map((c) => c.id));
+  const porId = new Map<string, boolean>();
+  for (const r of respuestas) {
+    if (!ids.has(r.concesionId)) throw new BadRequestException(`La concesión ${r.concesionId} no es de los titulares de este expediente.`);
+    if (porId.has(r.concesionId)) throw new BadRequestException(`La concesión ${r.concesionId} está respondida más de una vez.`);
+    porId.set(r.concesionId, r.tieneDeuda);
+  }
+  const faltan = concesiones.filter((c) => !porId.has(c.id));
+  if (faltan.length) throw new BadRequestException(`Indique si tienen deuda las concesiones ${faltan.map((c) => (c.numero ? `N° ${c.numero}` : `id ${c.id}`)).join(', ')}.`);
+  return porId;
+}

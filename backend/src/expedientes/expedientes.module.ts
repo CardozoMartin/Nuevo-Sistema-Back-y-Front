@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Module, Param, ParseIntPipe, Post } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Module, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsuarioActual } from '../seguridad/usuario-actual.decorator.js';
 import { Actuacion } from './entities/actuacion.entity.js';
@@ -7,6 +7,7 @@ import { Expediente } from './entities/expediente.entity.js';
 import { Movimiento } from './entities/movimiento.entity.js';
 import { Resolucion } from './entities/resolucion.entity.js';
 import { SolicitudNumero } from './entities/solicitud-numero.entity.js';
+import { NumeroExpedienteQuery } from './dto/numero-expediente.query.js';
 import { Oficina } from './expedientes.constantes.js';
 import { ExpedientesService } from './expedientes.service.js';
 
@@ -20,6 +21,15 @@ class ExpedientesController {
   bandeja(@Param('oficina') oficina: string) {
     if (!Object.values(Oficina).includes(oficina as Oficina)) throw new BadRequestException(`Oficina desconocida: ${oficina}.`);
     return this.expedientes.bandeja(oficina as Oficina);
+  }
+
+  /**
+   * GET /api/expedientes/disponibilidad?numero=123&reparticion=332&anio=2026: si el número
+   * está libre o, si ya está registrado, de qué trámite es y dónde está. Va antes de :id.
+   */
+  @Get('disponibilidad')
+  disponibilidad(@Query() query: NumeroExpedienteQuery) {
+    return this.expedientes.disponibilidad(query);
   }
 
   /** GET /api/expedientes/:id: dónde está y quién lo tiene. */

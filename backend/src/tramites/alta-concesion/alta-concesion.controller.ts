@@ -103,7 +103,16 @@ export class AltaConcesionController {
     return this.circuito.reenviar(String(id), dto, usuarioId);
   }
 
-  /** Recaudación: SIN_DEUDA (pasa a Distrito) o CON_DEUDA (queda en espera hasta que paguen). */
+  /** Recaudación: concesiones otorgadas de los titulares (tener otra solo se informa) y si tienen deuda. */
+  @Get(':id/recaudacion')
+  antecedentesDeuda(@Param('id', ParseIntPipe) id: number) {
+    return this.circuito.antecedentesDeuda(String(id));
+  }
+
+  /**
+   * Recaudación: por cada concesión otorgada de los titulares, si tiene deuda
+   * ({ concesiones: [{ concesionId, tieneDeuda }] }). Ninguna: pasa a Distrito. Alguna: en espera.
+   */
   @Post(':id/recaudacion')
   recaudacion(@Param('id', ParseIntPipe) id: number, @Body() dto: VerificacionDeudaDto, @UsuarioActual() usuarioId: string) {
     return this.circuito.verificarDeuda(String(id), dto, usuarioId);

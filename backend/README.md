@@ -66,6 +66,7 @@ Cómo se generan las tablas a partir de las entidades: sección 8 de [PROCESOS_B
 | DELETE | `/api/catalogos/{…}/:id` | **Baja lógica** con `{ "motivo" }` (mínimo 10 caracteres). Nunca se borra la fila |
 | POST   | `/api/catalogos/{…}/:id/reactivar` | Reactiva lo dado de baja |
 | POST   | `/api/tramites/alta-concesion/:id/{enviar, reenviar, recaudacion, distrito, juridico, numero-concesion, resolucion, verificacion-final, padron}` | Circuito por las oficinas (ver el README del trámite). `numero-concesion` **pide** el número a Catastro |
+| GET    | `/api/tramites/alta-concesion/:id/recaudacion` | Recaudación: concesiones otorgadas de los titulares y si tienen deuda (sí / no) |
 | POST   | `/api/tramites/alta-concesion/:id/recaudacion/notificar-deuda` | Recaudación avisa la deuda por correo a los titulares |
 | GET    | `/api/solicitudes-numero?estado=PENDIENTE` | Bandeja de Catastro: pedidos de número de concesión |
 | POST   | `/api/solicitudes-numero/:id/asignar` | Catastro carga el número de concesión (de su libro) |

@@ -30,12 +30,10 @@ function BotonEliminar({ onClick, title }: { onClick: () => void; title: string 
 interface Props {
   /** Título del primer titular (ej: "Nuevo titular"). */
   tituloTitular?: string
-  /** Correo y teléfono obligatorios para cada titular. */
-  contactoObligatorio?: boolean
 }
 
 /** Titular/es y domicilio/s legal/es, con alta y baja de adicionales (campos `titulares` y `domicilios`). */
-export function TitularesDomiciliosFields({ tituloTitular = 'Titular', contactoObligatorio }: Props) {
+export function TitularesDomiciliosFields({ tituloTitular = 'Titular' }: Props) {
   const { control } = useFormContext<FormTitulares>()
   const titulares = useFieldArray({ control, name: 'titulares' })
   const domicilios = useFieldArray({ control, name: 'domicilios' })
@@ -46,7 +44,7 @@ export function TitularesDomiciliosFields({ tituloTitular = 'Titular', contactoO
         {titulares.fields.map((field, i) =>
           i === 0 ? (
             <FormSection key={field.id} title={tituloTitular} icon="person">
-              <TitularFields prefix="titulares.0" contactoObligatorio={contactoObligatorio} />
+              <TitularFields prefix="titulares.0" />
             </FormSection>
           ) : (
             <FormSection
@@ -56,7 +54,7 @@ export function TitularesDomiciliosFields({ tituloTitular = 'Titular', contactoO
               icon="person"
               actions={<BotonEliminar title="Eliminar titular" onClick={() => titulares.remove(i)} />}
             >
-              <TitularFields prefix={`titulares.${i}`} contactoObligatorio={contactoObligatorio} />
+              <TitularFields prefix={`titulares.${i}`} />
             </FormSection>
           ),
         )}

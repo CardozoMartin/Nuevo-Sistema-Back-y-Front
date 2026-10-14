@@ -38,6 +38,22 @@ export enum TipoTramite {
   OTRO = 'OTRO',
 }
 
+/** Nombre del trámite para mostrar (ej: «el expediente ya es de un Alta de concesión»). */
+export const NOMBRE_TIPO_TRAMITE: Record<TipoTramite, string> = {
+  [TipoTramite.ALTA_CONCESION]: 'Alta de concesión',
+  [TipoTramite.CAMBIO_TITULARIDAD]: 'Cambio de titularidad',
+  [TipoTramite.ANULACION]: 'Anulación',
+  [TipoTramite.AMPLIACION_REDUCCION]: 'Ampliación o reducción',
+  [TipoTramite.SUBDIVISION]: 'Subdivisión',
+  [TipoTramite.REUBICACION]: 'Reubicación',
+  [TipoTramite.PERMISO_USO]: 'Permiso de uso',
+  [TipoTramite.AUTORIZACION_PERFORACION]: 'Autorización de perforación',
+  [TipoTramite.REGISTRO_POZO]: 'Registro de pozo',
+  [TipoTramite.BAJA_POZO]: 'Baja de pozo',
+  [TipoTramite.REGISTRO_EMPRESA]: 'Registro de empresa',
+  [TipoTramite.OTRO]: 'Otro trámite',
+};
+
 /**
  * Estado general del expediente.
  *   EN_TRAMITE  circulando normalmente.

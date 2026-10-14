@@ -85,6 +85,7 @@ export function BotonIcono({
   disabled,
   className,
   children,
+  solido = false,
 }: {
   icono: string
   titulo: string
@@ -95,6 +96,8 @@ export function BotonIcono({
   disabled?: boolean
   className?: string
   children?: ReactNode
+  /** Botón azul lleno (barra lateral del visor, como Argenmap); el activo, más oscuro y con borde celeste. */
+  solido?: boolean
 }) {
   return (
     <button
@@ -106,7 +109,11 @@ export function BotonIcono({
       aria-pressed={activo}
       className={cn(
         'relative grid size-10 shrink-0 place-items-center rounded-lg transition-colors disabled:opacity-50',
-        activo ? 'bg-primary text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white',
+        solido
+          ? cn('text-white shadow-sm', activo ? 'bg-primary-oscuro ring-2 ring-celeste ring-inset' : 'bg-institucional hover:bg-primary-oscuro')
+          : activo
+            ? 'bg-primary text-white shadow-sm'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white',
         className,
       )}
     >
@@ -116,5 +123,26 @@ export function BotonIcono({
       )}
       {marca === true && <span className="absolute top-1 right-1 size-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-800" />}
     </button>
+  )
+}
+
+/** Control deslizante de la opacidad de una capa (de 0 a 100 %). */
+export function ControlOpacidad({ valor, onCambiar, etiqueta = 'Opacidad', nombre }: { valor: number; onCambiar: (valor: number) => void; etiqueta?: string; nombre: string }) {
+  const porcentaje = Math.round(valor * 100)
+  return (
+    <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+      <span className="shrink-0">{etiqueta}</span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={5}
+        value={porcentaje}
+        onChange={(e) => onCambiar(Number(e.target.value) / 100)}
+        aria-label={`${etiqueta} de ${nombre}`}
+        className="h-1.5 min-w-0 flex-1 cursor-pointer accent-primary"
+      />
+      <span className="w-10 shrink-0 text-right whitespace-nowrap tabular-nums">{porcentaje} %</span>
+    </label>
   )
 }

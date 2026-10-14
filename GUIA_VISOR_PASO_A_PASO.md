@@ -385,8 +385,11 @@ Por ejemplo, «parcelas de catastro». Siguiendo los mismos pasos:
    `ST_Transform(geom, 4326)` (paso 9), y un `@Get('parcelas')` en `SigController` (paso 8).
 4. **Front:** función en `visor/api.ts`, hook en `visor/hooks.ts`, tipo en `visor/types.ts`
    (pasos 12 y 13).
-5. **Mapa:** un bloque `useEffect` en `MapaConcesiones.tsx` con `L.geoJSON(...)` (paso 15) y un
-   interruptor en el panel de capas ([PanelCapas.tsx](Proyecto%20En%20React%20-%20Full/src/features/visor/components/PanelCapas.tsx)).
+5. **Mapa:** un bloque `useEffect` en `MapaConcesiones.tsx` con `L.geoJSON(...)` (paso 15) y la capa en
+   la sección que corresponda del catálogo ([catalogo.ts](Proyecto%20En%20React%20-%20Full/src/features/visor/catalogo.ts));
+   el panel ([PanelCapas.tsx](Proyecto%20En%20React%20-%20Full/src/features/visor/components/PanelCapas.tsx)) la muestra sola.
+   Si la capa ya está en el GeoServer de la DRH, alcanza con sumarla a `capasDrh.ts` y al catálogo
+   (sin pasos 1 a 4): sale de la copia local que arma `npm run sig:copiar`.
 6. **Modo demo:** sumar la ruta al emulador ([src/services/demo/servidor/sig.ts](Proyecto%20En%20React%20-%20Full/src/services/demo/servidor/sig.ts)).
 
 El proxy no se toca: `/api/sig/*` ya va al backend.

@@ -24,6 +24,7 @@
     "demo:generar": "node scripts/demo/generar-padron-demo.mjs",
     "demo:cargar": "npm run demo:generar && npm run migracion -- importar datos/demo/padron-demo.json --demo",
     "demo:borrar": "npm run migracion -- borrar-demo",
+    "sig:copiar": "node scripts/sig/copiar-geoserver.mjs",
     "sig:cauces": "npm run migracion -- cargar-cauces recursos/sig/cauces-osm.json",
     "db:tablas": "node --env-file-if-exists=.env scripts/db/documentar-tablas.mjs",
     "db:sql": "docker exec drh-postgres pg_dump -U drh -d drh_sistema --schema-only --no-owner --schema=public --schema=sig -f /tmp/esquema.sql && docker cp drh-postgres:/tmp/esquema.sql docs/esquema.sql"

@@ -1,12 +1,14 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import type { Geometry, MultiPolygon } from 'geojson'
+import type { FeatureCollection, Geometry, MultiPolygon } from 'geojson'
 import { ponerFondoVisor } from '@/components/map/fondos'
 import { CENTRO_TUCUMAN, puntoEtiqueta, type LatLng } from '@/lib/geo'
 import { aPosgar, formatearPosgar } from '@/lib/posgar'
 import { COLOR_COMPARACION, COLOR_POZO_A_REVISAR, COLOR_POZO_OFICIO, DISTANCIA_MAX_PUNTO_M, TIPOS_PUNTO, ZOOM_ETIQUETAS, colorPozo, formatoHa, formatoNumero, nombreEstado, nombreEstadoPozo, tituloConcesion } from '../estilos'
 import { capaFija, capasActivas, consultar, SERVICIOS_WMS, type EstadoWms, type ObjetoConsultado, type ServicioWms } from '../capasWms'
+import { CAPAS_DRH, camposDe, type CapaDrh, type TipoCapaDrh } from '../capasDrh'
+import { claveOpacidadDrh, claveOpacidadWms, CLAVE_RELLENO_CONCESIONES, opacidadDe, RELLENO_CONCESIONES, type Opacidades } from '../preferencias'
 import type { CapasVisor } from '../filtros'
 import { iniciarMedicion, type ResultadoMedicion, type TipoMedicion } from '../medicion'
 import type { AtributosConcesion, CauceGeo, ConcesionGeo, PozoGeo, PuntoGeo } from '../types'
@@ -99,6 +101,32 @@ function htmlConsulta(objetos: ObjetoConsultado[]) {
     .join('')
 }
 
+/** Globo de un objeto de las capas del GeoServer de la DRH: título y todos sus datos. */
+function htmlObjetoDrh(capa: CapaDrh, p: Record<string, unknown>) {
+  const filas = camposDe(capa, p)
+    .map(([campo, valor]) => `<tr><td style="padding:1px 8px 1px 0;color:#64748b;vertical-align:top">${escapar(campo)}</td><td style="padding:1px 0;font-weight:600">${escapar(valor)}</td></tr>`)
+    .join('')
+  return `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:${capa.color}">${escapar(capa.nombre)}</div><div style="font-weight:700;margin-bottom:4px">${escapar(capa.titulo(p))}</div><div style="max-height:260px;overflow-y:auto"><table style="font-size:13px">${filas}</table></div><div style="margin-top:4px;font-size:11px;color:#94a3b8">GeoServer DRH · copia local</div>`
+}
+
+/**
+ * Panel de las capas del GeoServer de la DRH: encima de las capas propias (que se dibujan en un
+ * <canvas>) y en SVG, para que los clics donde no hay nada de estas capas lleguen al canvas de abajo.
+ */
+const PANEL_DRH = 'capasDrh'
+
+/** Estilo de un objeto de una capa del GeoServer con la opacidad elegida para la capa (1 = la de fábrica). */
+function estiloDrh(def: CapaDrh, opacidad: number, renderer: L.SVG): L.CircleMarkerOptions {
+  const base = { renderer, pane: PANEL_DRH, color: def.color, dashArray: def.punteado ? '6 4' : undefined }
+  if (def.tipo === 'punto') return { ...base, radius: 5, color: '#fff', weight: 1.5, opacity: opacidad, fillColor: def.color, fillOpacity: opacidad }
+  if (def.tipo === 'limite') return { ...base, weight: 2.5, opacity: 0.9 * opacidad, fill: false }
+  if (def.tipo === 'linea') return { ...base, weight: 2.5, opacity: 0.9 * opacidad }
+  return { ...base, weight: 1.5, opacity: opacidad, fillColor: def.color, fillOpacity: 0.15 * opacidad }
+}
+
+/** Orden de dibujo: los límites abajo, después polígonos, líneas y, arriba de todo, los puntos. */
+const ORDEN_DRH: TipoCapaDrh[] = ['limite', 'poligono', 'linea', 'punto']
+
 /** Color del resaltado de lo consultado (el de las parcelas de Catastro, más grueso). */
 const COLOR_CONSULTA = '#facc15'
 
@@ -120,6 +148,10 @@ interface Props {
   puntos?: PuntoGeo[]
   /** Ríos y canales (líneas). */
   cauces?: CauceGeo[]
+  /** Capas del GeoServer de la DRH que se ven (copia local), ya leídas. Clic en un objeto → sus datos. */
+  capasDrh?: { id: string; datos?: FeatureCollection }[]
+  /** Opacidad elegida para cada capa (temas WMS, capas del GeoServer, relleno de las concesiones). */
+  opacidades?: Opacidades
   /** Qué capas se ven. */
   capas: CapasVisor
   /** Capas WMS de otros organismos que se ven. Clic en el mapa → consulta las que se pueden consultar. */
@@ -157,7 +189,7 @@ interface Props {
  *   Mientras se mide, los clics son vértices: no seleccionan concesiones.
  */
 export function MapaConcesiones(props: Props) {
-  const { concesiones, colorDe, pozos = [], puntos = [], cauces = [], capas, wms, encuadre, seleccionada, onSeleccionar, comparacion } = props
+  const { concesiones, colorDe, pozos = [], puntos = [], cauces = [], capasDrh = [], opacidades = {}, capas, wms, encuadre, seleccionada, onSeleccionar, comparacion } = props
   const { fondo, onFondoFalla, medicion, onMedicion, marca, onVista, refCursor } = props
   const contenedor = useRef<HTMLDivElement>(null)
   const mapa = useRef<L.Map | null>(null)
@@ -169,6 +201,16 @@ export function MapaConcesiones(props: Props) {
   const capaCauces = useRef<L.GeoJSON | null>(null)
   /** Capa WMS de cada tema de otro organismo (clave «servicio|capa»): una por tema, así una capa rota no apaga las demás. */
   const capasWms = useRef(new Map<string, L.TileLayer.WMS>())
+  /** Capa de Leaflet de cada capa del GeoServer de la DRH que se ve (con los datos que dibuja). */
+  const dibujadasDrh = useRef(new Map<string, { datos: FeatureCollection; capa: L.LayerGroup; def: CapaDrh; geo: L.GeoJSON; etiquetas: L.Marker[] }>())
+  const opacidadesActuales = useRef(opacidades)
+  opacidadesActuales.current = opacidades
+  const relleno = opacidadDe(opacidades, CLAVE_RELLENO_CONCESIONES, RELLENO_CONCESIONES)
+  const rellenoActual = useRef(relleno)
+  rellenoActual.current = relleno
+  /** Relleno de una concesión: la seleccionada, un poco más marcada. */
+  const rellenoDe = (elegida: boolean) => (elegida ? Math.min(1, rellenoActual.current + 0.2) : rellenoActual.current)
+  const rendererDrh = useRef<L.SVG | null>(null)
   const wmsActual = useRef(wms)
   wmsActual.current = wms
   /** Consulta en curso o mostrada: el globo, lo resaltado y el pedido (para cancelarlo). */
@@ -199,6 +241,11 @@ export function MapaConcesiones(props: Props) {
     // El zoom va abajo a la derecha, sobre la barra de estado: arriba flotan los paneles.
     const m = L.map(contenedor.current, { preferCanvas: true, zoomControl: false }).setView(CENTRO_TUCUMAN, 9)
     L.control.zoom({ position: 'bottomright', zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar' }).addTo(m)
+    // Panel de las capas del GeoServer (ver PANEL_DRH): sin eventos propios, solo los de sus objetos.
+    const panelDrh = m.createPane(PANEL_DRH)
+    panelDrh.style.zIndex = '450'
+    panelDrh.style.pointerEvents = 'none'
+    rendererDrh.current = L.svg({ pane: PANEL_DRH })
     m.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noreferrer">Leaflet</a>')
     // Clic fuera de un polígono: quita la selección (salvo que se esté midiendo) y consulta las
     // capas de otros organismos que se ven (ej: padrón y nomenclatura de la parcela de Catastro).
@@ -236,6 +283,8 @@ export function MapaConcesiones(props: Props) {
       capaPuntos.current = null
       capaCauces.current = null
       capasWms.current.clear()
+      dibujadasDrh.current.clear()
+      rendererDrh.current = null
       consulta.current.control?.abort()
       consulta.current = { globo: null, resaltado: null, control: null }
       capaFondo.current = null
@@ -257,7 +306,7 @@ export function MapaConcesiones(props: Props) {
     const geo = L.geoJSON(concesiones, {
       style: (f) => {
         const color = f ? colorDe(f.properties) : '#64748b'
-        return { color, weight: 2.5, opacity: 1, fillColor: color, fillOpacity: 0.3 }
+        return { color, weight: 2.5, opacity: 1, fillColor: color, fillOpacity: rellenoDe(f?.properties.concesion_id === seleccionada) }
       },
       onEachFeature: (f: ConcesionGeo, layer) => {
         const p = f.properties
@@ -392,7 +441,7 @@ export function MapaConcesiones(props: Props) {
       capa.remove()
       capasWms.current.delete(clave)
     }
-    for (const [clave, { servicio, capa }] of pedidas) {
+    for (const [clave, { servicio, tema, capa }] of pedidas) {
       if (capasWms.current.has(clave)) continue
       const fija = capaFija(servicio, capa)
       const nueva = L.tileLayer
@@ -401,7 +450,7 @@ export function MapaConcesiones(props: Props) {
           format: 'image/png',
           transparent: true,
           version: '1.3.0',
-          opacity: servicio.opacidad ?? 0.75,
+          opacity: opacidadDe(opacidadesActuales.current, claveOpacidadWms(servicio.id, tema), servicio.opacidad ?? 0.75),
           zIndex: 10 + SERVICIOS_WMS.length - SERVICIOS_WMS.indexOf(servicio),
           minZoom: fija?.minZoom ?? 0,
           maxZoom: 21,
@@ -413,6 +462,94 @@ export function MapaConcesiones(props: Props) {
       capasWms.current.set(clave, nueva)
     }
   }, [wms])
+
+  // 2c''. Capas del GeoServer de la DRH (copia local): se agregan y quitan de a una, según el panel.
+  useEffect(() => {
+    const m = mapa.current
+    const renderer = rendererDrh.current
+    if (!m || !renderer) return
+    const pedidas = new Map(capasDrh.filter((c) => c.datos).map((c) => [c.id, c.datos!]))
+    for (const [id, { datos, capa }] of dibujadasDrh.current) {
+      if (pedidas.get(id) === datos) continue
+      capa.remove()
+      dibujadasDrh.current.delete(id)
+    }
+    let agregadas = 0
+    for (const [id, datos] of pedidas) {
+      if (dibujadasDrh.current.has(id)) continue
+      const def = CAPAS_DRH.find((c) => c.id === id)
+      if (!def) continue
+      const opacidad = opacidadDe(opacidadesActuales.current, claveOpacidadDrh(id), 1)
+      dibujadasDrh.current.set(id, { datos, def, ...dibujarCapaDrh(def, datos, renderer, opacidad) })
+      dibujadasDrh.current.get(id)!.capa.addTo(m)
+      agregadas++
+    }
+    if (!agregadas) return
+    // Orden de dibujo por tipo (el SVG dibuja arriba lo último).
+    for (const tipo of ORDEN_DRH) {
+      for (const [id, { capa }] of dibujadasDrh.current) {
+        if (CAPAS_DRH.find((c) => c.id === id)?.tipo === tipo) capa.eachLayer((l) => (l as L.FeatureGroup).bringToFront?.())
+      }
+    }
+  }, [capasDrh])
+
+  /**
+   * Una capa del GeoServer: puntos (círculos), líneas o polígonos del color de la capa; los límites
+   * (distritos, departamentos) solo con borde, sin clic y con su nombre en el centro.
+   */
+  function dibujarCapaDrh(def: CapaDrh, datos: FeatureCollection, renderer: L.SVG, opacidad: number) {
+    const limite = def.tipo === 'limite'
+    const geo = L.geoJSON(datos, {
+      pane: PANEL_DRH,
+      interactive: !limite,
+      pointToLayer: (_, latlng) => L.circleMarker(latlng, estiloDrh(def, opacidad, renderer)),
+      style: () => estiloDrh(def, opacidad, renderer),
+      onEachFeature: (f, layer) => {
+        if (limite) return
+        const p = (f.properties ?? {}) as Record<string, unknown>
+        layer.bindTooltip(`<strong>${escapar(def.titulo(p))}</strong><br><span style="color:#64748b">${escapar(def.nombre)}</span>`, { sticky: def.tipo !== 'punto' })
+        layer.on('click', (e: L.LeafletMouseEvent) => {
+          if (midiendo.current) return
+          L.DomEvent.stopPropagation(e)
+          limpiarConsulta()
+          L.popup({ maxWidth: 360, autoPanPaddingTopLeft: [440, 80] }).setLatLng(e.latlng).setContent(htmlObjetoDrh(def, p)).openOn(mapa.current!)
+        })
+      },
+    })
+    const grupo = L.layerGroup([geo])
+    const etiquetas: L.Marker[] = []
+    if (limite) {
+      // Nombre del distrito o departamento en el centro de su recuadro.
+      geo.eachLayer((l) => {
+        const p = ((l as L.Polygon).feature?.properties ?? {}) as Record<string, unknown>
+        const etiqueta = L.marker((l as L.Polygon).getBounds().getCenter(), {
+          pane: PANEL_DRH,
+          interactive: false,
+          keyboard: false,
+          opacity: opacidad,
+          icon: L.divIcon({ className: '', iconSize: [0, 0], html: `<span style="display:inline-block;transform:translate(-50%,-50%);white-space:nowrap;font:700 12px 'Public Sans',sans-serif;color:${def.color};text-shadow:0 0 3px #fff,0 0 3px #fff">${escapar(def.titulo(p))}</span>` }),
+        }).addTo(grupo)
+        etiquetas.push(etiqueta)
+      })
+    }
+    return { capa: grupo, geo, etiquetas }
+  }
+
+  // 2c'''. Opacidad elegida en el panel: se cambia el estilo de lo que ya está dibujado (sin volver a pedirlo).
+  useEffect(() => {
+    for (const { servicio, tema, capa } of capasActivas(wms)) {
+      capasWms.current.get(`${servicio.id}|${capa}`)?.setOpacity(opacidadDe(opacidades, claveOpacidadWms(servicio.id, tema), servicio.opacidad ?? 0.75))
+    }
+    const renderer = rendererDrh.current
+    if (renderer) {
+      for (const [id, { def, geo, etiquetas }] of dibujadasDrh.current) {
+        const opacidad = opacidadDe(opacidades, claveOpacidadDrh(id), 1)
+        geo.setStyle(() => estiloDrh(def, opacidad, renderer))
+        for (const e of etiquetas) e.setOpacity(opacidad)
+      }
+    }
+    porId.current.forEach((layer, id) => layer.setStyle({ fillOpacity: rellenoDe(id === seleccionada) }))
+  }, [opacidades])
 
   /** Quita el globo y el resaltado de la consulta anterior, y cancela la que esté en curso. */
   function limpiarConsulta() {
@@ -538,7 +675,7 @@ export function MapaConcesiones(props: Props) {
     if (!m) return
     porId.current.forEach((layer, id) => {
       const elegida = id === seleccionada
-      layer.setStyle({ weight: elegida ? 4.5 : 2.5, fillOpacity: elegida ? 0.5 : 0.3 })
+      layer.setStyle({ weight: elegida ? 4.5 : 2.5, fillOpacity: rellenoDe(elegida) })
       if (elegida) layer.bringToFront()
     })
     pozosAlFrente()

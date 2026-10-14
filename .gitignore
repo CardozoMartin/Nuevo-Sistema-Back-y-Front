@@ -1,2 +1,5 @@
 # Respaldos de la base: tienen datos reales de personas (ver respaldos-bd/LEEME.md)
 respaldos-bd/
+
+# Copia local del GeoServer (scripts/sig/copiar-geoserver.mjs): nombres y CUIT de titulares
+backend/recursos/sig/geoserver/

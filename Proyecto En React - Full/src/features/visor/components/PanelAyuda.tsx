@@ -3,7 +3,8 @@ import { Icon } from '@/components/ui/Icon'
 const TEMAS: { icono: string; titulo: string; texto: string }[] = [
   { icono: 'search', titulo: 'Buscar', texto: 'Escriba arriba un titular, número de concesión, expediente, padrón o fuente. La lista y el mapa muestran solo lo que coincide.' },
   { icono: 'ads_click', titulo: 'Consultar una concesión', texto: 'Haga clic en un polígono (o en su punto, con el mapa alejado) para ver la ficha. El enlace de la página queda con esa concesión: se puede compartir.' },
-  { icono: 'layers', titulo: 'Capas', texto: 'Prenda o apague concesiones, pozos y ríos. Elija por qué colorear las concesiones: la leyenda también sirve de filtro.' },
+  { icono: 'layers', titulo: 'Capas', texto: 'Las capas están ordenadas por tema (concesiones, aguas subterráneas, riego, hidrografía, límites…), vengan de la DRH, de Catastro o del Ministerio. Marque las que quiera ver o búsquelas por nombre. El botón de ajustes de cada capa tiene la opacidad, la leyenda y sus opciones.' },
+  { icono: 'save', titulo: 'Su configuración', texto: 'Las capas que deja a la vista, su opacidad y el mapa base quedan guardados en esta PC: el visor se abre como lo dejó.' },
   { icono: 'straighten', titulo: 'Medir', texto: 'Con la regla o el área de la barra de herramientas, haga clic para agregar puntos. Doble clic o Enter termina; Esc cancela.' },
   { icono: 'pin_drop', titulo: 'Ir a una coordenada', texto: 'Ingrese X/Y en POSGAR 2007 faja 3 (como en los planos) o latitud/longitud de un GPS.' },
   { icono: 'upload_file', titulo: 'Comparar un archivo', texto: 'Cargue el KML o GeoJSON de un pedido para ver si se superpone con concesiones existentes antes de iniciar el trámite.' },

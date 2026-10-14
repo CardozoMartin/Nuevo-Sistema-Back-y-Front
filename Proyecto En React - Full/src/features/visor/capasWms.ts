@@ -8,6 +8,9 @@
 //   Actividades agropecuarias  Ministerio de Producción: cultivos por campaña (EEAOC, INTA),
 //                              apiarios, cooperativas, producción porcina, caprina, vitivinícola.
 //   Actividades industriales   Ministerio de Producción: industrias, parques industriales, catastro minero.
+//   Recursos hídricos          Ministerio de Producción: distritos, cuencas, cuerpos de agua, ríos,
+//                              canales, pozos de agua, diques y comparticiones. Se puede consultar
+//                              (ArcGIS: la consulta viene en XML propio de Esri, sin geometría).
 //
 // Las del Ministerio se leen del servidor (GetCapabilities) al abrir el visor: así las campañas
 // nuevas aparecen solas. Las capas que son la misma cosa en distintos años («Caña de azúcar 2023»,
@@ -41,8 +44,12 @@ export interface ServicioWms {
   porDefecto?: string[]
   /** Lista fija de capas; sin esto, se leen del GetCapabilities. */
   capas?: CapaFija[]
-  /** Se puede consultar con un clic (GetFeatureInfo en JSON; el servidor tiene que permitirlo). */
+  /** Se puede consultar con un clic (GetFeatureInfo; el servidor tiene que permitirlo). */
   consultable?: boolean
+  /** Formato de la consulta: JSON (GeoServer, por defecto) o el XML de ArcGIS. */
+  formatoConsulta?: 'json' | 'esri-xml'
+  /** Qué se ve al consultar (para el texto de ayuda del panel). */
+  ayudaConsulta?: string
   /** Opacidad de las imágenes. */
   opacidad?: number
 }
@@ -66,6 +73,7 @@ export const SERVICIOS_WMS: ServicioWms[] = [
     fuente: 'Dirección General de Catastro de Tucumán (IDET)',
     porDefecto: ['parcelas', 'canales_riego'],
     consultable: true,
+    ayudaConsulta: 'padrón y nomenclatura de la parcela, nombre del canal…',
     opacidad: 0.9,
     capas: [
       { capa: 'parcelas', nombre: 'Parcelas', minZoom: ZOOM_PARCELAS, estilo: soloBorde('parcelas', '#facc15') },
@@ -102,6 +110,22 @@ export const SERVICIOS_WMS: ServicioWms[] = [
     servidor: 'gis.producciontucuman.gob.ar',
     fuente: 'Ministerio de Producción de Tucumán',
     opacidad: 0.75,
+  },
+  {
+    id: 'recursos_hidricos',
+    titulo: 'Recursos hídricos',
+    resumen: 'Pozos, canales, cuencas · Min. de Producción',
+    icono: 'water',
+    color: '#0e7490',
+    url: 'https://gis.producciontucuman.gob.ar/ArcGIS/services/Recursos_Hidricos_WMS/MapServer/WMSServer',
+    servidor: 'gis.producciontucuman.gob.ar',
+    fuente: 'Ministerio de Producción de Tucumán (datos de la DRH)',
+    // Los distritos y las cuencas vienen rellenos y tapan el mapa: se prenden a mano.
+    porDefecto: ['pozos de agua', 'canales', 'diques'],
+    consultable: true,
+    formatoConsulta: 'esri-xml',
+    ayudaConsulta: 'datos del pozo, canal, dique o distrito.',
+    opacidad: 0.8,
   },
 ]
 
@@ -165,7 +189,7 @@ export function urlLeyenda(servicio: ServicioWms, capa: string) {
 
 /** Capas que se ven, de todos los servicios prendidos. */
 export const capasActivas = (estado: EstadoWms) =>
-  SERVICIOS_WMS.flatMap((servicio) => (estado[servicio.id]?.activo ? Object.values(estado[servicio.id].elegidas).map((capa) => ({ servicio, capa })) : []))
+  SERVICIOS_WMS.flatMap((servicio) => (estado[servicio.id]?.activo ? Object.entries(estado[servicio.id].elegidas).map(([tema, capa]) => ({ servicio, tema, capa })) : []))
 
 // ---------------------------------------------------------------------------
 // Consulta con un clic (GetFeatureInfo): qué hay de cada capa consultable bajo el cursor.
@@ -226,13 +250,14 @@ export async function consultar(servicio: ServicioWms, capas: string[], punto: P
     height: String(punto.alto),
     i: String(Math.round(punto.x)),
     j: String(Math.round(punto.y)),
-    info_format: 'application/json',
+    info_format: servicio.formatoConsulta === 'esri-xml' ? 'application/vnd.esri.wms_featureinfo_xml' : 'application/json',
     feature_count: '5',
     // Margen en píxeles alrededor del clic: las líneas (canales, ríos) son finas.
     buffer: '6',
   })
   const r = await fetch(`${servicio.url}?${parametros}`, { signal: senal })
   if (!r.ok) throw new Error(`El servidor respondió ${r.status}`)
+  if (servicio.formatoConsulta === 'esri-xml') return objetosDeXmlEsri(servicio, await r.text())
   const datos = (await r.json()) as FeatureCollection
   return datos.features.map((f) => {
     // El id es «capa.fid-…»: de ahí sale de qué capa es cada objeto.
@@ -241,5 +266,24 @@ export async function consultar(servicio: ServicioWms, capas: string[], punto: P
       .filter(([campo, valor]) => !CAMPOS_OCULTOS.has(campo) && valor !== null && valor !== '' && valor !== 0)
       .map(([campo, valor]): [string, string] => [nombreCampo(campo), typeof valor === 'number' ? valor.toLocaleString('es-AR') : String(valor)])
     return { capa, nombre: capaFija(servicio, capa)?.nombre ?? capa, datos: visibles, geometria: f.geometry }
+  })
+}
+
+/**
+ * Respuesta de ArcGIS (application/vnd.esri.wms_featureinfo_xml): un FeatureInfoCollection por
+ * capa, con un FeatureInfo por objeto y sus Field (FieldName / FieldValue). No trae geometría.
+ */
+function objetosDeXmlEsri(servicio: ServicioWms, xml: string): ObjetoConsultado[] {
+  const doc = new DOMParser().parseFromString(xml, 'text/xml')
+  const hijos = (el: Element, nombre: string) => [...el.children].filter((c) => c.localName === nombre)
+  return [...doc.getElementsByTagNameNS('*', 'FeatureInfoCollection')].flatMap((coleccion) => {
+    const capa = coleccion.getAttribute('layername') ?? ''
+    return hijos(coleccion, 'FeatureInfo').map((objeto) => {
+      const datos = hijos(objeto, 'Field')
+        .map((campo): [string, string] => [hijos(campo, 'FieldName')[0]?.textContent?.trim() ?? '', hijos(campo, 'FieldValue')[0]?.textContent?.trim() ?? ''])
+        .filter(([campo, valor]) => campo && valor && !CAMPOS_OCULTOS.has(campo.toUpperCase()) && !/^(Shape|OBJECTID|FID)(.|_|$)/i.test(campo) && valor !== 'Null')
+        .map(([campo, valor]): [string, string] => [nombreCampo(campo.toUpperCase()), valor])
+      return { capa, nombre: capaFija(servicio, capa)?.nombre ?? capa.replace(/_/g, ' '), datos, geometria: null }
+    })
   })
 }

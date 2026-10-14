@@ -16,11 +16,11 @@ import { PanelCapas, type Destino } from '../components/PanelCapas'
 import { PanelFondos } from '../components/PanelFondos'
 import { PanelResultados } from '../components/PanelResultados'
 import { BotonIcono, claseFlotante } from '../components/ui'
-import { ESTADO_WMS_INICIAL, type EstadoWms } from '../capasWms'
+import { borrarPreferencias, usePreferenciaCapas, usePreferenciaCriterio, usePreferenciaDrh, usePreferenciaOpacidades, usePreferenciaWms } from '../preferencias'
 import { armarLeyenda, colorizador } from '../colores'
 import { formatoHa } from '../estilos'
-import { CAPAS_TODAS, filtrar, filtrosIniciales, recuadroDe, type CapasVisor } from '../filtros'
-import { useCapaCauces, useCapaConcesiones, useCapaPozos, useCapaPuntos } from '../hooks'
+import { filtrar, filtrosIniciales, recuadroDe } from '../filtros'
+import { useCapaCauces, useCapaConcesiones, useCapaPozos, useCapaPuntos, useCapasDrh } from '../hooks'
 import type { ResultadoMedicion, TipoMedicion } from '../medicion'
 
 type Panel = 'capas' | 'fondos' | 'resultados' | 'archivo' | 'ayuda'
@@ -56,11 +56,23 @@ export default function VisorPage() {
   const capaPozos = useCapaPozos()
   const capaPuntos = useCapaPuntos()
   const capaCauces = useCapaCauces()
-  const [capas, setCapas] = useState<CapasVisor>(CAPAS_TODAS)
-  const [wms, setWms] = useState<EstadoWms>(ESTADO_WMS_INICIAL)
+  // Lo que el usuario elige en el panel de capas queda guardado en la PC (ver preferencias.ts).
+  const [capas, setCapas] = usePreferenciaCapas()
+  const [wms, setWms] = usePreferenciaWms()
+  const [drh, setDrh] = usePreferenciaDrh()
+  const [opacidades, setOpacidades] = usePreferenciaOpacidades()
+  const [criterio, setCriterio] = usePreferenciaCriterio()
+  // Las capas elegidas se siguen leyendo aunque el grupo se apague: así prenderlo de nuevo es inmediato.
+  const capasDrh = useCapasDrh(drh.elegidas)
+  const lecturaDrh = useMemo(
+    () => Object.fromEntries(capasDrh.map((c) => [c.id, { cantidad: c.datos?.features.length, cargando: c.cargando, error: c.error ? mensajeDeError(c.error) : null }])),
+    [capasDrh],
+  )
+  const drhVisibles = useMemo(() => (drh.activo ? capasDrh : []), [drh.activo, capasDrh])
   const [encuadre, setEncuadre] = useState<{ recuadro: [number, number, number, number]; clave: number } | null>(null)
   const [parametros, setParametros] = useSearchParams()
-  const [filtros, setFiltros] = useState(filtrosIniciales)
+  const [filtros, setFiltros] = useState(() => ({ ...filtrosIniciales(), criterio }))
+  useEffect(() => setCriterio(filtros.criterio), [filtros.criterio, setCriterio])
   const [panel, setPanel] = useState<Panel | null>(() => (window.matchMedia('(min-width: 640px)').matches ? 'capas' : null))
   const [fondo, setFondoEstado] = useState(() => storage.get(CLAVE_FONDO, 'satelite'))
   const [aviso, setAviso] = useState<string | null>(null)
@@ -201,6 +213,15 @@ export default function VisorPage() {
         onIrA={irA}
         wms={wms}
         onWms={setWms}
+        drh={drh}
+        onDrh={setDrh}
+        lecturaDrh={lecturaDrh}
+        opacidades={opacidades}
+        onOpacidad={(clave, valor) => setOpacidades((o) => ({ ...o, [clave]: valor }))}
+        onRestablecer={() => {
+          borrarPreferencias()
+          window.location.reload()
+        }}
       />
     )
   else if (panel === 'fondos') contenido = <PanelFondos fondo={fondo} onFondo={setFondo} />
@@ -227,6 +248,8 @@ export default function VisorPage() {
           pozos={pozos}
           puntos={puntos}
           cauces={capaCauces.data?.features}
+          capasDrh={drhVisibles}
+          opacidades={opacidades}
           capas={capas}
           wms={wms}
           encuadre={encuadre}
@@ -278,6 +301,7 @@ export default function VisorPage() {
           <nav aria-label="Paneles del visor" className={cn('pointer-events-auto flex flex-col gap-1 rounded-xl p-1', claseFlotante)}>
             {PANELES.map((p) => (
               <BotonIcono
+                solido
                 key={p.id}
                 icono={p.icono}
                 titulo={p.titulo}

@@ -38,6 +38,9 @@ export default defineConfig({
     },
   },
   server: {
+    // Acceso desde otra red por un túnel (Cloudflare o ngrok): Vite rechaza los nombres de host
+    // que no conoce. Solo se aceptan estos dominios, además de localhost.
+    allowedHosts: ['.trycloudflare.com', '.ngrok-free.app'],
     // El front siempre llama a /api/...; en desarrollo se redirige a json-server.
     // Con el backend real solo cambia el target (o VITE_API_URL).
     proxy: {

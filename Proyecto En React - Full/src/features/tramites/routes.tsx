@@ -9,6 +9,7 @@ import { reduccionAmpliacionRoute } from './ReduccionAmpliacion/routes'
 import { subdivisionRoute } from './Subdivision/routes'
 import { reubicacionRoute } from './Reubicacion/routes'
 import { permisosRoute } from './Permisos/routes'
+import { deOficina } from '@/features/auth/components/RutaDeOficina'
 
 export const tramitesRoutes: RouteObject[] = [
   {
@@ -17,12 +18,8 @@ export const tramitesRoutes: RouteObject[] = [
     children: [
       { index: true, element: <Navigate to={ROUTES.catastro.tramites} replace /> },
       altaDeConcesionRoute,
-      cambioDeTitularidadRoute,
-      anulacionRoute,
-      reduccionAmpliacionRoute,
-      subdivisionRoute,
-      reubicacionRoute,
-      permisosRoute,
+      // Pendientes de migrar al backend: por ahora, solo Catastro.
+      deOficina('catastro', [cambioDeTitularidadRoute, anulacionRoute, reduccionAmpliacionRoute, subdivisionRoute, reubicacionRoute, permisosRoute]),
     ],
   },
 ]

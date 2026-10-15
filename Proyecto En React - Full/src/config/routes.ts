@@ -96,6 +96,16 @@ export const ROUTES = {
   busqueda: '/busqueda',
   visor: '/visor',
   configuracion: '/configuracion',
+
+  /** Informática: administración del acceso (solo administradores). */
+  informatica: {
+    root: '/informatica',
+    usuarios: '/informatica/usuarios',
+    permisos: '/informatica/permisos',
+  },
+
+  login: '/login',
+  cambiarClave: '/cambiar-clave',
 } as const
 
 /** Bandeja de expedientes de cada oficina (la usan notificaciones y sidebar). */

@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+
+const SISTEMA = '1';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { AppModule } from './../src/app.module.js';
@@ -16,7 +18,9 @@ describe('ABM del catálogo de suministro y de los cauces (e2e)', () => {
   const CATASTRO = '2';
   const RECAUDACION = '3';
   const sufijo = Date.now().toString(36).toUpperCase();
-  const api = () => request(app.getHttpServer());
+  // Sin sesión todo da 401: por defecto se actúa como «Sistema» (encabezado de pruebas); los
+  // pedidos de una oficina lo cambian con .set('X-Usuario-Id', …).
+  const api = () => request.agent(app.getHttpServer()).set('X-Usuario-Id', SISTEMA);
   const MOTIVO = 'Cargado para la prueba automática.';
 
   let leales: { id: number };

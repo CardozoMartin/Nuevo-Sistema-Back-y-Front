@@ -6,7 +6,7 @@
 import axios from 'axios'
 import { adaptadorDemo } from '../demo/adaptador'
 import { MODO_DEMO } from '../demo/modo'
-import { usuarioActualId } from '../sesion'
+import { guardarToken, tokenActual, usuarioActualId } from '../sesion'
 import { toApiError } from './errors'
 
 export const backend = axios.create({
@@ -18,9 +18,10 @@ export const backend = axios.create({
 // Modo demo: todo lo del backend real lo responde el emulador del navegador (services/demo).
 if (MODO_DEMO) backend.defaults.adapter = adaptadorDemo(() => true)
 
-// Quién actúa (pases, actuaciones). TODO(login): token de sesión en lugar del encabezado.
+// Quién actúa: el token del login. En el modo demo, el usuario elegido en la barra superior.
 backend.interceptors.request.use((config) => {
-  config.headers.set('X-Usuario-Id', usuarioActualId())
+  if (MODO_DEMO) config.headers.set('X-Usuario-Id', usuarioActualId())
+  else if (tokenActual()) config.headers.set('Authorization', `Bearer ${tokenActual()}`)
   return config
 })
 
@@ -29,6 +30,8 @@ backend.interceptors.request.use((config) => {
 backend.interceptors.response.use(
   (response) => response,
   (error) => {
+    // La sesión venció o se cerró (salvo el propio login, que responde 401 con clave incorrecta).
+    if (error?.response?.status === 401 && !String(error.config?.url ?? '').startsWith('/auth/login')) guardarToken(null)
     const data = error?.response?.data
     if (data && Array.isArray(data.message)) data.message = data.message.join(' · ')
     return Promise.reject(toApiError(error))

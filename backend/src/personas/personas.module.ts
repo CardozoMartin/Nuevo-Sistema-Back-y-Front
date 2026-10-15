@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { soloDigitos } from '../comun/validadores/cuit.js';
 import { Persona } from './entities/persona.entity.js';
 import { PersonasService } from './personas.service.js';
+import { ConDatosSensibles } from '../seguridad/auth.decorators.js';
 
 @Controller('personas')
 class PersonasController {
@@ -14,6 +15,7 @@ class PersonasController {
    * concesiones y sus deudas pendientes. 404 si no existe.
    */
   @Get()
+  @ConDatosSensibles()
   buscar(@Query('documento') documento?: string) {
     const doc = soloDigitos(documento ?? '');
     if (!/^\d{7,11}$/.test(doc)) throw new BadRequestException('Indique el documento (DNI, CUIL o CUIT, solo números).');

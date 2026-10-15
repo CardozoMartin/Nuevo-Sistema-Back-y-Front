@@ -1,7 +1,8 @@
 import { Link } from 'react-router'
-import { NAVIGATION, NAVIGATION_FOOTER } from '@/config/navigation'
+import { itemVisible, NAVIGATION, NAVIGATION_FOOTER } from '@/config/navigation'
 import { ROUTES } from '@/config/routes'
 import { Icon } from '@/components/ui/Icon'
+import { useSesion } from '@/features/auth/context'
 import { useResumenBandejas } from '@/features/notificaciones/useResumenBandejas'
 import { cn } from '@/lib/cn'
 import type { NavItem } from '@/types/navigation'
@@ -19,7 +20,9 @@ interface SidebarProps {
 }
 
 export function Sidebar({ open, onClose, flotante = false }: SidebarProps) {
-  // TODO(login): filtrar NAVIGATION por item.roles según el rol del usuario.
+  // Cada usuario ve su oficina y lo general (el administrador, todo); las secciones vacías no se muestran.
+  const { usuario } = useSesion()
+  const secciones = NAVIGATION.map((s) => ({ ...s, items: s.items.filter((i) => itemVisible(i, usuario)) })).filter((s) => s.items.length)
   const resumen = useResumenBandejas()
   const getBadge = (item: NavItem): BadgeItem | undefined => {
     if (!item.bandejaDe) return undefined
@@ -51,7 +54,7 @@ export function Sidebar({ open, onClose, flotante = false }: SidebarProps) {
         </Link>
 
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-3">
-          {NAVIGATION.map((section) => (
+          {secciones.map((section) => (
             <div key={section.key} className="flex flex-col gap-1">
               {section.title && (
                 <p className="mx-3 mt-4 mb-1 border-b border-slate-200 pb-1.5 text-xs font-bold tracking-wider text-slate-500 uppercase dark:border-slate-700 dark:text-slate-400">

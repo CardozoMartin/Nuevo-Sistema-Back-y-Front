@@ -21,6 +21,7 @@ describe('Catálogo de ubicación (e2e)', () => {
   it('GET /catalogos/ubicaciones devuelve el árbol departamento → localidad → distritos', () => {
     return request(app.getHttpServer())
       .get('/catalogos/ubicaciones')
+      .set('X-Usuario-Id', '1')
       .expect(200)
       .expect((res) => {
         expect(Object.keys(res.body)).toHaveLength(17);
@@ -31,6 +32,7 @@ describe('Catálogo de ubicación (e2e)', () => {
   it('GET /catalogos/cuencas devuelve las cuencas', () => {
     return request(app.getHttpServer())
       .get('/catalogos/cuencas')
+      .set('X-Usuario-Id', '1')
       .expect(200)
       .expect((res) => expect(res.body).toContainEqual(expect.objectContaining({ nombre: 'CUENCA RIO SALI' })));
   });

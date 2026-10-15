@@ -7,6 +7,9 @@ import { nombrePersona } from '../personas/entities/persona.entity.js';
 import { UsuarioActual } from '../seguridad/usuario-actual.decorator.js';
 import { Deuda } from './entities/deuda.entity.js';
 import { RecaudacionService } from './recaudacion.service.js';
+import { ConDatosSensibles, RequierePermiso, SoloOficina } from '../seguridad/auth.decorators.js';
+import { Permiso } from '../seguridad/permisos.constantes.js';
+import { Oficina } from '../expedientes/expedientes.constantes.js';
 
 class CancelarDeudaDto {
   /** Número de recibo, transferencia, etc. */
@@ -20,6 +23,8 @@ class DeudasController {
 
   /** GET /api/deudas?personaId=5 — deudas de una persona; sin persona, todas las pendientes. */
   @Get()
+  @ConDatosSensibles()
+  @SoloOficina(Oficina.RECAUDACION)
   async listar(@Query('personaId') personaId?: string) {
     const deudas = await this.recaudacion.listar(personaId);
     return deudas.map((d) => ({
@@ -36,6 +41,7 @@ class DeudasController {
 
   /** POST /api/deudas/:id/cancelar — Recaudación registra el pago (reanuda los expedientes en espera). */
   @Post(':id/cancelar')
+  @RequierePermiso(Permiso.DEUDA_VERIFICAR)
   cancelar(@Param('id', ParseIntPipe) id: number, @Body() dto: CancelarDeudaDto, @UsuarioActual() usuarioId: string) {
     return this.recaudacion.cancelar(String(id), usuarioId, dto.comprobante);
   }

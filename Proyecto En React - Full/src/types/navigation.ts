@@ -9,6 +9,10 @@ export interface NavItem {
   path: string
   /** Roles que ven el ítem. Sin definir = visible para todos. Se aplicará con el login. */
   roles?: Rol[]
+  /** Oficina dueña del ítem (si no se indica, sale de `roles`): solo la ven sus usuarios. */
+  oficina?: string
+  /** Solo lo ven los administradores (ej: Informática). */
+  soloAdministrador?: boolean
   /** Si el ítem es la bandeja de una oficina, muestra el contador de pendientes y el aviso de nuevos. */
   bandejaDe?: Oficina
   children?: NavItem[]

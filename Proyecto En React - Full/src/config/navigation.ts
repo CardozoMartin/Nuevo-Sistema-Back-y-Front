@@ -67,6 +67,7 @@ export const NAVIGATION: NavSection[] = [
         label: 'Pozos',
         icon: 'water_pump',
         path: ROUTES.pozo.root,
+        oficina: 'pozos',
         children: [
           { key: 'pozo-autorizacion', label: 'Autorización de pozo', icon: 'domain_verification', path: ROUTES.pozo.autorizacion },
           { key: 'pozo-registro', label: 'Registro de pozo', icon: 'water_drop', path: ROUTES.pozo.registro },
@@ -80,10 +81,28 @@ export const NAVIGATION: NavSection[] = [
     ],
   },
   {
+    key: 'informatica',
+    title: 'Informática',
+    items: [
+      {
+        key: 'informatica',
+        label: 'Informática',
+        icon: 'computer',
+        path: ROUTES.informatica.root,
+        soloAdministrador: true,
+        children: [
+          { key: 'informatica-panel', label: 'Panel', icon: 'monitoring', path: ROUTES.informatica.root },
+          { key: 'informatica-usuarios', label: 'Usuarios', icon: 'group', path: ROUTES.informatica.usuarios },
+          { key: 'informatica-permisos', label: 'Plantillas por rol', icon: 'admin_panel_settings', path: ROUTES.informatica.permisos },
+        ],
+      },
+    ],
+  },
+  {
     key: 'herramientas',
     title: 'Herramientas',
     items: [
-      { key: 'busqueda', label: 'Búsqueda', icon: 'manage_search', path: ROUTES.busqueda },
+      { key: 'busqueda', label: 'Búsqueda de expedientes', icon: 'manage_search', path: ROUTES.busqueda },
       { key: 'visor', label: 'Visor cartográfico', icon: 'map', path: ROUTES.visor },
     ],
   },
@@ -93,3 +112,14 @@ export const NAVIGATION: NavSection[] = [
 export const NAVIGATION_FOOTER: NavItem[] = [
   { key: 'configuracion', label: 'Configuración', icon: 'settings', path: ROUTES.configuracion },
 ]
+
+/**
+ * Quién ve cada ítem: lo de una oficina, solo sus usuarios; lo de administración, solo los
+ * administradores (que ven todo). Lo general (búsqueda, visor), todos. El backend controla igual.
+ */
+export function itemVisible(item: NavItem, usuario: { esAdministrador: boolean; oficina: { codigo: string } | null } | null): boolean {
+  if (usuario?.esAdministrador) return true
+  if (item.soloAdministrador) return false
+  const oficina = item.oficina ?? item.roles?.find((r) => r !== 'administrador')
+  return !oficina || usuario?.oficina?.codigo === oficina
+}

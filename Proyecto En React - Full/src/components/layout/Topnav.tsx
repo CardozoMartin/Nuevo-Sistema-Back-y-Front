@@ -6,6 +6,8 @@ import { Icon } from '@/components/ui/Icon'
 import { cn } from '@/lib/cn'
 import { CampanaNotificaciones } from '@/features/notificaciones/components/CampanaNotificaciones'
 import { IndicadorDemo } from './IndicadorDemo'
+import { MenuUsuario } from '@/features/auth/components/MenuUsuario'
+import { MODO_DEMO } from '@/services/demo/modo'
 import { SelectorUsuario } from './SelectorUsuario'
 
 interface TopnavProps {
@@ -64,8 +66,8 @@ export function Topnav({ onOpenSidebar, menuSiempre = false }: TopnavProps) {
             <Icon name={theme === 'dark' ? 'light_mode' : 'dark_mode'} />
           </button>
 
-          {/* TODO(login): pasa a mostrar el usuario autenticado */}
-          <SelectorUsuario />
+          {/* Modo demo: sin login, se elige con qué usuario actuar. */}
+          {MODO_DEMO ? <SelectorUsuario /> : <MenuUsuario />}
         </div>
       </div>
     </header>

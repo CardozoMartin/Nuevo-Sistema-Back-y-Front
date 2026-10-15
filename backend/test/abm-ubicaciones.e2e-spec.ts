@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+
+const SISTEMA = '1';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module.js';
 import { UbicacionesService } from './../src/catalogos/ubicaciones.service.js';
@@ -13,7 +15,9 @@ describe('ABM del catálogo de ubicación (e2e)', () => {
   const CATASTRO = '2';
   const RECAUDACION = '3';
   const sufijo = Date.now().toString(36).toUpperCase();
-  const api = () => request(app.getHttpServer());
+  // Sin sesión todo da 401: por defecto se actúa como «Sistema» (encabezado de pruebas); los
+  // pedidos de una oficina lo cambian con .set('X-Usuario-Id', …).
+  const api = () => request.agent(app.getHttpServer()).set('X-Usuario-Id', SISTEMA);
 
   let leales: { id: number; nombre: string };
   let distritoIII: { id: number; codigo: string };

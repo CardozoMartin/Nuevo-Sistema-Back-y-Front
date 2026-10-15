@@ -1,14 +1,12 @@
-import { createParamDecorator, type ExecutionContext } from '@nestjs/common';
-import { USUARIO_SISTEMA } from '../comun/usuario-sistema.js';
+import { createParamDecorator, UnauthorizedException, type ExecutionContext } from '@nestjs/common';
+import type { PedidoAutenticado } from './auth.decorators.js';
 
 /**
- * Id del usuario que hace la petición.
- *
- * TODO(login): hoy sale del encabezado «X-Usuario-Id» (para probar el circuito con los
- * usuarios de prueba de cada oficina); si no viene, es el usuario Sistema. Con el login va
- * a salir del token de la sesión, y los controllers no cambian.
+ * Id del usuario que hace la petición: lo deja el AuthGuard a partir del token de la sesión
+ * (o del encabezado X-Usuario-Id, solo en pruebas con AUTH_ENCABEZADO_PRUEBAS=true).
  */
 export const UsuarioActual = createParamDecorator((_dato: unknown, ctx: ExecutionContext): string => {
-  const pedido = ctx.switchToHttp().getRequest<{ headers: Record<string, string | undefined> }>();
-  return pedido.headers['x-usuario-id']?.trim() || USUARIO_SISTEMA;
+  const usuario = ctx.switchToHttp().getRequest<PedidoAutenticado>().usuario;
+  if (!usuario) throw new UnauthorizedException('Ingrese con su usuario y contraseña.');
+  return usuario.id;
 });

@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { CrearEmpresaDto } from './dto/crear-empresa.dto.js';
 import { EmpresasService } from './empresas.service.js';
+import { RequierePermiso } from '../seguridad/auth.decorators.js';
+import { Permiso } from '../seguridad/permisos.constantes.js';
 
 @Controller('empresas')
 export class EmpresasController {
@@ -17,6 +19,7 @@ export class EmpresasController {
   }
 
   @Post()
+  @RequierePermiso(Permiso.EMPRESAS_GESTIONAR)
   crear(@Body() dto: CrearEmpresaDto) {
     return this.empresasService.crear(dto);
   }

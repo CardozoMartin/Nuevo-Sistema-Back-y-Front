@@ -4,6 +4,7 @@ import { CapasService } from './capas.service.js';
 import { CaucesService } from './cauces.service.js';
 import { avisoLejosDelCauce, GeometriaService } from './geometria.service.js';
 import { exigirKml, leerArchivoGeografico, RecibirKml, type ArchivoSubido } from './kml/archivo-kml.js';
+import { ConDatosSensibles } from '../seguridad/auth.decorators.js';
 
 @Controller('sig')
 export class SigController {
@@ -25,6 +26,7 @@ export class SigController {
 
   /** GET /api/sig/concesiones/:id: una concesión como Feature GeoJSON. */
   @Get('concesiones/:id')
+  @ConDatosSensibles()
   concesion(@Param('id', ParseIntPipe) id: number) {
     return this.capas.concesion(String(id));
   }
@@ -57,6 +59,7 @@ export class SigController {
    * Pozos no anulados, como puntos GeoJSON WGS84. Sin bbox devuelve todos.
    */
   @Get('pozos')
+  @ConDatosSensibles()
   pozos(@Query('bbox') bbox?: string) {
     return this.capas.pozos(CapasService.leerRecuadro(bbox));
   }
@@ -66,6 +69,7 @@ export class SigController {
    * Desagües y puntos de entrega vigentes, como puntos GeoJSON WGS84. Sin bbox devuelve todos.
    */
   @Get('puntos')
+  @ConDatosSensibles()
   puntos(@Query('bbox') bbox?: string) {
     return this.capas.puntos(CapasService.leerRecuadro(bbox));
   }

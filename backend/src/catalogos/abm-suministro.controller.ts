@@ -4,6 +4,8 @@ import { BajaCatalogoDto } from './dto/abm-ubicaciones.dto.js';
 import { CanalSuministroDto, EditarZonaSuministroDto, FiltroZonasDto, NombreSuministroDto, OpcionSuministroDto, VincularZonaDto, ZonaSuministroDto } from './dto/suministro.dto.js';
 import { SuministroAbmService } from './suministro/suministro-abm.service.js';
 import { SuministroCatalogoService } from './suministro/suministro-catalogo.service.js';
+import { RequierePermiso } from '../seguridad/auth.decorators.js';
+import { Permiso } from '../seguridad/permisos.constantes.js';
 
 /**
  * ABM del catálogo de suministro de riego (solo por la API, sin pantalla por ahora):
@@ -51,27 +53,32 @@ export class AbmSuministroController {
     return this.abm.obtenerZona(id);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('zonas')
   crearZona(@Body() dto: ZonaSuministroDto, @UsuarioActual() usuarioId: string) {
     return this.abm.crearZona(dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Put('zonas/:id')
   editarZona(@Param('id', ParseIntPipe) id: number, @Body() dto: EditarZonaSuministroDto, @UsuarioActual() usuarioId: string) {
     return this.abm.editarZona(id, dto, usuarioId);
   }
 
   /** Vincula una zona del catálogo de la DRH a una localidad (ej: «TRANCAS» → «VILLA DE TRANCAS»). */
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Put('zonas/:id/localidad')
   vincularZona(@Param('id', ParseIntPipe) id: number, @Body() dto: VincularZonaDto, @UsuarioActual() usuarioId: string) {
     return this.catalogo.vincular(id, dto.localidadId, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Delete('zonas/:id')
   bajaZona(@Param('id', ParseIntPipe) id: number, @Body() dto: BajaCatalogoDto, @UsuarioActual() usuarioId: string) {
     return this.abm.darDeBajaZona(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('zonas/:id/reactivar')
   reactivarZona(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuarioId: string) {
     return this.abm.reactivarZona(id, usuarioId);
@@ -79,21 +86,25 @@ export class AbmSuministroController {
 
   // --- Fuentes, sistemas de distribución y desagües --------------------------------
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('zonas/:id/opciones')
   crearOpcion(@Param('id', ParseIntPipe) zonaId: number, @Body() dto: OpcionSuministroDto, @UsuarioActual() usuarioId: string) {
     return this.abm.crearOpcion(zonaId, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Put('opciones/:id')
   editarOpcion(@Param('id', ParseIntPipe) id: number, @Body() dto: NombreSuministroDto, @UsuarioActual() usuarioId: string) {
     return this.abm.editarOpcion(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Delete('opciones/:id')
   bajaOpcion(@Param('id', ParseIntPipe) id: number, @Body() dto: BajaCatalogoDto, @UsuarioActual() usuarioId: string) {
     return this.abm.darDeBajaOpcion(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('opciones/:id/reactivar')
   reactivarOpcion(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuarioId: string) {
     return this.abm.reactivarOpcion(id, usuarioId);
@@ -101,21 +112,25 @@ export class AbmSuministroController {
 
   // --- Canales ----------------------------------------------------------------------
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('zonas/:id/canales')
   crearCanal(@Param('id', ParseIntPipe) zonaId: number, @Body() dto: CanalSuministroDto, @UsuarioActual() usuarioId: string) {
     return this.abm.crearCanal(zonaId, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Put('canales/:id')
   editarCanal(@Param('id', ParseIntPipe) id: number, @Body() dto: NombreSuministroDto, @UsuarioActual() usuarioId: string) {
     return this.abm.editarCanal(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Delete('canales/:id')
   bajaCanal(@Param('id', ParseIntPipe) id: number, @Body() dto: BajaCatalogoDto, @UsuarioActual() usuarioId: string) {
     return this.abm.darDeBajaCanal(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('canales/:id/reactivar')
   reactivarCanal(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuarioId: string) {
     return this.abm.reactivarCanal(id, usuarioId);

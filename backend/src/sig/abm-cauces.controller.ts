@@ -3,6 +3,8 @@ import { BajaCatalogoDto } from '../catalogos/dto/abm-ubicaciones.dto.js';
 import { UsuarioActual } from '../seguridad/usuario-actual.decorator.js';
 import { CaucesService } from './cauces.service.js';
 import { CauceDto, EditarCauceDto, FiltroCaucesDto } from './dto/cauce.dto.js';
+import { RequierePermiso } from '../seguridad/auth.decorators.js';
+import { Permiso } from '../seguridad/permisos.constantes.js';
 
 /**
  * ABM de ríos y canales (sig.cauce), solo por la API (sin pantalla por ahora):
@@ -31,21 +33,25 @@ export class AbmCaucesController {
     return this.cauces.obtener(id);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post()
   crear(@Body() dto: CauceDto, @UsuarioActual() usuarioId: string) {
     return this.cauces.crear(dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Put(':id')
   editar(@Param('id', ParseIntPipe) id: number, @Body() dto: EditarCauceDto, @UsuarioActual() usuarioId: string) {
     return this.cauces.editar(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Delete(':id')
   darDeBaja(@Param('id', ParseIntPipe) id: number, @Body() dto: BajaCatalogoDto, @UsuarioActual() usuarioId: string) {
     return this.cauces.darDeBaja(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post(':id/reactivar')
   reactivar(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuarioId: string) {
     return this.cauces.reactivar(id, usuarioId);

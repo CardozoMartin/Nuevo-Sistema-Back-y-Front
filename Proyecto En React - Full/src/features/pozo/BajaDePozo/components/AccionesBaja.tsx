@@ -7,7 +7,7 @@ import { Icon } from '@/components/ui/Icon'
 import { Campo, Observaciones, Opciones } from '@/features/tramites/AltaDeConcesion/components/circuito/AccionesOficina'
 import { cn } from '@/lib/cn'
 import { mensajeDeError } from '@/services/api/errors'
-import { useUsuarioActualId } from '@/services/sesion'
+import { AvisoSoloConsulta, useActor } from '@/features/auth/useActor'
 import { bajaPozoApi } from '../api'
 import { formatoFecha, formatoPesos } from '../estilos'
 import { useAccionBaja, useDocumentosBaja } from '../hooks'
@@ -500,7 +500,8 @@ function AccionClausura({ b }: { b: BajaBackend }) {
  * El backend valida todo igual (oficina, etapa, tomado); acá solo se guía al usuario.
  */
 export function AccionesBaja({ b }: { b: BajaBackend }) {
-  const usuarioId = useUsuarioActualId()
+  const actor = useActor()
+  const usuarioId = actor.id
   const tomar = useAccionBaja(b.expediente.id, (id, _: void) => bajaPozoApi.tomar(id))
   const e = b.expediente
 
@@ -532,6 +533,9 @@ export function AccionesBaja({ b }: { b: BajaBackend }) {
     )
   }
 
+  // Quien no es de la oficina donde está el expediente, lo consulta sin actuar.
+  if (!actor.puedeActuarEn(e.oficinaActual)) return <AvisoSoloConsulta oficina={e.oficinaNombre} />
+
   if (!e.tomadoPor) {
     return (
       <div className="flex flex-col gap-3">
@@ -548,7 +552,7 @@ export function AccionesBaja({ b }: { b: BajaBackend }) {
     )
   }
   // Lo tiene otra persona (el administrador «Sistema» puede actuar igual: lo controla el backend).
-  if (e.tomadoPor.id !== usuarioId && usuarioId !== '1') {
+  if (e.tomadoPor.id !== usuarioId && !actor.esAdministrador) {
     return (
       <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
         <Icon name="person" className="text-[18px]!" />

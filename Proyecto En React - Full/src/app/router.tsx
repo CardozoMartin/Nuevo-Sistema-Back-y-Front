@@ -8,14 +8,22 @@ import { oficinasRoutes } from '@/features/oficinas.routes'
 import { tramitesRoutes } from '@/features/tramites/routes'
 import { pozoRoutes } from '@/features/pozo/routes'
 import { herramientasRoutes } from '@/features/herramientas.routes'
+import { informaticaRoutes } from '@/features/informatica/routes'
+import { RutaProtegida } from '@/features/auth/components/RutaProtegida'
+import { lazyPage } from './lazyPage'
 
-// Cada módulo define sus propias rutas; acá solo se ensamblan.
-// Cuando exista el login, `/login` va como hermano de este árbol (fuera de AppLayout)
-// y AppLayout se envuelve en una ruta protegida.
+// Cada módulo define sus propias rutas; acá solo se ensamblan. El login y el cambio de
+// contraseña van fuera de AppLayout; todo lo demás exige sesión (RutaProtegida).
 export const router = createBrowserRouter([
+  { path: '/login', lazy: lazyPage(() => import('@/features/auth/pages/LoginPage')), errorElement: <RouteErrorPage /> },
+  { path: '/cambiar-clave', lazy: lazyPage(() => import('@/features/auth/pages/CambiarClavePage')), errorElement: <RouteErrorPage /> },
   {
     path: '/',
-    element: <AppLayout />,
+    element: (
+      <RutaProtegida>
+        <AppLayout />
+      </RutaProtegida>
+    ),
     errorElement: <RouteErrorPage />,
     handle: { crumb: 'Inicio' },
     children: [
@@ -25,6 +33,7 @@ export const router = createBrowserRouter([
       ...tramitesRoutes,
       ...pozoRoutes,
       ...herramientasRoutes,
+      ...informaticaRoutes,
       { path: '*', element: <NotFoundPage />, handle: { crumb: 'No encontrada' } },
     ],
   },

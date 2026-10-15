@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Module, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
+import { BadRequestException, Controller, ForbiddenException, Get, Module, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsuarioActual } from '../seguridad/usuario-actual.decorator.js';
 import { Actuacion } from './entities/actuacion.entity.js';
@@ -11,6 +11,8 @@ import { BuscarExpedientesQuery } from './dto/buscar-expedientes.query.js';
 import { NumeroExpedienteQuery } from './dto/numero-expediente.query.js';
 import { Oficina } from './expedientes.constantes.js';
 import { ExpedientesService } from './expedientes.service.js';
+import { ConDatosSensibles, RequierePermiso, SesionActual, type UsuarioSesion } from '../seguridad/auth.decorators.js';
+import { Permiso } from '../seguridad/permisos.constantes.js';
 
 /** Acciones comunes a cualquier expediente, sea del trámite que sea. */
 @Controller('expedientes')
@@ -19,8 +21,10 @@ class ExpedientesController {
 
   /** GET /api/expedientes/bandeja/recaudacion: expedientes que están en esa oficina. */
   @Get('bandeja/:oficina')
-  bandeja(@Param('oficina') oficina: string) {
+  bandeja(@Param('oficina') oficina: string, @SesionActual() sesion: UsuarioSesion) {
     if (!Object.values(Oficina).includes(oficina as Oficina)) throw new BadRequestException(`Oficina desconocida: ${oficina}.`);
+    // Cada oficina ve solo su bandeja (el administrador, todas).
+    if (!sesion.esAdministrador && sesion.oficina?.codigo !== oficina) throw new ForbiddenException('Solo puede ver la bandeja de su oficina.');
     return this.expedientes.bandeja(oficina as Oficina);
   }
 
@@ -29,6 +33,7 @@ class ExpedientesController {
    * buscador general (cualquier trámite, en curso o terminado). Va antes de :id.
    */
   @Get('buscar')
+  @ConDatosSensibles()
   buscar(@Query() query: BuscarExpedientesQuery) {
     return this.expedientes.buscar(query);
   }
@@ -44,6 +49,7 @@ class ExpedientesController {
 
   /** GET /api/expedientes/:id: dónde está y quién lo tiene. */
   @Get(':id')
+  @ConDatosSensibles()
   resumen(@Param('id', ParseIntPipe) id: number) {
     return this.expedientes.resumen(String(id));
   }
@@ -56,6 +62,7 @@ class ExpedientesController {
 
   /** POST /api/expedientes/:id/tomar: la oficina donde está el expediente lo recibe. */
   @Post(':id/tomar')
+  @RequierePermiso(Permiso.EXPEDIENTE_TOMAR)
   tomar(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuarioId: string) {
     return this.expedientes.tomar(String(id), usuarioId);
   }

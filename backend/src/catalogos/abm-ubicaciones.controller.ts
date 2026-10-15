@@ -5,6 +5,8 @@ import { DepartamentosService } from './abm/departamentos.service.js';
 import { DistritosService } from './abm/distritos.service.js';
 import { LocalidadesService } from './abm/localidades.service.js';
 import { BajaCatalogoDto, DistritoDto, FiltroCatalogoDto, FiltroLocalidadesDto, LocalidadDto, NombreCatalogoDto } from './dto/abm-ubicaciones.dto.js';
+import { RequierePermiso } from '../seguridad/auth.decorators.js';
+import { Permiso } from '../seguridad/permisos.constantes.js';
 
 /**
  * ABM del catálogo de ubicación: departamentos, localidades, distritos y cuencas.
@@ -41,21 +43,25 @@ export class AbmUbicacionesController {
     return this.departamentos.obtener(id);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('departamentos')
   crearDepartamento(@Body() dto: NombreCatalogoDto, @UsuarioActual() usuarioId: string) {
     return this.departamentos.crear(dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Put('departamentos/:id')
   editarDepartamento(@Param('id', ParseIntPipe) id: number, @Body() dto: NombreCatalogoDto, @UsuarioActual() usuarioId: string) {
     return this.departamentos.editar(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Delete('departamentos/:id')
   bajaDepartamento(@Param('id', ParseIntPipe) id: number, @Body() dto: BajaCatalogoDto, @UsuarioActual() usuarioId: string) {
     return this.departamentos.darDeBaja(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('departamentos/:id/reactivar')
   reactivarDepartamento(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuarioId: string) {
     return this.departamentos.reactivar(id, usuarioId);
@@ -73,21 +79,25 @@ export class AbmUbicacionesController {
     return this.localidades.obtener(id);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('localidades')
   crearLocalidad(@Body() dto: LocalidadDto, @UsuarioActual() usuarioId: string) {
     return this.localidades.crear(dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Put('localidades/:id')
   editarLocalidad(@Param('id', ParseIntPipe) id: number, @Body() dto: LocalidadDto, @UsuarioActual() usuarioId: string) {
     return this.localidades.editar(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Delete('localidades/:id')
   bajaLocalidad(@Param('id', ParseIntPipe) id: number, @Body() dto: BajaCatalogoDto, @UsuarioActual() usuarioId: string) {
     return this.localidades.darDeBaja(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('localidades/:id/reactivar')
   reactivarLocalidad(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuarioId: string) {
     return this.localidades.reactivar(id, usuarioId);
@@ -105,21 +115,25 @@ export class AbmUbicacionesController {
     return this.distritos.obtener(id);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('distritos')
   crearDistrito(@Body() dto: DistritoDto, @UsuarioActual() usuarioId: string) {
     return this.distritos.crear(dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Put('distritos/:id')
   editarDistrito(@Param('id', ParseIntPipe) id: number, @Body() dto: DistritoDto, @UsuarioActual() usuarioId: string) {
     return this.distritos.editar(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Delete('distritos/:id')
   bajaDistrito(@Param('id', ParseIntPipe) id: number, @Body() dto: BajaCatalogoDto, @UsuarioActual() usuarioId: string) {
     return this.distritos.darDeBaja(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('distritos/:id/reactivar')
   reactivarDistrito(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuarioId: string) {
     return this.distritos.reactivar(id, usuarioId);
@@ -137,21 +151,25 @@ export class AbmUbicacionesController {
     return this.cuencas.obtener(id);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('cuencas')
   crearCuenca(@Body() dto: NombreCatalogoDto, @UsuarioActual() usuarioId: string) {
     return this.cuencas.crear(dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Put('cuencas/:id')
   editarCuenca(@Param('id', ParseIntPipe) id: number, @Body() dto: NombreCatalogoDto, @UsuarioActual() usuarioId: string) {
     return this.cuencas.editar(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Delete('cuencas/:id')
   bajaCuenca(@Param('id', ParseIntPipe) id: number, @Body() dto: BajaCatalogoDto, @UsuarioActual() usuarioId: string) {
     return this.cuencas.darDeBaja(id, dto, usuarioId);
   }
 
+  @RequierePermiso(Permiso.CATALOGOS_ADMINISTRAR)
   @Post('cuencas/:id/reactivar')
   reactivarCuenca(@Param('id', ParseIntPipe) id: number, @UsuarioActual() usuarioId: string) {
     return this.cuencas.reactivar(id, usuarioId);

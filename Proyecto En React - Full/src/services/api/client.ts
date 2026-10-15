@@ -3,6 +3,7 @@
 import axios from 'axios'
 import { adaptadorDemo } from '../demo/adaptador'
 import { MODO_DEMO, USA_JSON_SERVER } from '../demo/modo'
+import { guardarToken, tokenActual } from '../sesion'
 import { toApiError } from './errors'
 
 const DEMORA_MS = import.meta.env.DEV ? Number(import.meta.env.VITE_API_DELAY_MS ?? 400) : 0
@@ -37,11 +38,17 @@ if (!USA_JSON_SERVER) {
   }
 }
 
-// TODO(login): agregar el token de sesión.
-// api.interceptors.request.use((config) => { config.headers.Authorization = `Bearer ${token}`; return config })
+// /sig/* va al backend real: lleva el token del login.
+api.interceptors.request.use((config) => {
+  if (!MODO_DEMO && tokenActual() && config.url?.startsWith('/sig/')) config.headers.set('Authorization', `Bearer ${tokenActual()}`)
+  return config
+})
 
 // Todos los errores salen como ApiError con un mensaje listo para mostrar.
 api.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(toApiError(error)),
+  (error) => {
+    if (error?.response?.status === 401 && error.config?.url?.startsWith('/sig/')) guardarToken(null)
+    return Promise.reject(toApiError(error))
+  },
 )

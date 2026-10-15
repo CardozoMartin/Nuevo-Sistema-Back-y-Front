@@ -7,7 +7,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Icon } from '@/components/ui/Icon'
 import { ROUTES } from '@/config/routes'
 import { mensajeDeError } from '@/services/api/errors'
-import { useUsuarioActualId } from '@/services/sesion'
+import { AvisoSoloConsulta, useActor } from '@/features/auth/useActor'
 import { altaConcesionApi } from '@/features/tramites/AltaDeConcesion/api'
 import { Campo, Observaciones, Opciones } from '@/features/tramites/AltaDeConcesion/components/circuito/AccionesOficina'
 import { formatoPesos } from '../../BajaDePozo/estilos'
@@ -255,7 +255,8 @@ function AccionCierre({ r }: { r: RegistroPozoBackend }) {
  * el formulario de su etapa. El servidor valida todo igual (oficina, etapa, tomado).
  */
 export function AccionesPozo({ r }: { r: RegistroPozoBackend }) {
-  const usuarioId = useUsuarioActualId()
+  const actor = useActor()
+  const usuarioId = actor.id
   const tomar = useAccionRegistro(r.expediente.id, (id, _: void) => registroPozoApi.tomar(id))
   const e = r.expediente
 
@@ -286,6 +287,9 @@ export function AccionesPozo({ r }: { r: RegistroPozoBackend }) {
       </div>
     )
   }
+  // Quien no es de la oficina donde está el expediente, lo consulta sin actuar.
+  if (!actor.puedeActuarEn(e.oficinaActual)) return <AvisoSoloConsulta oficina={e.oficinaNombre} />
+
   if (!e.tomadoPor) {
     return (
       <div className="flex flex-col gap-3">
@@ -301,7 +305,7 @@ export function AccionesPozo({ r }: { r: RegistroPozoBackend }) {
       </div>
     )
   }
-  if (e.tomadoPor.id !== usuarioId && usuarioId !== '1') {
+  if (e.tomadoPor.id !== usuarioId && !actor.esAdministrador) {
     return (
       <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
         <Icon name="person" className="text-[18px]!" />

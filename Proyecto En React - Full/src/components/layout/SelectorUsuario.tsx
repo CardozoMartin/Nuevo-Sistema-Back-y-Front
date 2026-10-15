@@ -25,9 +25,8 @@ const NOMBRE_OFICINA: Record<string, string> = {
 const descripcion = (u: UsuarioBackend) => (u.esAdministrador ? 'Administrador' : (NOMBRE_OFICINA[u.oficina ?? ''] ?? 'Sin oficina'))
 
 /**
- * Usuario con el que se actúa (barra superior).
- * TODO(login): hoy se elige entre los usuarios de prueba del backend (uno por oficina) para
- * probar el circuito; con el login muestra el usuario de la sesión y el botón «Salir».
+ * Usuario con el que se actúa (barra superior), solo en el MODO DEMO: se elige entre los
+ * usuarios emulados. Con el backend real se entra con login y se muestra MenuUsuario.
  */
 export function SelectorUsuario() {
   const actualId = useUsuarioActualId()

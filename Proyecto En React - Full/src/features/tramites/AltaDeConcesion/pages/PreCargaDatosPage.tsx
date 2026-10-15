@@ -74,6 +74,24 @@ export default function PreCargaDatosPage() {
     )
   }
 
+  // Con los datos sensibles ocultos, guardar borraría lo cargado: no se edita.
+  if (alta.data.datosSensiblesOcultos) {
+    return (
+      <>
+        <PageHeader title={TITULO} />
+        <EmptyState
+          icon="visibility_off"
+          titulo="Para editar el alta hace falta ver los datos sensibles"
+          descripcion="Los documentos, domicilios y datos de contacto se le muestran ocultos. Pídale a Informática el permiso «Ver datos sensibles»."
+        >
+          <Button size="sm" onClick={() => navigate(ROUTES.tramites.altaConcesion.circuito(alta.data.id))}>
+            Ver el expediente
+          </Button>
+        </EmptyState>
+      </>
+    )
+  }
+
   // key: si cambia el expediente se crea un formulario nuevo con sus datos.
   return <CargaDatos key={alta.data.id} alta={alta.data} />
 }

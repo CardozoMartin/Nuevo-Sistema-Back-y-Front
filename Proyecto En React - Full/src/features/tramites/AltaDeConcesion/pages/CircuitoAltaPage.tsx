@@ -1,5 +1,5 @@
 import { useParams } from 'react-router'
-import { EmptyState, ErrorState, LoadingState } from '@/components/feedback/States'
+import { EmptyState, ErrorState, LoadingState, Alert } from '@/components/feedback/States'
 import { Card } from '@/components/ui/Card'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { esNoEncontrado } from '@/services/api/errors'
@@ -49,6 +49,9 @@ export default function CircuitoAltaPage() {
       />
 
       <div className="flex flex-col gap-6">
+        {a.datosSensiblesOcultos && (
+          <Alert tone="info">Algunos datos se muestran ocultos (documentos, domicilios, contacto y montos): para verlos hace falta el permiso «Ver datos sensibles».</Alert>
+        )}
         <Card className="p-5">
           <BarraEtapas circuito={a.circuito} />
         </Card>

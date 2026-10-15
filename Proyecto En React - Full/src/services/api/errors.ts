@@ -23,11 +23,13 @@ const MENSAJES_HTTP: Record<number, string> = {
 }
 
 /** Convierte cualquier error (axios, red, código) en un ApiError con mensaje para el usuario. */
-const SIN_CONEXION = 'No se pudo conectar con el servidor. Verifique que la API esté en ejecución (npm run dev).'
+const SIN_CONEXION = 'No se pudo conectar con el servidor. Verifique que el backend esté en ejecución (npm run start:dev en backend/).'
 
 export function toApiError(error: unknown): ApiError {
   if (error instanceof ApiError) return error
   if (isAxiosError(error)) {
+    // Pantalla que todavía lee de json-server, en el modo real (services/api/client.ts).
+    if (error.code === 'PENDIENTE_MIGRAR') return new ApiError(error.message, null, error.code)
     if (!error.response) return new ApiError(SIN_CONEXION, null, 'NETWORK')
     const { status, data } = error.response
     // 502/503/504: el proxy (o un gateway) no llega a la API.

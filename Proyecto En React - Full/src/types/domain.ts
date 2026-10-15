@@ -44,6 +44,8 @@ export interface EtapaInfo {
 
 export interface TramiteInfo {
   id: TipoTramite
+  /** Código en la base (ALTA_CONCESION): el que se manda al backend. Solo con el backend real. */
+  codigo?: string
   nombre: string
   descripcion: string
   icono: string
@@ -53,6 +55,8 @@ export type ColorEstado = 'azul' | 'ambar' | 'verde' | 'gris'
 
 export interface EstadoInfo {
   id: EstadoExpediente
+  /** Código en la base (EN_TRAMITE): el que se manda al backend. Solo con el backend real. */
+  codigo?: string
   nombre: string
   color: ColorEstado
   /** true = la oficina tiene que atenderlo (aparece en su bandeja). */
@@ -86,7 +90,8 @@ export interface OpcionCatalogo {
 export interface Usuario {
   id: string
   nombre: string
-  oficinaId: Oficina
+  /** null: el usuario «Sistema» (procesos automáticos), que no trabaja en ninguna oficina. */
+  oficinaId: Oficina | null
 }
 
 // --- Expedientes -------------------------------------------------------------------

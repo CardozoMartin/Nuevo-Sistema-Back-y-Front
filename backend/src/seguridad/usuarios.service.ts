@@ -6,12 +6,48 @@ import { Usuario } from './entities/usuario.entity.js';
 
 /** Oficinas del circuito (mismos códigos que el enum Oficina de expedientes y que el frontend). */
 const OFICINAS = [
-  { codigo: 'catastro', nombre: 'Catastro', orden: 1 },
-  { codigo: 'recaudacion', nombre: 'Recaudación', orden: 2 },
-  { codigo: 'distrito', nombre: 'Distrito', orden: 3 },
-  { codigo: 'juridico', nombre: 'Jurídico', orden: 4 },
-  { codigo: 'secretaria_general', nombre: 'Secretaría General', orden: 5 },
-  { codigo: 'pozos', nombre: 'Pozos', orden: 6 },
+  {
+    codigo: 'catastro',
+    nombre: 'Catastro',
+    orden: 1,
+    descripcion: 'Inicio de trámites, carga de datos y cierre de expedientes.',
+    descripcionBandeja: 'Expedientes que volvieron a Catastro para el cierre del trámite.',
+  },
+  {
+    codigo: 'recaudacion',
+    nombre: 'Recaudación',
+    orden: 2,
+    descripcion: 'Verificación de deuda y pagos del expediente.',
+    descripcionBandeja: 'Expedientes pendientes de verificación de deuda y pagos.',
+  },
+  {
+    codigo: 'distrito',
+    nombre: 'Distrito',
+    orden: 3,
+    descripcion: 'Inspección y dictamen técnico.',
+    descripcionBandeja: 'Expedientes pendientes de inspección y dictamen técnico del distrito.',
+  },
+  {
+    codigo: 'juridico',
+    nombre: 'Jurídico',
+    orden: 4,
+    descripcion: 'Dictamen jurídico del expediente.',
+    descripcionBandeja: 'Expedientes pendientes de dictamen jurídico.',
+  },
+  {
+    codigo: 'secretaria_general',
+    nombre: 'Secretaría General',
+    orden: 5,
+    descripcion: 'Resolución y firma.',
+    descripcionBandeja: 'Expedientes pendientes de resolución.',
+  },
+  {
+    codigo: 'pozos',
+    nombre: 'Pozos',
+    orden: 6,
+    descripcion: 'Registro, baja y control de las perforaciones de agua subterránea.',
+    descripcionBandeja: 'Trámites de pozos pendientes en la oficina.',
+  },
 ];
 
 /**
@@ -41,12 +77,31 @@ export class UsuariosService implements OnApplicationBootstrap {
    * Al arrancar: carga las oficinas y los usuarios iniciales que falten. Así una oficina
    * nueva (ej: Pozos) aparece también en una base que ya tenía las demás.
    */
-  async onApplicationBootstrap() {
-    const oficinas = new Set((await this.oficinas.find()).map((o) => o.codigo));
+  onApplicationBootstrap(): Promise<void> {
+    return this.cargaInicial();
+  }
+
+  private carga?: Promise<void>;
+
+  /**
+   * La carga inicial se hace una sola vez; otros módulos la esperan antes de sembrar tablas que
+   * apuntan a seg_oficina o seg_usuario (ej: cat_etapa), sin importar qué módulo arranca primero.
+   */
+  cargaInicial(): Promise<void> {
+    return (this.carga ??= this.cargarOficinasYUsuarios());
+  }
+
+  private async cargarOficinasYUsuarios() {
+    const oficinas = new Map((await this.oficinas.find()).map((o) => [o.codigo, o]));
     const oficinasNuevas = OFICINAS.filter((o) => !oficinas.has(o.codigo));
     if (oficinasNuevas.length) {
       await this.oficinas.save(oficinasNuevas);
       this.logger.log(`Oficinas cargadas: ${oficinasNuevas.map((o) => o.nombre).join(', ')}.`);
+    }
+    // Bases creadas antes de que existieran las descripciones: se completan sin pisar lo editado.
+    for (const o of OFICINAS) {
+      const actual = oficinas.get(o.codigo);
+      if (actual && actual.descripcion === null) await this.oficinas.update(o.codigo, { descripcion: o.descripcion, descripcionBandeja: o.descripcionBandeja });
     }
     // Se insertan en orden para que «Sistema» quede con id 1 (lo usa USUARIO_SISTEMA).
     const legajos = new Set((await this.usuarios.find()).map((u) => u.legajo));

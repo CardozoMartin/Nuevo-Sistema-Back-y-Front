@@ -6,8 +6,14 @@ import { CuencasService } from './abm/cuencas.service.js';
 import { DepartamentosService } from './abm/departamentos.service.js';
 import { DistritosService } from './abm/distritos.service.js';
 import { LocalidadesService } from './abm/localidades.service.js';
-import { CatalogosController } from './catalogos.controller.js';
+import { CatalogosController, DominioController } from './catalogos.controller.js';
 import { CatalogosService } from './catalogos.service.js';
+import { DominioService } from './dominio.service.js';
+import { EstadoExpedienteCatalogo } from './entities/estado-expediente.entity.js';
+import { EtapaCatalogo } from './entities/etapa.entity.js';
+import { Opcion } from './entities/opcion.entity.js';
+import { TipoTramiteCatalogo } from './entities/tipo-tramite.entity.js';
+import { OficinaDrh } from '../seguridad/entities/oficina.entity.js';
 import { Cuenca } from './entities/cuenca.entity.js';
 import { Departamento } from './entities/departamento.entity.js';
 import { Distrito } from './entities/distrito.entity.js';
@@ -30,9 +36,9 @@ import { UbicacionesService } from './ubicaciones.service.js';
  * (AbmSuministroController + SuministroAbmService).
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([SituacionLegal, DocumentoRequerido, TipoUso, Departamento, Localidad, Distrito, Cuenca, SuministroZona, SuministroOpcion, SuministroCanal])],
-  controllers: [CatalogosController, AbmUbicacionesController, AbmSuministroController],
-  providers: [CatalogosService, UbicacionesService, SuministroCatalogoService, SuministroAbmService, DepartamentosService, LocalidadesService, DistritosService, CuencasService],
+  imports: [TypeOrmModule.forFeature([SituacionLegal, DocumentoRequerido, TipoUso, Departamento, Localidad, Distrito, Cuenca, SuministroZona, SuministroOpcion, SuministroCanal, TipoTramiteCatalogo, EtapaCatalogo, EstadoExpedienteCatalogo, Opcion, OficinaDrh])],
+  controllers: [CatalogosController, DominioController, AbmUbicacionesController, AbmSuministroController],
+  providers: [CatalogosService, DominioService, UbicacionesService, SuministroCatalogoService, SuministroAbmService, DepartamentosService, LocalidadesService, DistritosService, CuencasService],
   exports: [CatalogosService, UbicacionesService, SuministroCatalogoService],
 })
 export class CatalogosModule {}

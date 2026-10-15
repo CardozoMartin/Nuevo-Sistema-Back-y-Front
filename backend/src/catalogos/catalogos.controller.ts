@@ -1,5 +1,6 @@
 import { BadRequestException, Controller, Get, Query } from '@nestjs/common';
 import { CatalogosService } from './catalogos.service.js';
+import { DominioService } from './dominio.service.js';
 import { UbicacionSuministroDto } from './dto/suministro.dto.js';
 import { SuministroCatalogoService } from './suministro/suministro-catalogo.service.js';
 import { UbicacionesService } from './ubicaciones.service.js';
@@ -56,5 +57,19 @@ export class CatalogosController {
       unidad,
       requierePuntoEntrega,
     }));
+  }
+}
+
+@Controller('dominio')
+export class DominioController {
+  constructor(private readonly dominio: DominioService) {}
+
+  /**
+   * GET /api/dominio: todos los datos de referencia que el frontend carga al abrir la app
+   * (oficinas, etapas, trámites, estados, usos, situaciones legales, listas y usuarios).
+   */
+  @Get()
+  obtener() {
+    return this.dominio.obtener();
   }
 }

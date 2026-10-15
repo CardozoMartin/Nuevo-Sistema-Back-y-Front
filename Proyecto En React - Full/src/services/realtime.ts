@@ -1,6 +1,7 @@
 // Conexión de eventos en tiempo real. Hoy usa SSE (EventSource) contra el servidor de
 // eventos de la demo; si el backend real usa WebSocket o Socket.IO, solo cambia este archivo.
 import type { EstadoExpediente, Oficina, TipoTramite } from '@/types/domain'
+import { USA_JSON_SERVER } from './demo/modo'
 
 export interface EventoExpediente {
   tipo: 'nuevo' | 'derivado' | 'observado' | 'finalizado' | 'solicitud_numero' | 'numero_asignado'
@@ -19,7 +20,8 @@ export interface EventoExpediente {
   fecha: string // ISO
 }
 
-export type EstadoConexion = 'conectando' | 'en_vivo' | 'desconectado'
+/** sin_servicio: no hay servidor de avisos (el backend real todavía no los publica). */
+export type EstadoConexion = 'conectando' | 'en_vivo' | 'desconectado' | 'sin_servicio'
 
 const URL_EVENTOS = `${import.meta.env.VITE_API_URL ?? '/api'}/events`
 const REINTENTO_MS = 5000
@@ -33,6 +35,12 @@ export function suscribirEventos(onEvento: (e: EventoExpediente) => void, onEsta
   let fuente: EventSource | null = null
   let reintento: ReturnType<typeof setTimeout> | undefined
   let activo = true
+  // El servidor de eventos (mock-server/events.mjs) es parte de json-server; el backend real
+  // todavía no publica eventos.
+  if (!USA_JSON_SERVER) {
+    onEstado('sin_servicio')
+    return () => {}
+  }
 
   function conectar() {
     if (!activo) return

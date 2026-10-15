@@ -10,6 +10,11 @@ const ESTADOS: Record<EstadoConexion, { label: string; punto: string; titulo: st
     punto: 'bg-slate-400',
     titulo: 'Sin avisos en vivo: las bandejas se actualizan cada 30 s (¿está corriendo npm run dev?)',
   },
+  sin_servicio: {
+    label: 'Se actualiza cada 30 s',
+    punto: 'bg-slate-400',
+    titulo: 'El backend todavía no publica avisos en vivo: las bandejas se actualizan cada 30 s',
+  },
 }
 
 export function IndicadorConexion({ className }: { className?: string }) {

@@ -2,7 +2,7 @@
 // URL base, headers (token cuando exista login), demoras simuladas y errores.
 import axios from 'axios'
 import { adaptadorDemo } from '../demo/adaptador'
-import { MODO_DEMO } from '../demo/modo'
+import { MODO_DEMO, USA_JSON_SERVER } from '../demo/modo'
 import { toApiError } from './errors'
 
 const DEMORA_MS = import.meta.env.DEV ? Number(import.meta.env.VITE_API_DELAY_MS ?? 400) : 0
@@ -20,6 +20,22 @@ if (DEMORA_MS > 0) {
 
 // Modo demo: lo geográfico (/sig/*, backend real) lo responde el emulador; lo demás sigue en json-server.
 if (MODO_DEMO) api.defaults.adapter = adaptadorDemo((url) => url.startsWith('/sig/'))
+
+// Modo real: este cliente solo llega al backend en /sig/* (el proxy de Vite lo manda a NestJS).
+// Lo demás era de json-server: se corta con un aviso claro en lugar de mostrar datos simulados.
+if (!USA_JSON_SERVER) {
+  const adaptadorHttp = api.defaults.adapter
+  api.defaults.adapter = (config) => {
+    if (config.url?.startsWith('/sig/')) return axios.getAdapter(adaptadorHttp)(config)
+    return Promise.reject(
+      new axios.AxiosError(
+        'Esta pantalla todavía no está conectada a la base de datos (pendiente de migrar al backend).',
+        'PENDIENTE_MIGRAR',
+        config,
+      ),
+    )
+  }
+}
 
 // TODO(login): agregar el token de sesión.
 // api.interceptors.request.use((config) => { config.headers.Authorization = `Bearer ${token}`; return config })

@@ -1,6 +1,8 @@
-// Peticiones de catálogos de referencia. La API ya los devuelve normalizados
-// (mayúsculas, sin duplicados, ordenados).
+// Peticiones de catálogos de referencia: salen de la base (backend /catalogos/*), ya
+// normalizados (mayúsculas, sin duplicados, ordenados). json-server solo en demo / dev:mock.
+import { backend } from './api/backend'
 import { api } from './api/client'
+import { USA_JSON_SERVER } from './demo/modo'
 
 /** departamento → localidad → distritos */
 export type CatalogoLocalidades = Record<string, Record<string, string[]>>
@@ -23,12 +25,16 @@ export interface DatosSuministro {
 export type CatalogoSuministro = Record<string, Record<string, Record<string, DatosSuministro>>>
 
 export async function fetchCatalogoLocalidades(): Promise<CatalogoLocalidades> {
-  const { data } = await api.get<CatalogoLocalidades>('/catalogoLocalidades')
+  const { data } = USA_JSON_SERVER
+    ? await api.get<CatalogoLocalidades>('/catalogoLocalidades')
+    : await backend.get<CatalogoLocalidades>('/catalogos/ubicaciones')
   return data
 }
 
-/** Con el backend real convendría pedir solo la ubicación elegida (?departamento=…). */
+/** El backend también acepta ?departamento=&localidad=&distrito= para pedir solo esa ubicación. */
 export async function fetchCatalogoSuministro(): Promise<CatalogoSuministro> {
-  const { data } = await api.get<CatalogoSuministro>('/catalogoSuministro')
+  const { data } = USA_JSON_SERVER
+    ? await api.get<CatalogoSuministro>('/catalogoSuministro')
+    : await backend.get<CatalogoSuministro>('/catalogos/suministro')
   return data
 }

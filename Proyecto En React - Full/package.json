@@ -4,8 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n api,eventos,web -c magenta,yellow,cyan \"npm:mock\" \"npm:mock:events\" \"npm:dev:web\"",
-    "dev:web": "vite",
+    "dev": "vite",
+    "dev:mock": "concurrently -k -n api,eventos,web -c magenta,yellow,cyan \"npm:mock\" \"npm:mock:events\" \"npm:dev:mock:web\"",
+    "dev:mock:web": "vite --mode mock",
     "demo": "concurrently -k -n api,eventos,web -c magenta,yellow,cyan \"npm:mock\" \"npm:mock:events\" \"npm:demo:web\"",
     "demo:web": "vite --mode demo",
     "premock": "node mock-server/build-db.mjs",

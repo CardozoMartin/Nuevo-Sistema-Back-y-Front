@@ -6,9 +6,10 @@ Migración del prototipo HTML de la Dirección de Recursos Hídricos de Tucumán
 
 ```bash
 npm install
-npm run dev         # API (:3001) + eventos en vivo (:3002) + front (:5173)  ← usar siempre este
-npm run demo        # igual, en MODO DEMO: sin el backend real (ver «Modo demo» abajo)
-npm run dev:web     # solo el front (sin API: las pantallas muestran error de conexión)
+npm run dev         # front (:5173) contra el backend real (backend/: npm run start:dev, :3000)  ← usar siempre este
+                    # todo sale de la base: las pantallas que aún usan json-server avisan «pendiente de migrar»
+npm run dev:mock    # como antes de la migración: json-server (:3001) + eventos (:3002) + front
+npm run demo        # MODO DEMO: sin el backend real (ver «Modo demo» abajo)
 npm run mock        # solo la API simulada (json-server)
 npm run mock:events # solo el servidor de avisos en vivo (SSE)
 npm run mock:reset  # vuelve la base de la demo a su estado inicial (con el servidor frenado)

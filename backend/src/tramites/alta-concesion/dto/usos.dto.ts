@@ -1,13 +1,12 @@
 // Paso 5 del alta: usos y magnitudes.
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsEmpty, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { EjePosgarFaja3 } from '../../../comun/validadores/posgar.js';
 import { Texto } from '../../../comun/validadores/texto.js';
-import { Caracter, CODIGOS_SERVICIO, RANGO_POSGAR } from '../../../concesiones/concesiones.constantes.js';
+import { Caracter, CODIGOS_SERVICIO } from '../../../concesiones/concesiones.constantes.js';
 import { LIMITES_TUCUMAN } from '../../../sig/sig.constantes.js';
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
-
-const miles = (n: number) => n.toLocaleString('es-AR');
 
 const grados = (n: number) => n.toLocaleString('es-AR');
 
@@ -22,16 +21,15 @@ const enGrados = (c: CoordenadaDto) => c.latitud != null || c.longitud != null;
  * El backend calcula la otra forma con PostGIS y guarda las dos.
  */
 export class CoordenadaDto {
+  // X/Y: la regla compartida con el frontend (comun/validadores/posgar-faja3.ts).
   @ValidateIf((c: CoordenadaDto) => !enGrados(c))
-  @Max(RANGO_POSGAR.x.max, { message: `La X POSGAR debe estar entre ${miles(RANGO_POSGAR.x.min)} y ${miles(RANGO_POSGAR.x.max)} (Tucumán, faja 3).` })
-  @Min(RANGO_POSGAR.x.min, { message: `La X POSGAR debe estar entre ${miles(RANGO_POSGAR.x.min)} y ${miles(RANGO_POSGAR.x.max)} (Tucumán, faja 3).` })
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Ingrese la X POSGAR en metros (hasta 2 decimales), o la latitud y longitud.' })
+  @EjePosgarFaja3('x')
+  @IsNumber({}, { message: 'Ingrese la X POSGAR en metros (ej: 3577293.45), o la latitud y longitud.' })
   x?: number;
 
   @ValidateIf((c: CoordenadaDto) => !enGrados(c))
-  @Max(RANGO_POSGAR.y.max, { message: `La Y POSGAR debe estar entre ${miles(RANGO_POSGAR.y.min)} y ${miles(RANGO_POSGAR.y.max)} (Tucumán, faja 3).` })
-  @Min(RANGO_POSGAR.y.min, { message: `La Y POSGAR debe estar entre ${miles(RANGO_POSGAR.y.min)} y ${miles(RANGO_POSGAR.y.max)} (Tucumán, faja 3).` })
-  @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Ingrese la Y POSGAR en metros (hasta 2 decimales), o la latitud y longitud.' })
+  @EjePosgarFaja3('y')
+  @IsNumber({}, { message: 'Ingrese la Y POSGAR en metros (ej: 7035340.12), o la latitud y longitud.' })
   y?: number;
 
   @ValidateIf(enGrados)
@@ -45,6 +43,26 @@ export class CoordenadaDto {
   @Min(LIMITES_TUCUMAN.oeste, { message: `La longitud debe estar entre ${grados(LIMITES_TUCUMAN.oeste)} y ${grados(LIMITES_TUCUMAN.este)} (Tucumán).` })
   @IsNumber({ maxDecimalPlaces: 8 }, { message: 'Ingrese la longitud en grados decimales (hasta 8 decimales).' })
   longitud?: number;
+}
+
+/**
+ * Desagüe: SOLO en X/Y POSGAR 2007 faja 3 (EPSG:5345), con la regla compartida con el frontend
+ * (7 cifras enteras, hasta 2 decimales, dentro de Tucumán). El backend calcula la latitud/longitud.
+ */
+export class DesagueDto {
+  @EjePosgarFaja3('x', 'del desagüe')
+  @IsNumber({}, { message: 'Ingrese la X POSGAR del desagüe en metros (ej: 3577293.45).' })
+  x: number;
+
+  @EjePosgarFaja3('y', 'del desagüe')
+  @IsNumber({}, { message: 'Ingrese la Y POSGAR del desagüe en metros (ej: 7035340.12).' })
+  y: number;
+
+  @IsEmpty({ message: 'El desagüe se carga en X/Y POSGAR 2007 faja 3, no en latitud/longitud.' })
+  latitud?: unknown;
+
+  @IsEmpty({ message: 'El desagüe se carga en X/Y POSGAR 2007 faja 3, no en latitud/longitud.' })
+  longitud?: unknown;
 }
 
 /** Punto de entrega del agua: coordenada + una referencia del lugar. */
@@ -95,9 +113,9 @@ export class UsosDto {
   // --- Desagüe (obligatorio) ---
 
   @ValidateNested()
-  @Type(() => CoordenadaDto)
+  @Type(() => DesagueDto)
   @IsNotEmpty({ message: 'Ingrese las coordenadas de desagüe.' })
-  desague: CoordenadaDto;
+  desague: DesagueDto;
 
   // --- Usos (al menos uno, sin repetir) ---
 

@@ -83,7 +83,7 @@ export class UsosAltaService {
 
       //8.- Puntos: el desagüe siempre; la entrega solo si algún uso la exige.
       await tx.delete(Punto, { concesion: { id: concesion.id }, vigente: true });
-      await this.guardarPunto(tx, editable, TipoPunto.DESAGUE, datos.desague);
+      await this.guardarPunto(tx, editable, TipoPunto.DESAGUE, { x: datos.desague.x, y: datos.desague.y });
       if (exigenEntrega.length && datos.puntoEntrega) {
         const { referencia, ...coordenada } = datos.puntoEntrega;
         await this.guardarPunto(tx, editable, TipoPunto.ENTREGA, coordenada, referencia);

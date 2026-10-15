@@ -85,7 +85,7 @@ export function usosADto(u: PreCargaForm['usos']) {
     periodoInicio: textoONulo(u.periodoInicio),
     periodoFin: textoONulo(u.periodoFin),
     // X/Y POSGAR o latitud/longitud, según lo que se cargó: el backend calcula la otra forma.
-    desague: coordenadaADto(u.desague),
+    desague: coordenadaADto({ ...u.desague, sistema: 'posgar' }),
     items: u.items.filter((i) => i.uso).map((i) => ({ uso: i.uso, magnitud: Number(i.magnitud) })),
     // El backend lo pide solo si algún uso lo exige (pecuario); si viene sin necesidad, lo ignora.
     puntoEntrega: puntoEntrega ? { ...puntoEntrega, referencia: textoONulo(u.pecuario.referencia) } : undefined,
@@ -174,11 +174,12 @@ export function altaAFormulario(a: AltaBackend): PreCargaForm {
       : vacio.registral,
     usos: a.usos
       ? {
-          caracter: a.usos.caracter?.toLowerCase() ?? '',
+          caracter: a.usos.caracter ?? '',
           codigoServicio: t(a.usos.codigoServicio),
           periodoInicio: t(a.usos.periodoInicio),
           periodoFin: t(a.usos.periodoFin),
-          desague: coordenadaDesdeApi(a.usos.desague),
+          // Solo X/Y POSGAR: el backend siempre devuelve la X/Y calculada.
+          desague: { ...coordenadaDesdeApi(a.usos.desague), sistema: 'posgar' },
           items: a.usos.items.length ? a.usos.items.map((i) => ({ uso: i.uso, magnitud: String(i.magnitud) })) : vacio.usos.items,
           pecuario: { ...coordenadaDesdeApi(a.usos.puntoEntrega), referencia: t(a.usos.puntoEntrega?.referencia) },
         }

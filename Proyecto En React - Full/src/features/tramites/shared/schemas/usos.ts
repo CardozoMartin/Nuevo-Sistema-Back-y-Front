@@ -42,7 +42,8 @@ export function crearUsosSchema(usosConPuntoEntrega: string[]) {
         for (const [eje, msj] of Object.entries(leerCoordenada(c, contexto).errores)) issue([campo, eje], msj ?? null)
       }
 
-      coordenada('desague', u.desague, 'del desagüe')
+      // El desagüe va solo en X/Y POSGAR faja 3 (regla compartida con el backend, lib/posgar-faja3.ts).
+      coordenada('desague', { ...u.desague, sistema: 'posgar' }, 'del desagüe')
 
       if (u.periodoInicio && u.periodoFin && u.periodoFin < u.periodoInicio) {
         issue(['periodoFin'], 'El fin del período no puede ser anterior al inicio.')

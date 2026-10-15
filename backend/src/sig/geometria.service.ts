@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { MultiPolygon } from 'geojson';
 import { DataSource, type EntityManager } from 'typeorm';
+import { errorPuntoConvertido } from '../comun/validadores/posgar-faja3.js';
 import { detectarSistema, NOMBRE_SISTEMA, SistemaCoordenadas } from './kml/sistema-coordenadas.js';
 import { DISTANCIA_MAX_CAUCE_M, DISTANCIA_MAX_PUNTO_M, LIMITES_TUCUMAN, SRID_POSGAR, SRID_WGS84, TOLERANCIA_SUPERPOSICION_M2 } from './sig.constantes.js';
 
@@ -259,6 +260,10 @@ export class GeometriaService {
       return { sistema: SistemaCoordenadas.WGS84, x: redondear(f.x, 2), y: redondear(f.y, 2), latitud: redondear(c.latitud!, 6), longitud: redondear(c.longitud!, 6) };
     }
     const [f] = await tx.query(`SELECT ST_Y(p) AS lat, ST_X(p) AS lon FROM ST_Transform(ST_SetSRID(ST_MakePoint($1, $2), ${SRID_POSGAR}), ${SRID_WGS84}) AS p`, [c.x, c.y]);
+
+    //3.- Lo convertido tiene que caer en Tucumán (regla compartida con el frontend).
+    const fuera = errorPuntoConvertido(Number(f.lat), Number(f.lon));
+    if (fuera) throw new BadRequestException(fuera);
     return { sistema: SistemaCoordenadas.POSGAR_FAJA3, x: c.x!, y: c.y!, latitud: redondear(f.lat, 6), longitud: redondear(f.lon, 6) };
   }
 

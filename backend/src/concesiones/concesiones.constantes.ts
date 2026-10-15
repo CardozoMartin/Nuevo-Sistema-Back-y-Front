@@ -88,7 +88,7 @@ export const RANGO_LONGITUD = { min: -74, max: -53 } as const;
  * Coordenadas POSGAR 2007 faja 3 (EPSG:5345) válidas para Tucumán, en metros (mismo rango que
  * el frontend). Es el sistema en que la oficina carga los puntos.
  */
-export const RANGO_POSGAR = { x: { min: 3_400_000, max: 3_750_000 }, y: { min: 6_800_000, max: 7_200_000 } } as const;
+export { RANGO_POSGAR_FAJA3 as RANGO_POSGAR } from '../comun/validadores/posgar-faja3.js';
 
 /** Canales del suministro después del secundario: terciario, cuarto y quinto. */
 export const MAX_CANALES_ADICIONALES = 3;

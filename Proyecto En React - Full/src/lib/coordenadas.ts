@@ -10,12 +10,13 @@
 // Acá se lee lo que escribe el usuario, se valida y se muestra la conversión en vivo (proj4,
 // difiere de PostGIS menos de 1 m: lo que se guarda lo calcula el backend).
 import { aPosgar, dePosgar, formatearPosgar } from './posgar'
+import { errorPuntoConvertido, LIMITES_TUCUMAN_GRADOS } from './posgar-faja3'
 import { RANGO_POSGAR_TUCUMAN, validarPosgar } from './validaciones'
 
 export type SistemaCoordenada = 'posgar' | 'grados'
 
-/** Rectángulo de Tucumán en grados. Mismo que el backend (LIMITES_TUCUMAN de sig.constantes.ts). */
-export const LIMITES_TUCUMAN = { oeste: -66.3, sur: -28.1, este: -64.4, norte: -25.95 } as const
+/** Rectángulo de Tucumán en grados (regla compartida con el backend, lib/posgar-faja3.ts). */
+export const LIMITES_TUCUMAN = LIMITES_TUCUMAN_GRADOS
 
 /** Lo que guarda el formulario para cada punto: el sistema elegido y los valores de los dos. */
 export interface CoordenadaForm {
@@ -111,8 +112,10 @@ function leerPosgar({ x, y }: CoordenadaForm, contexto: string): LecturaCoordena
   const errores = { x: validarPosgar(x, 'x', contexto) ?? undefined, y: validarPosgar(y, 'y', contexto) ?? undefined }
   if (errores.x || errores.y) return { punto: null, errores, aviso: null }
 
-  //3.- La latitud/longitud, para mostrarla.
+  //3.- La latitud/longitud, para mostrarla: tiene que caer en Tucumán (lo mismo controla el backend).
   const p = dePosgar(Number(x), Number(y))
+  const fuera = errorPuntoConvertido(p.lat, p.lng, contexto)
+  if (fuera) return { punto: null, errores: { x: fuera, y: fuera }, aviso: null }
   return { punto: { x: Number(x), y: Number(y), latitud: p.lat, longitud: p.lng }, errores: {}, aviso: null }
 }
 

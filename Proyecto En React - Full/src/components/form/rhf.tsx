@@ -45,7 +45,8 @@ export function FormTextField({ name, label, required, hint, hideLabel, classNam
 type MaskedFieldProps = BaseFieldProps &
   Omit<ComponentProps<'input'>, 'name' | 'className' | 'required' | 'value' | 'onChange'> & {
     /** Limpia el texto en cada tecla (ver lib/mascaras.ts). */
-    mask: (valor: string) => string
+    /** Limpia lo tipeado; recibe también el valor anterior (ej: para ignorar una tecla de más). */
+    mask: (valor: string, anterior: string) => string
     icon?: string
   }
 
@@ -68,7 +69,7 @@ export function FormMaskedField({ name, label, required, hint, hideLabel, classN
         value={(field.value as string | undefined) ?? ''}
         onBlur={field.onBlur}
         onChange={(e) => {
-          const limpio = mask(e.target.value)
+          const limpio = mask(e.target.value, (field.value as string | undefined) ?? '')
           field.onChange(maxLength ? limpio.slice(0, maxLength) : limpio)
         }}
       />

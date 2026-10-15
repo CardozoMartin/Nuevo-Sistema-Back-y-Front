@@ -47,7 +47,7 @@ export function UsosFields({ prefix, onCaudalTotalChange }: Props) {
         <FormSelectField name={n('codigoServicio')} label="Código de servicio" placeholder="Seleccione…" options={opcionesDe(codigosServicio)} />
         <FormTextField name={n('periodoInicio')} label="Inicio del período" type="date" />
         <FormTextField name={n('periodoFin')} label="Fin del período" type="date" />
-        <CoordenadaFields name={n('desague')} titulo="Desagüe" required className="md:col-span-2" />
+        <CoordenadaFields name={n('desague')} titulo="Desagüe" required soloPosgar className="md:col-span-2" />
       </div>
 
       <div className="flex flex-col gap-3">

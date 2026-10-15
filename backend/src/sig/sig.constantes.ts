@@ -18,7 +18,7 @@ export const SRID_WGS84 = 4326;
  * Sirve para detectar KML mal georreferenciados (coordenadas invertidas, otro sistema…).
  * TODO: reemplazar por el límite provincial real (capa del IGN) cuando se cargue.
  */
-export const LIMITES_TUCUMAN = { oeste: -66.3, sur: -28.1, este: -64.4, norte: -25.95 } as const;
+export { LIMITES_TUCUMAN_GRADOS as LIMITES_TUCUMAN } from '../comun/validadores/posgar-faja3.js';
 
 /**
  * Distancia máxima esperable entre una concesión y el río o canal más cercano (metros). Las

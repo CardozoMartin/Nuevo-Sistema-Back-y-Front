@@ -2,7 +2,7 @@
 import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
-import { CoordenadaDto } from './usos.dto.js';
+import { CoordenadaDto, DesagueDto } from './usos.dto.js';
 
 const errores = (datos: object) =>
   validateSync(plainToInstance(CoordenadaDto, datos)).flatMap((e) => Object.values(e.constraints ?? {}));
@@ -27,11 +27,40 @@ describe('CoordenadaDto', () => {
   });
 
   it('pide la coordenada si no viene ninguna', () => {
-    expect(errores({})).toContain('Ingrese la X POSGAR en metros (hasta 2 decimales), o la latitud y longitud.');
+    expect(errores({})).toContain('Ingrese la X POSGAR en metros (ej: 3577293.45), o la latitud y longitud.');
   });
 
   it('si viene en grados no exige X/Y (y al revés)', () => {
     expect(errores({ latitud: -27.05 })).toContain('Ingrese la longitud en grados decimales (hasta 8 decimales).');
-    expect(errores({ x: 3577293 })).toContain('Ingrese la Y POSGAR en metros (hasta 2 decimales), o la latitud y longitud.');
+    expect(errores({ x: 3577293 })).toContain('Ingrese la Y POSGAR en metros (ej: 7035340.12), o la latitud y longitud.');
+  });
+});
+
+describe('DesagueDto (solo X/Y POSGAR faja 3, regla compartida con el frontend)', () => {
+  const erroresDesague = (datos: object) =>
+    // Igual que el ValidationPipe de main.ts: un mensaje por campo.
+    validateSync(plainToInstance(DesagueDto, datos), { stopAtFirstError: true }).flatMap((e) => Object.values(e.constraints ?? {}));
+
+  it('acepta X/Y de Tucumán con hasta 2 decimales', () => {
+    expect(erroresDesague({ x: 3577293.45, y: 7035340.12 })).toEqual([]);
+  });
+
+  it('rechaza cifras de más (ej: X sin el punto decimal)', () => {
+    expect(erroresDesague({ x: 3584508751, y: 7035340 })).toEqual([
+      'La X POSGAR faja 3 lleva 7 cifras antes del punto decimal (ej: 3577293.45) y tiene 10: ¿falta el punto decimal?',
+    ]);
+  });
+
+  it('rechaza más de 2 decimales y texto', () => {
+    expect(erroresDesague({ x: 3577293.456, y: 7035340 })).toEqual(['La X POSGAR admite hasta 2 decimales (centímetros).']);
+    expect(erroresDesague({ x: '3.577.293', y: 7035340 })).toEqual(['Ingrese la X POSGAR del desagüe en metros (ej: 3577293.45).']);
+  });
+
+  it('no acepta latitud/longitud', () => {
+    expect(erroresDesague({ latitud: -27.05, longitud: -65.23 })).toContain('El desagüe se carga en X/Y POSGAR 2007 faja 3, no en latitud/longitud.');
+  });
+
+  it('pide las dos coordenadas', () => {
+    expect(erroresDesague({ x: 3577293 })).toEqual(['Ingrese la Y POSGAR del desagüe en metros (ej: 7035340.12).']);
   });
 });

@@ -1,3 +1,5 @@
+import { errorEjePosgar, RANGO_POSGAR_FAJA3 } from './posgar-faja3'
+
 const PESOS_CUIT = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2]
 
 /** Valida el dígito verificador de un CUIT/CUIL (11 dígitos, sin guiones). */
@@ -16,27 +18,13 @@ export function esFechaFutura(fecha: string): boolean {
 }
 
 /**
- * Coordenadas POSGAR 2007 faja 3 (EPSG:5345) válidas para Tucumán, en metros. Mismo rango que
- * el backend (RANGO_POSGAR de concesiones.constantes.ts).
+ * Coordenadas POSGAR 2007 faja 3 (EPSG:5345) válidas para Tucumán, en metros. Sale de la regla
+ * compartida con el backend (lib/posgar-faja3.ts, copia idéntica de comun/validadores/posgar-faja3.ts).
  */
-export const RANGO_POSGAR_TUCUMAN = { x: { min: 3_400_000, max: 3_750_000 }, y: { min: 6_800_000, max: 7_200_000 } } as const
+export const RANGO_POSGAR_TUCUMAN = RANGO_POSGAR_FAJA3
 
-const miles = (n: number) => n.toLocaleString('es-AR')
-
-/** Valida una X o Y POSGAR (metros, hasta 2 decimales). Devuelve el mensaje de error o null. */
-export function validarPosgar(valor: string, eje: 'x' | 'y', contexto: string): string | null {
-  const nombre = eje.toUpperCase()
-  if (!valor) return `Ingrese la ${nombre} POSGAR ${contexto}.`
-  if (!/^\d+(\.\d{1,2})?$/.test(valor)) return `La ${nombre} POSGAR va en metros, sin puntos de miles (hasta 2 decimales).`
-  const n = Number(valor)
-  const { min, max } = RANGO_POSGAR_TUCUMAN[eje]
-  if (n < min || n > max) {
-    const otra = RANGO_POSGAR_TUCUMAN[eje === 'x' ? 'y' : 'x']
-    if (n >= otra.min && n <= otra.max) return `Ese valor parece la ${eje === 'x' ? 'Y' : 'X'}: ¿están invertidas?`
-    return `La ${nombre} POSGAR (faja 3) en Tucumán va de ${miles(min)} a ${miles(max)}.`
-  }
-  return null
-}
+/** Valida una X o Y POSGAR (7 cifras enteras, hasta 2 decimales, en Tucumán). Mensaje de error o null. */
+export const validarPosgar = (valor: string, eje: 'x' | 'y', contexto: string): string | null => errorEjePosgar(valor, eje, contexto)
 
 /** Prefijos de CUIL / CUIT de personas físicas: en el medio llevan el DNI (20-12345678-9). */
 const PREFIJOS_FISICA = ['20', '23', '24', '27']

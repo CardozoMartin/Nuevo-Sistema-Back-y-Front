@@ -7,6 +7,7 @@ import { UsuariosService } from '../seguridad/usuarios.service.js';
 import { Actuacion } from './entities/actuacion.entity.js';
 import { Expediente } from './entities/expediente.entity.js';
 import { Movimiento } from './entities/movimiento.entity.js';
+import type { BuscarExpedientesQuery } from './dto/buscar-expedientes.query.js';
 import {
   Dictamen,
   ESTADOS_FINALES,
@@ -391,5 +392,86 @@ export class ExpedientesService {
       tomadoPor: e.tomadoPor && nombreUsuario(e.tomadoPor),
       enLaOficinaDesde: desdeDe.get(e.id) ?? null,
     }));
+  }
+
+  /**
+   * Búsqueda general (buscador de Catastro): cualquier expediente, en curso o terminado, con
+   * dónde está, de qué oficina vino y desde cuándo. Los nombres de oficinas, trámites, estados y
+   * etapas salen de los catálogos de la base. Más recientes primero (por el último pase).
+   */
+  async buscar(q: BuscarExpedientesQuery) {
+    const condiciones: string[] = [];
+    const params: unknown[] = [];
+    const param = (v: unknown) => `$${params.push(v)}`;
+
+    if (q.texto) {
+      const t = param(`%${q.texto.replace(/[%_\\]/g, '\\$&')}%`);
+      // El número se compara como se muestra (123/332-2026), sin ceros a la izquierda.
+      condiciones.push(
+        `((e.numero::int)::text || '/' || (e.reparticion::int)::text || '-' || e.anio ILIKE ${t}` +
+          ` OR e.solicitante_nombre ILIKE ${t} OR e.solicitante_documento ILIKE ${t})`,
+      );
+    }
+    if (q.tipoTramite) condiciones.push(`e.tipo_tramite = ${param(q.tipoTramite)}`);
+    if (q.estado === 'PENDIENTES') condiciones.push(`e.estado <> ALL(${param(ESTADOS_FINALES)}::exp_estado_expediente[])`);
+    else if (q.estado) condiciones.push(`e.estado = ${param(q.estado)}`);
+    if (q.oficina) condiciones.push(`e.oficina_actual = ${param(q.oficina)}`);
+    if (q.desde) condiciones.push(`e.fecha_ingreso >= ${param(q.desde)}`);
+    if (q.hasta) condiciones.push(`e.fecha_ingreso <= ${param(q.hasta)}`);
+
+    const where = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
+    const limite = param(q.porPagina);
+    const desplazamiento = param((q.pagina - 1) * q.porPagina);
+
+    const filas: Record<string, string | null>[] = await this.dataSource.query(
+      `SELECT e.id, e.numero, e.reparticion, e.anio, to_char(e.fecha_ingreso, 'YYYY-MM-DD') AS fecha_ingreso,
+              e.tipo_tramite, tt.nombre AS tramite_nombre, e.estado, es.nombre AS estado_nombre, es.color AS estado_color,
+              e.etapa, et.nombre AS etapa_nombre, e.solicitante_nombre, e.solicitante_documento,
+              e.oficina_actual, oa.nombre AS oficina_actual_nombre,
+              ant.oficina_origen AS oficina_anterior, oo.nombre AS oficina_anterior_nombre,
+              ult.fecha AS ultimo_pase, count(*) OVER () AS total
+         FROM exp_expediente e
+         -- Último pase: cuándo llegó a donde está.
+         LEFT JOIN LATERAL (SELECT m.fecha FROM exp_movimiento m WHERE m.expediente_id = e.id
+                             ORDER BY m.fecha DESC, m.id DESC LIMIT 1) ult ON true
+         -- Oficina anterior: la última que se lo pasó a otra (un cambio de etapa dentro de la misma oficina no cuenta).
+         LEFT JOIN LATERAL (SELECT m.oficina_origen FROM exp_movimiento m
+                             WHERE m.expediente_id = e.id AND m.oficina_origen IS NOT NULL AND m.oficina_origen <> m.oficina_destino
+                             ORDER BY m.fecha DESC, m.id DESC LIMIT 1) ant ON true
+         LEFT JOIN seg_oficina oa ON oa.codigo = e.oficina_actual::text
+         LEFT JOIN seg_oficina oo ON oo.codigo = ant.oficina_origen::text
+         LEFT JOIN cat_tipo_tramite tt ON tt.codigo = e.tipo_tramite::text
+         LEFT JOIN cat_estado_expediente es ON es.codigo = e.estado::text
+         LEFT JOIN cat_etapa et ON et.codigo = e.etapa::text
+         ${where}
+        ORDER BY coalesce(ult.fecha, e.creado_en) DESC, e.id DESC
+        LIMIT ${limite} OFFSET ${desplazamiento}`,
+      params,
+    );
+
+    return {
+      total: filas.length ? Number(filas[0].total) : 0,
+      pagina: q.pagina,
+      porPagina: q.porPagina,
+      expedientes: filas.map((f) => ({
+        id: String(f.id),
+        numero: formatearNumeroExpediente(f.numero!, f.reparticion!, Number(f.anio)),
+        fechaIngreso: f.fecha_ingreso,
+        tipoTramite: f.tipo_tramite,
+        tramiteNombre: f.tramite_nombre ?? f.tipo_tramite,
+        estado: f.estado,
+        estadoNombre: f.estado_nombre ?? f.estado,
+        estadoColor: f.estado_color ?? 'gris',
+        etapa: f.etapa,
+        etapaNombre: f.etapa_nombre ?? f.etapa,
+        titular: f.solicitante_nombre,
+        documento: f.solicitante_documento,
+        oficinaActual: f.oficina_actual,
+        oficinaActualNombre: f.oficina_actual_nombre ?? f.oficina_actual,
+        oficinaAnterior: f.oficina_anterior,
+        oficinaAnteriorNombre: f.oficina_anterior_nombre ?? f.oficina_anterior,
+        ultimoPase: f.ultimo_pase,
+      })),
+    };
   }
 }

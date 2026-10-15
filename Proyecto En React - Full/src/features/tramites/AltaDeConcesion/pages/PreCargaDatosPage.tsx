@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Stepper } from '@/components/ui/Stepper'
 import { useDominio } from '@/hooks/useDominio'
+import { useNotificaciones } from '@/features/notificaciones/context'
 import { esNoEncontrado, mensajeDeError } from '@/services/api/errors'
 import { altaAFormulario, inmuebleADto, seccionAlcanzada, suministroADto, titularesADto, ubicacionAFormData, usosADto } from '../adaptadores'
 import { altaConcesionApi } from '../api'
@@ -18,10 +19,10 @@ import type { AltaBackend } from '../backend.types'
 import { ResumenBorrador } from '../components/ResumenBorrador'
 import { SECCIONES_CON_COMPONENTE as SECCIONES, seccionDeCampo } from '../components/secciones'
 import type { InfoSeccion } from '../components/secciones/config'
-import { useAccionAlta, useAlta, useHistorial } from '../hooks'
+import { useAccionAlta, useAlta, useDerivarCarga, useHistorial } from '../hooks'
 import { crearPreCargaSchema, type PreCargaForm } from '../schemas'
 
-type Dialogo = 'enviar' | 'enviado' | null
+type Dialogo = 'enviar' | null
 
 const TITULO = 'Alta de Concesión — Carga de datos'
 /** Etapas en las que Catastro puede editar (las mismas que valida el backend). */
@@ -113,10 +114,20 @@ function CargaDatos({ alta }: { alta: AltaBackend }) {
   // Algunas reglas dependen de los catálogos (ej: qué usos exigen punto de entrega).
   const schema = useMemo(() => crearPreCargaSchema(dominio), [dominio])
   const guardar = useAccionAlta(alta.id, (id, { clave, valores }: { clave: InfoSeccion['key']; valores: PreCargaForm }) => guardarSeccion(id, clave, valores))
-  const enviar = useAccionAlta(alta.id, (id, _: void) => altaConcesionApi.enviar(id))
-  const reenviar = useAccionAlta(alta.id, (id, observaciones: string | undefined) => altaConcesionApi.reenviar(id, observaciones))
-
+  const { mostrarAviso } = useNotificaciones()
   const etapa = alta.circuito.etapa
+  // Al derivar, Catastro ya no puede actuar sobre el expediente (salvo que vuelva observado):
+  // se avisa y se va al buscador de expedientes, sin pasar por la pantalla del expediente.
+  const derivar = useDerivarCarga(alta.id, (derivada) => {
+    mostrarAviso({
+      tono: 'exito',
+      icono: 'send',
+      titulo: `Expediente ${alta.numeroExpediente} enviado a ${derivada.circuito.oficinaNombre}`,
+      detalle: 'Queda registrado en su historial. Catastro vuelve a tenerlo si lo observan o para el cierre.',
+    })
+    navigate(ROUTES.catastro.busqueda, { replace: true })
+  })
+
   const ultima = SECCIONES.length - 1
   const inicial = etapa === 'CARGA' ? seccionAlcanzada(alta) : 0
   const [actual, setActual] = useState(inicial)
@@ -129,8 +140,8 @@ function CargaDatos({ alta }: { alta: AltaBackend }) {
 
   const seccion = SECCIONES[actual]
   const esUltima = actual === ultima
-  const ocupado = guardar.isPending || enviar.isPending || reenviar.isPending
-  const errorMutacion = guardar.error ?? enviar.error ?? reenviar.error
+  const ocupado = guardar.isPending || derivar.isPending
+  const errorMutacion = guardar.error ?? derivar.error
 
   // Si volvió observado: lo que pidió corregir la oficina (última observación del historial).
   const observacion = etapa === 'CORRECCION' ? historial.data?.filter((h) => h.tipo === 'ACTUACION' && h.resultado === 'OBSERVADO').at(-1) : undefined
@@ -178,9 +189,7 @@ function CargaDatos({ alta }: { alta: AltaBackend }) {
 
   function confirmarEnvio() {
     setDialogo(null)
-    const opciones = { onSuccess: () => setDialogo('enviado') }
-    if (etapa === 'CORRECCION') reenviar.mutate('Observaciones corregidas.', opciones)
-    else enviar.mutate(undefined, opciones)
+    derivar.mutate({ corregido: etapa === 'CORRECCION' })
   }
 
   const textoTerminar = etapa === 'CARGA' ? 'Enviar a Recaudación' : etapa === 'CORRECCION' ? 'Reenviar' : 'Guardar y volver al expediente'
@@ -257,14 +266,6 @@ function CargaDatos({ alta }: { alta: AltaBackend }) {
         cancelLabel="Cancelar"
         onConfirm={confirmarEnvio}
         onCancel={() => setDialogo(null)}
-      />
-      <ConfirmDialog
-        open={dialogo === 'enviado'}
-        tone="success"
-        title="Expediente derivado"
-        message={`El expediente ${alta.numeroExpediente} fue derivado a ${destino}. Queda registrado en su historial.`}
-        confirmLabel="Ver el expediente"
-        onConfirm={() => navigate(ROUTES.tramites.altaConcesion.circuito(alta.id))}
       />
     </FormProvider>
   )

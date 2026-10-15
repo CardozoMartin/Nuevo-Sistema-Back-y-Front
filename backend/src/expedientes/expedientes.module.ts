@@ -7,6 +7,7 @@ import { Expediente } from './entities/expediente.entity.js';
 import { Movimiento } from './entities/movimiento.entity.js';
 import { Resolucion } from './entities/resolucion.entity.js';
 import { SolicitudNumero } from './entities/solicitud-numero.entity.js';
+import { BuscarExpedientesQuery } from './dto/buscar-expedientes.query.js';
 import { NumeroExpedienteQuery } from './dto/numero-expediente.query.js';
 import { Oficina } from './expedientes.constantes.js';
 import { ExpedientesService } from './expedientes.service.js';
@@ -21,6 +22,15 @@ class ExpedientesController {
   bandeja(@Param('oficina') oficina: string) {
     if (!Object.values(Oficina).includes(oficina as Oficina)) throw new BadRequestException(`Oficina desconocida: ${oficina}.`);
     return this.expedientes.bandeja(oficina as Oficina);
+  }
+
+  /**
+   * GET /api/expedientes/buscar?texto=&tipoTramite=&estado=&oficina=&desde=&hasta=&pagina=:
+   * buscador general (cualquier trámite, en curso o terminado). Va antes de :id.
+   */
+  @Get('buscar')
+  buscar(@Query() query: BuscarExpedientesQuery) {
+    return this.expedientes.buscar(query);
   }
 
   /**

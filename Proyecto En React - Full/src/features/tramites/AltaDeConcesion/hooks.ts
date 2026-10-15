@@ -88,6 +88,22 @@ export function useAccionAlta<TInput, TOutput = unknown>(id: string, accion: (id
   })
 }
 
+/**
+ * Enviar (CARGA → Recaudación) o reenviar (CORRECCION → la oficina que observó) desde la carga.
+ * Catastro deja de tener el expediente: primero se sale de la pantalla (`alDerivar`) y recién
+ * después se actualiza la caché, para que la carga no se reemplace por «el expediente está en …».
+ */
+export function useDerivarCarga(id: string, alDerivar: (alta: AltaBackend) => void) {
+  const alActualizar = useAlActualizar(id)
+  return useMutation<AltaBackend, Error, { corregido: boolean }>({
+    mutationFn: ({ corregido }) => (corregido ? altaConcesionApi.reenviar(id, 'Observaciones corregidas.') : altaConcesionApi.enviar(id)),
+    onSuccess: (alta) => {
+      alDerivar(alta)
+      alActualizar(alta)
+    },
+  })
+}
+
 export function useTomar(id: string) {
   return useAccionAlta<void>(id, (i) => altaConcesionApi.tomar(i))
 }

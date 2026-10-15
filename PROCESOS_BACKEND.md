@@ -27,7 +27,8 @@ La documentación técnica del backend (puesta en marcha, endpoints, PostGIS, es
    - Baja lógica siempre: nada se borra, todo queda en el historial.
 3. **Las respuestas sirven al front tal como está.** Antes de cerrar un proceso se compara con lo que consume la
    pantalla en json-server (`features/<…>/api.ts`, `types.ts`) y se anota acá cualquier diferencia de forma.
-4. Usuario que actúa: encabezado `X-Usuario-Id` hasta que haya login (`TODO(login)`).
+4. Usuario que actúa: el de la sesión (login, ver «Login, roles y permisos»). Cada acción que modifica datos lleva
+   `@RequierePermiso(...)`. El encabezado `X-Usuario-Id` queda solo para tests y scripts (`AUTH_ENCABEZADO_PRUEBAS=true`).
 
 ---
 
@@ -57,7 +58,7 @@ La documentación técnica del backend (puesta en marcha, endpoints, PostGIS, es
 | Carga en padrón de Rentas | 🟡 Solo dentro del Alta | ⏳ |
 | Búsqueda Catastro / consulta de expediente | 🟡 Historial de expediente | ✅ |
 | Avisos en vivo (SSE) | ❌ | ✅ (mock) |
-| Login / roles | ❌ | ❌ |
+| Login / roles | ✅ Login, sesiones, roles y permisos por oficina, ABM de usuarios | ✅ |
 | Migraciones de base (reemplazar `DB_SYNCHRONIZE`) | ❌ | — |
 
 ---
@@ -114,9 +115,9 @@ programarlo, y recién después pasa a su carpeta en `src/tramites/` con su READ
 | 8 | Pozo: autorización y registro | ⏳ Por detallar | RN-10: solo empresas activas con máquina válida |
 | 9 | Permisos | ⏳ Por detallar | |
 | 10 | Carga en padrón de Rentas (pantalla propia, para todos los trámites) | ⏳ Por detallar | |
-| 11 | Búsqueda Catastro y consulta de expediente | ⏳ Por detallar | |
+| 11 | Búsqueda Catastro y consulta de expediente | ✅ Búsqueda (`GET /api/expedientes/buscar`) | Falta la búsqueda por concesión / datos catastrales |
 | 12 | Avisos en vivo (SSE) | ⏳ Por detallar | |
-| 13 | Login, roles y auditoría | ⏳ Por detallar | Reemplaza `X-Usuario-Id` y el usuario fijo `1` |
+| 13 | Login, roles y auditoría | ✅ Login, roles y permisos · ⏳ auditoría | Ver «Login, roles y permisos» |
 
 ---
 
@@ -528,6 +529,8 @@ que escribir su `ConfigTramite` y sus endpoints: el circuito ya está.
 
 | Método | Ruta | Oficina | Qué hace |
 | --- | --- | --- | --- |
+| GET | `/api/tramites/alta-concesion/:id/recaudacion` | Recaudación | Lo que informa el sistema: los titulares, sus **otras concesiones otorgadas** (con todos sus titulares y si tienen deuda registrada) y deudas anteriores sin concesión |
+| POST | `/api/tramites/alta-concesion/:id/recaudacion` `{ resultado: APTO\|NO_APTO, concesiones: [{ concesionId, tieneDeuda }], observaciones? }` | Recaudación | **Apto**: ninguna concesión con deuda ni deudas sin cancelar → pasa a Distrito (si estaba en espera, se levantan las deudas). **No apto**: al menos una concesión marcada con deuda (o una deuda anterior) y el motivo obligatorio → queda EN ESPERA en Recaudación hasta que pague. La deuda queda en la concesión y en todos sus titulares (`validarDecisionDeuda`) |
 | POST | `/api/tramites/alta-concesion/:id/recaudacion/notificar-deuda` `{ observaciones? }` | Recaudación | Un correo a cada titular con deuda pendiente que tenga correo cargado, con el detalle de SUS deudas. Devuelve a quién se mandó y quién no tiene correo |
 | GET | `/api/expedientes/:id/emails` | — | Los correos que se mandaron por el expediente |
 | POST | `/api/tramites/alta-concesion/:id/numero-concesion` | Secretaría | **Cambió:** ahora **pide** el número a Catastro (no lo asigna). Pedirlo dos veces no crea otro pedido |
@@ -774,3 +777,34 @@ propios para las claves foráneas (`fk_`), los únicos (`uk_`), los índices (`i
 
 > `DB_SYNCHRONIZE=true` sirve solo en desarrollo. Antes de producción se pasa a **migraciones**: archivos con el SQL
 > de cada cambio, que se revisan y se aplican en orden (está en la deuda técnica).
+
+---
+
+## Login, roles y permisos (`seguridad/`)
+
+- **Ingreso:** `POST /api/auth/login { usuario, clave }` con legajo o email. Contraseña con scrypt (`seguridad/claves.ts`,
+  8+ caracteres con letras y números). Devuelve un token al azar; en `seg_sesion` se guarda solo su SHA-256. La sesión
+  vence tras `SESION_HORAS` (8) sin uso. Al quinto intento fallido el usuario se bloquea 15 minutos.
+- **Contraseña temporal:** el alta y el restablecimiento generan una (se muestra una vez). Con ella solo se puede ver la
+  sesión, cambiarla (`POST /api/auth/cambiar-clave`) o salir (`POST /api/auth/logout`).
+- **Permisos por usuario:** cada usuario tiene UNA oficina y un rol (`seg_rol`: Jefe, Operador, Solo consulta). Lo que
+  puede hacer son los permisos que le asigna Informática (`seg_usuario_permiso`); cada permiso pertenece a una oficina
+  (`seg_permiso.oficina_codigo`; sin oficina = general: tomar expedientes, ver datos sensibles) y solo se asigna a
+  usuarios de esa oficina. El rol es una **plantilla** (`seg_rol_permiso`, `GET/PUT /api/roles/permisos`) que se precarga
+  al crear el usuario o al cambiarle oficina o rol. Los códigos y la carga inicial están en `permisos.constantes.ts`
+  (Catastro: crear e iniciar, editar, **cargar el KML** —aparte porque cambia el visor—, cerrar, asignar N°, catálogos).
+  El administrador puede todo. Además del permiso, para actuar sobre un expediente tiene que estar en su oficina.
+- **Acceso por oficina:** `@SoloOficina(...)` en lo propio de cada oficina (deudas y antecedentes → Recaudación; pedidos
+  de N° → Catastro / Secretaría; avisos de baja → Distrito; bajas en trámite → Pozos); cada bandeja solo para su oficina.
+  Buscar y ver un expediente es para todos.
+- **Datos sensibles:** las consultas marcadas `@ConDatosSensibles()` pasan por `DatosSensiblesInterceptor`: sin el
+  permiso `DATOS_SENSIBLES_VER` se enmascara el documento (últimos 3 dígitos) y se quitan domicilios, teléfono, email y
+  montos / comprobantes de deudas; la respuesta lleva `datosSensiblesOcultos: true` (el front no deja editar la carga).
+- **Guardia global** (`auth.guard.ts`): toda ruta exige sesión salvo `@Publico()` (login, health); controla
+  `@SoloAdministrador()`, `@SoloOficina(...)` y `@RequierePermiso(...)`. Los permisos que dependen de lo que se manda
+  (el KML solo si viene un archivo) se controlan en el controlador con `exigirPermiso(sesion, ...)`.
+- **ABM de usuarios** (`/api/usuarios`, solo administradores): alta, modificación, baja lógica con motivo (cierra sus
+  sesiones), reactivación y restablecer contraseña. El usuario «Sistema» (id 1) no se edita ni entra.
+- **`.env`:** `ADMIN_CLAVE_INICIAL` crea el usuario `ADMIN`. Solo desarrollo: `CLAVE_USUARIOS_PRUEBA` (usuarios DEMO-*,
+  rol Jefe) y `AUTH_ENCABEZADO_PRUEBAS=true` (tests e2e y `requests/*.sh`). Los dos se ignoran con `NODE_ENV=production`.
+- **Pendiente:** auditoría de cambios (`seg_auditoria`).

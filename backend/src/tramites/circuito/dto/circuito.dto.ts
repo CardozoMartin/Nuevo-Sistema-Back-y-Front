@@ -22,10 +22,14 @@ export class DeudaConcesionDto {
 }
 
 /**
- * Recaudación: por cada concesión otorgada de los titulares (GET …/recaudacion), si tiene deuda
- * o no. Vacío si los titulares no tienen otras concesiones. El resultado sale de las respuestas.
+ * Recaudación: Apto (sin deuda: pasa a la oficina siguiente) o No apto (tiene deuda: queda en
+ * espera en Recaudación hasta que pague). Además, por cada concesión otorgada de los titulares
+ * (GET …/recaudacion), si tiene deuda o no. Vacío si los titulares no tienen otras concesiones.
  */
 export class VerificacionDeudaDto {
+  @IsIn(['APTO', 'NO_APTO'], { message: 'Indique si es Apto (sin deuda) o No apto (tiene deuda).' })
+  resultado: 'APTO' | 'NO_APTO';
+
   @ValidateNested({ each: true })
   @Type(() => DeudaConcesionDto)
   @ArrayMaxSize(500)

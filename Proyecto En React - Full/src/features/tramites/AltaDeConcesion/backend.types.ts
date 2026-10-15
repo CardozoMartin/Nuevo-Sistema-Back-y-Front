@@ -33,6 +33,8 @@ export interface TitularBackend {
 
 export interface AltaBackend {
   id: string
+  /** El usuario no tiene «Ver datos sensibles»: documentos enmascarados, sin contacto ni domicilios. */
+  datosSensiblesOcultos?: boolean
   numeroExpediente: string
   expediente: { numero: string; reparticion: string; anio: number }
   fechaIngreso: string
@@ -185,4 +187,23 @@ export interface DeudaBackend {
   creadoEn: string
   canceladoEn: string | null
   comprobantePago: string | null
+}
+
+/** Un correo que mandó el sistema por el expediente (GET /expedientes/:id/emails). */
+export interface EmailExpediente {
+  id: string
+  tipo: string
+  para: string[]
+  asunto: string
+  cuerpo: string
+  /** NO_ENVIADO_PRUEBA: no hay servidor de correo configurado (quedó registrado, no salió). */
+  estado: 'ENVIADO' | 'NO_ENVIADO_PRUEBA' | 'ERROR'
+  error: string | null
+  fecha: string
+}
+
+/** POST …/recaudacion/notificar-deuda: a quién se mandó y quién no tiene correo cargado. */
+export interface ResultadoAvisoDeuda {
+  enviados: { id: string; titular: string; para: string[]; estado: EmailExpediente['estado']; error: string | null }[]
+  sinCorreo: string[]
 }

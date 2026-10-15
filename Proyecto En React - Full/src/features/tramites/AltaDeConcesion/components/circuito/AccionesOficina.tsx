@@ -8,10 +8,10 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Icon } from '@/components/ui/Icon'
 import { cn } from '@/lib/cn'
 import { mensajeDeError } from '@/services/api/errors'
-import { useUsuarioActualId } from '@/services/sesion'
+import { AvisoSoloConsulta, useActor } from '@/features/auth/useActor'
 import { altaConcesionApi, type ResultadoDictamen } from '../../api'
 import type { AltaBackend } from '../../backend.types'
-import { useAccionAlta, useAntecedentesDeuda, useCancelarDeuda, useTomar } from '../../hooks'
+import { useAccionAlta, useAntecedentesDeuda, useCancelarDeuda, useEmails, useNotificarDeuda, useTomar } from '../../hooks'
 
 const hoy = () => new Date().toISOString().slice(0, 10)
 
@@ -61,41 +61,87 @@ export function Opciones<T extends string>({ valor, onChange, opciones }: { valo
 // Recaudación
 // ---------------------------------------------------------------------------
 
-/** «Sin deuda» / «Con deuda» de una concesión. */
-function SiNoDeuda({ valor, onChange, concesion }: { valor: boolean; onChange: (v: boolean) => void; concesion: string }) {
-  const opcion = (tieneDeuda: boolean, texto: string, icono: string, activa: string) => (
-    <button
-      type="button"
-      onClick={() => onChange(tieneDeuda)}
-      aria-pressed={valor === tieneDeuda}
-      aria-label={`${texto} (concesión ${concesion})`}
-      className={cn(
-        'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors',
-        valor === tieneDeuda ? activa : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700',
-      )}
-    >
-      <Icon name={icono} className="text-[18px]!" />
-      {texto}
-    </button>
-  )
+type DecisionDeuda = 'APTO' | 'NO_APTO'
+
+/**
+ * Con el expediente en espera por deuda («No apto»): avisar por correo a los titulares que deben,
+ * al email que tienen cargado. El correo solo informa en qué concesión hay deuda (sin montos).
+ */
+function AvisoDeudaPorEmail({ alta, deudores }: { alta: AltaBackend; deudores: string[] }) {
+  const emails = useEmails(alta.id)
+  const notificar = useNotificarDeuda(alta.id)
+  const [nota, setNota] = useState('')
+  const avisos = (emails.data ?? []).filter((e) => e.tipo === 'AVISO_DEUDA')
+  const titulares = alta.titulares.filter((t) => deudores.includes(t.personaId))
+  const nombre = (t: AltaBackend['titulares'][number]) => t.razonSocial ?? `${t.apellido}, ${t.nombre}`
+  const resultado = notificar.data
+  const fecha = (iso: string) => new Date(iso).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })
+
   return (
-    <div className="inline-flex shrink-0 gap-1 rounded-lg border border-slate-200 p-1 dark:border-slate-700">
-      {opcion(false, 'Sin deuda', 'check_circle', 'bg-green-50 text-green-700 ring-1 ring-green-500 dark:bg-green-500/10 dark:text-green-300')}
-      {opcion(true, 'Con deuda', 'payments', 'bg-amber-50 text-amber-700 ring-1 ring-amber-500 dark:bg-amber-500/10 dark:text-amber-300')}
+    <div className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50/60 p-4 dark:border-red-500/30 dark:bg-red-500/5">
+      <div className="flex items-start gap-2">
+        <Icon name="mail" className="mt-0.5 text-red-600 dark:text-red-300" />
+        <div>
+          <p className="text-sm font-semibold text-red-800 dark:text-red-200">Avisar la deuda por correo</p>
+          <p className="text-xs text-red-800/80 dark:text-red-200/80">Se informa que tiene deuda en la concesión, sin indicar montos. Llega al email cargado de cada titular.</p>
+        </div>
+      </div>
+
+      <ul className="flex flex-col gap-1 text-sm">
+        {titulares.map((t) => (
+          <li key={t.personaId} className="flex flex-wrap items-center gap-x-2">
+            <span className="font-medium">{nombre(t)}</span>
+            {t.email ? <span className="text-slate-600 dark:text-slate-300">→ {t.email}</span> : <span className="text-amber-700 dark:text-amber-300">sin email cargado: no se le puede avisar</span>}
+          </li>
+        ))}
+      </ul>
+
+      <input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Agregar al correo (opcional): horario de atención, dónde acercarse…" className={controlClass({ className: 'py-2' })} />
+
+      {resultado && (
+        <Alert tone="info">
+          {resultado.enviados.map((e) => (
+            <span key={e.id} className="block">
+              {e.estado === 'ENVIADO'
+                ? `Enviado a ${e.titular} (${e.para.join(', ')}).`
+                : e.estado === 'NO_ENVIADO_PRUEBA'
+                  ? `Registrado para ${e.titular} (${e.para.join(', ')}), pero NO salió: el servidor de correo no está configurado.`
+                  : `No se pudo enviar a ${e.titular}: ${e.error ?? 'error del servidor de correo'}.`}
+            </span>
+          ))}
+          {resultado.sinCorreo.length > 0 && <span className="block">Sin email cargado: {resultado.sinCorreo.join(', ')}.</span>}
+        </Alert>
+      )}
+      {notificar.error && <Alert>{mensajeDeError(notificar.error)}</Alert>}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button size="sm" variant="secondary" iconLeft="send" loading={notificar.isPending} disabled={!titulares.some((t) => t.email)} onClick={() => notificar.mutate(nota.trim() || undefined)}>
+          {avisos.length ? 'Enviar el aviso de nuevo' : 'Enviar aviso de deuda'}
+        </Button>
+        {avisos[0] && (
+          <span className="text-xs text-slate-600 dark:text-slate-400">
+            Último aviso: {fecha(avisos[0].fecha)} a {avisos[0].para.join(', ')}
+            {avisos[0].estado !== 'ENVIADO' && ' (no salió)'} · {avisos.length} en total
+          </span>
+        )}
+      </div>
     </div>
   )
 }
 
 /**
- * Recaudación: las concesiones otorgadas de los titulares del alta (tener otra concesión solo se
- * informa) y, por cada una, si tiene deuda. La deuda queda ligada a la concesión y a todos sus
- * titulares. Ninguna con deuda: pasa a Distrito. Alguna: el expediente queda en espera; mientras
- * espera se puede volver a responder (ej: marcar que ya no tiene deuda) y entonces sigue.
+ * Recaudación: el sistema informa si los titulares tienen otras concesiones otorgadas, para
+ * verificar si alguna tiene deuda. Se decide:
+ *   - Apto: no tiene deuda → pasa a Distrito.
+ *   - No apto: tiene deuda → se marca en qué concesión y el motivo; el expediente queda en espera
+ *     en Recaudación. Cuando paga, se vuelve a entrar y se marca Apto: se levanta la deuda y sigue.
+ * La deuda queda ligada a la concesión y a todos sus titulares (la ven sus otros trámites).
  */
 function AccionRecaudacion({ alta, enEspera }: { alta: AltaBackend; enEspera: boolean }) {
   const antecedentes = useAntecedentesDeuda(alta.id)
-  /** Lo que cambió el usuario; lo demás queda como está registrado. */
-  const [cambios, setCambios] = useState<Record<string, boolean>>({})
+  const [decision, setDecision] = useState<DecisionDeuda | ''>(enEspera ? 'NO_APTO' : '')
+  /** Concesiones marcadas con deuda (solo con «No apto»); si no se tocan, las ya registradas. */
+  const [marcadas, setMarcadas] = useState<Record<string, boolean>>({})
   const [observaciones, setObservaciones] = useState('')
   const accion = useAccionAlta(alta.id, altaConcesionApi.recaudacion)
   const cancelar = useCancelarDeuda(alta.id)
@@ -105,63 +151,93 @@ function AccionRecaudacion({ alta, enEspera }: { alta: AltaBackend; enEspera: bo
   if (antecedentes.isError) return <Alert>No se pudieron consultar las concesiones de los titulares: {mensajeDeError(antecedentes.error)}</Alert>
 
   const { titulares, concesiones, otrasDeudas } = antecedentes.data
-  const respuesta = (c: (typeof concesiones)[number]) => cambios[c.id] ?? c.tieneDeuda
-  const conDeuda = concesiones.filter(respuesta).length
+  const tieneDeuda = (c: (typeof concesiones)[number]) => decision === 'NO_APTO' && (marcadas[c.id] ?? c.tieneDeuda)
+  const conDeuda = concesiones.filter(tieneDeuda)
   const nombreDe = (personaId: string) => titulares.find((t) => t.personaId === personaId)?.nombre ?? personaId
-  const quedaEnEspera = conDeuda > 0 || otrasDeudas.length > 0
+  const siguiente = 'Distrito'
+
+  // Lo mismo que valida el backend (validarDecisionDeuda), para avisar antes de mandar.
+  const falta =
+    decision === 'APTO' && otrasDeudas.length
+      ? 'Quedan deudas registradas sin cancelar: registre el pago antes de marcar «Apto».'
+      : decision === 'NO_APTO' && !conDeuda.length && !otrasDeudas.length
+        ? concesiones.length
+          ? 'Marque en qué concesión está la deuda.'
+          : 'Los titulares no tienen otras concesiones ni deudas registradas: no hay deuda para marcar «No apto».'
+        : decision === 'NO_APTO' && !observaciones.trim()
+          ? 'Indique el motivo del «No apto» (qué se adeuda).'
+          : null
 
   function enviar() {
+    if (!decision || falta) return
     accion.mutate({
-      concesiones: concesiones.map((c) => ({ concesionId: c.id, tieneDeuda: respuesta(c) })),
-      observaciones: observaciones || undefined,
+      resultado: decision,
+      concesiones: concesiones.map((c) => ({ concesionId: c.id, tieneDeuda: tieneDeuda(c) })),
+      observaciones: observaciones.trim() || undefined,
     })
   }
 
   return (
     <div className="flex flex-col gap-4">
       {enEspera && (
-        <Alert tone="info">
-          El expediente está en espera por deuda. Cuando ya no la tenga, marque la concesión «Sin deuda» y confirme: el expediente se reanuda y pasa a Distrito.
-        </Alert>
+        <>
+          <Alert tone="info">El expediente está en espera por deuda. Cuando el titular pague, marque «Apto»: se levanta la deuda y pasa a {siguiente}.</Alert>
+          <AvisoDeudaPorEmail alta={alta} deudores={[...new Set([...concesiones.filter((c) => c.tieneDeuda).flatMap((c) => c.deTitulares), ...otrasDeudas.map((d) => d.personaId)])]} />
+        </>
       )}
 
       <div>
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          Se verifica si los titulares del alta tienen otras concesiones otorgadas y si alguna tiene deuda. La deuda queda ligada a la concesión y a todos sus
-          titulares.
-        </p>
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">¿Los titulares tienen deudas en otras concesiones?</p>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Titulares del alta: {titulares.map((t) => t.nombre).join(' · ') || 'sin titulares cargados'}</p>
       </div>
 
+      {/* Lo que informa el sistema: las otras concesiones otorgadas de los titulares. */}
       {concesiones.length === 0 ? (
         <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-200">
           <Icon name="check_circle" filled />
-          Los titulares no tienen otras concesiones otorgadas: no hay deudas de concesiones que verificar.
+          Los titulares no tienen otras concesiones otorgadas en el sistema.
         </div>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {concesiones.map((c) => (
-            <li key={c.id} className={cn('flex flex-wrap items-center gap-3 rounded-lg border p-3', respuesta(c) ? 'border-amber-300 bg-amber-50/50 dark:border-amber-500/40 dark:bg-amber-500/5' : 'border-slate-200 dark:border-slate-700')}>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                  Concesión {c.numero ? `N° ${c.numero}` : `id ${c.id}`}
-                  {(c.localidad || c.departamento) && <span className="font-normal text-slate-500 dark:text-slate-400"> · {[c.localidad, c.departamento].filter(Boolean).join(', ')}</span>}
-                </p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Titulares:{' '}
-                  {c.titulares.map((t, i) => (
-                    <span key={t.personaId}>
-                      {i > 0 && ' · '}
-                      <span className={c.deTitulares.includes(t.personaId) ? 'font-semibold text-slate-700 dark:text-slate-200' : undefined}>{t.nombre}</span>
-                    </span>
-                  ))}
-                </p>
-                <p className="text-xs text-slate-400">De {c.deTitulares.map(nombreDe).join(' y ')}, titular del alta.</p>
-              </div>
-              <SiNoDeuda valor={respuesta(c)} onChange={(v) => setCambios({ ...cambios, [c.id]: v })} concesion={c.numero ?? c.id} />
-            </li>
-          ))}
-        </ul>
+        <div className="flex flex-col gap-2">
+          <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
+            {concesiones.length === 1 ? 'Tiene otra concesión' : `Tienen ${concesiones.length} concesiones más`}
+          </p>
+          <ul className="flex flex-col gap-2">
+            {concesiones.map((c) => (
+              <li
+                key={c.id}
+                className={cn(
+                  'flex flex-wrap items-center gap-3 rounded-lg border p-3',
+                  tieneDeuda(c) ? 'border-red-300 bg-red-50/50 dark:border-red-500/40 dark:bg-red-500/5' : 'border-slate-200 dark:border-slate-700',
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                    Concesión {c.numero ? `N° ${c.numero}` : `id ${c.id}`}
+                    {(c.localidad || c.departamento) && <span className="font-normal text-slate-500 dark:text-slate-400"> · {[c.localidad, c.departamento].filter(Boolean).join(', ')}</span>}
+                    {c.tieneDeuda && <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">Deuda registrada</span>}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Titulares:{' '}
+                    {c.titulares.map((t, i) => (
+                      <span key={t.personaId}>
+                        {i > 0 && ' · '}
+                        <span className={c.deTitulares.includes(t.personaId) ? 'font-semibold text-slate-700 dark:text-slate-200' : undefined}>{t.nombre}</span>
+                      </span>
+                    ))}
+                  </p>
+                  <p className="text-xs text-slate-400">De {c.deTitulares.map(nombreDe).join(' y ')}, titular del alta.</p>
+                </div>
+                {decision === 'NO_APTO' && (
+                  <label className="flex shrink-0 items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
+                    <input type="checkbox" className="size-4 accent-red-600" checked={tieneDeuda(c)} onChange={(e) => setMarcadas({ ...marcadas, [c.id]: e.target.checked })} />
+                    Tiene deuda
+                  </label>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {otrasDeudas.length > 0 && (
@@ -187,17 +263,45 @@ function AccionRecaudacion({ alta, enEspera }: { alta: AltaBackend; enEspera: bo
         </div>
       )}
 
-      <Observaciones valor={observaciones} onChange={setObservaciones} />
-      {quedaEnEspera && (
-        <p className="text-xs text-amber-800 dark:text-amber-300">
-          {conDeuda > 0 ? `${conDeuda === 1 ? 'Una concesión tiene' : `${conDeuda} concesiones tienen`} deuda` : 'Quedan deudas registradas'}: el expediente queda en espera en
-          Recaudación hasta que se levante.
-        </p>
+      <Opciones
+        valor={decision}
+        onChange={(d) => {
+          // El motivo de un «No apto» no tiene que viajar con un «Apto» (y al revés).
+          if (d !== decision) setObservaciones('')
+          setDecision(d)
+        }}
+        opciones={[
+          { valor: 'APTO', texto: 'Apto (sin deuda)', icono: 'check_circle', color: 'border-green-500 bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300' },
+          { valor: 'NO_APTO', texto: 'No apto (tiene deuda)', icono: 'block', color: 'border-red-500 bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300' },
+        ]}
+      />
+
+      {decision && (
+        <>
+          <Observaciones
+            valor={observaciones}
+            onChange={setObservaciones}
+            obligatorio={decision === 'NO_APTO'}
+            placeholder={decision === 'NO_APTO' ? 'Qué se adeuda (ej: canon de riego 2025 de la concesión 906)' : undefined}
+          />
+          <p className={cn('text-xs', decision === 'APTO' ? 'text-slate-500 dark:text-slate-400' : 'text-amber-800 dark:text-amber-300')}>
+            {decision === 'APTO'
+              ? `Pasa a ${siguiente}.${enEspera ? ' Se levantan las deudas marcadas antes.' : ''}`
+              : 'El expediente queda en espera en Recaudación hasta que pague. La deuda queda registrada en la concesión.'}
+          </p>
+        </>
       )}
+      {falta && <p className="text-xs font-medium text-red-600 dark:text-red-400">{falta}</p>}
       {accion.error && <Alert>{mensajeDeError(accion.error)}</Alert>}
       <div>
-        <Button iconRight={quedaEnEspera ? 'pause_circle' : 'send'} loading={accion.isPending} onClick={enviar}>
-          {quedaEnEspera ? (enEspera ? 'Guardar: sigue en espera' : 'Registrar deuda y dejar en espera') : 'Sin deuda: pasar a Distrito'}
+        <Button
+          iconRight={decision === 'NO_APTO' ? 'pause_circle' : 'send'}
+          variant={decision === 'NO_APTO' ? 'secondary' : 'primary'}
+          loading={accion.isPending}
+          disabled={!decision || !!falta || accion.isPending}
+          onClick={enviar}
+        >
+          {decision === 'NO_APTO' ? (enEspera ? 'Guardar: sigue en espera' : 'No apto: dejar en espera') : `Apto: pasar a ${siguiente}`}
         </Button>
       </div>
     </div>
@@ -387,7 +491,8 @@ function AccionPadron({ alta }: { alta: AltaBackend }) {
  */
 export function AccionesOficina({ alta }: { alta: AltaBackend }) {
   const navigate = useNavigate()
-  const usuarioId = useUsuarioActualId()
+  const actor = useActor()
+  const usuarioId = actor.id
   const tomar = useTomar(alta.id)
   const { circuito } = alta
 
@@ -416,6 +521,9 @@ export function AccionesOficina({ alta }: { alta: AltaBackend }) {
     )
   }
 
+  // Quien no es de la oficina donde está el expediente, lo consulta sin actuar.
+  if (!actor.puedeActuarEn(circuito.oficinaActual)) return <AvisoSoloConsulta oficina={circuito.oficinaNombre} />
+
   // Paso 1: tomar el expediente.
   if (!circuito.tomadoPor) {
     return (
@@ -433,7 +541,7 @@ export function AccionesOficina({ alta }: { alta: AltaBackend }) {
     )
   }
   // Lo tiene otra persona (el administrador «Sistema» puede actuar igual: lo controla el backend).
-  if (circuito.tomadoPor.id !== usuarioId && usuarioId !== '1') {
+  if (circuito.tomadoPor.id !== usuarioId && !actor.esAdministrador) {
     return (
       <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
         <Icon name="person" className="text-[18px]!" />

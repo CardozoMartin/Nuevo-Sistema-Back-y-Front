@@ -5,16 +5,7 @@
 // El backend valida todo (etapa, oficina, que el expediente esté tomado, duplicados…) y
 // devuelve el mensaje de error listo para mostrar.
 import { backend } from '@/services/api/backend'
-import type {
-  AltaBackend,
-  AntecedentesDeuda,
-  DeudaBackend,
-  DisponibilidadExpediente,
-  EntradaHistorial,
-  ExpedienteEnBandeja,
-  OficinaBackend,
-  SituacionLegalBackend,
-} from './backend.types'
+import type { AltaBackend, AntecedentesDeuda, DeudaBackend, DisponibilidadExpediente, EmailExpediente, EntradaHistorial, ExpedienteEnBandeja, OficinaBackend, ResultadoAvisoDeuda, SituacionLegalBackend } from './backend.types'
 
 const ALTA = '/tramites/alta-concesion'
 
@@ -51,7 +42,8 @@ export const altaConcesionApi = {
   /** Concesiones otorgadas de los titulares y si tienen deuda (lo que verifica Recaudación). */
   antecedentesDeuda: (id: string) => datos(backend.get<AntecedentesDeuda>(`${ALTA}/${id}/recaudacion`)),
   /** Por cada concesión otorgada de los titulares, si tiene deuda. Ninguna: pasa a Distrito; alguna: queda en espera. */
-  recaudacion: (id: string, dto: { concesiones: { concesionId: string; tieneDeuda: boolean }[]; observaciones?: string }) =>
+  /** Apto: pasa a la oficina siguiente. No apto: queda en espera en Recaudación (con la concesión que debe marcada). */
+  recaudacion: (id: string, dto: { resultado: 'APTO' | 'NO_APTO'; concesiones: { concesionId: string; tieneDeuda: boolean }[]; observaciones?: string }) =>
     datos(backend.post<AltaBackend>(`${ALTA}/${id}/recaudacion`, dto)),
   dictaminar: (id: string, oficina: 'distrito' | 'juridico', dto: { resultado: ResultadoDictamen; observaciones?: string }) =>
     datos(backend.post<AltaBackend>(`${ALTA}/${id}/${oficina}`, dto)),
@@ -64,6 +56,9 @@ export const altaConcesionApi = {
   // --- Expediente (común a todos los trámites) ---------------------------------------
   tomar: (id: string) => datos(backend.post(`/expedientes/${id}/tomar`)),
   historial: (id: string) => datos(backend.get<EntradaHistorial[]>(`/expedientes/${id}/historial`)),
+  emails: (id: string) => datos(backend.get<EmailExpediente[]>(`/expedientes/${id}/emails`)),
+  /** Recaudación: un correo a cada titular con deuda (solo informa en qué concesión, sin montos). */
+  notificarDeuda: (id: string, observaciones?: string) => datos(backend.post<ResultadoAvisoDeuda>(`${ALTA}/${id}/recaudacion/notificar-deuda`, { observaciones })),
   bandeja: (oficina: OficinaBackend) => datos(backend.get<ExpedienteEnBandeja[]>(`/expedientes/bandeja/${oficina}`)),
 
   // --- Deudas (Recaudación) -----------------------------------------------------------

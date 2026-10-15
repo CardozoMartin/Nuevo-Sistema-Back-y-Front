@@ -1,6 +1,6 @@
 // Pruebas de las reglas del circuito y del texto del aviso de deuda (sin base: npm test).
 import { armarAvisoDeuda } from '../aviso-deuda.js';
-import { destinoTrasVerificarDeuda, exigirFechaDelAnio, exigirMotivoSiNoEsApto, normalizarNumerosConcesion, personasSinVerificar, respuestasDeDeuda } from './circuito.validaciones.js';
+import { destinoTrasVerificarDeuda, exigirFechaDelAnio, exigirMotivoSiNoEsApto, normalizarNumerosConcesion, personasSinVerificar, respuestasDeDeuda, validarDecisionDeuda } from './circuito.validaciones.js';
 
 describe('Distrito y Jurídico', () => {
   it('observado y no apto llevan motivo; apto no', () => {
@@ -34,26 +34,22 @@ describe('Catastro: números de concesión del libro', () => {
 describe('Aviso de deuda por correo', () => {
   const base = { expediente: '123/332-2026', tramite: 'Alta de concesión', titular: 'Medina, Juan Carlos' };
 
-  it('lista cada deuda con su monto y el total', () => {
+  it('arma el aviso sin montos: solo en qué concesión hay deuda', () => {
     const { asunto, cuerpo } = armarAvisoDeuda({
       ...base,
-      deudas: [
-        { detalle: 'Canon de riego 2025', monto: 125000 },
-        { detalle: 'Canon de riego 2024', monto: 50000.5 },
-      ],
+      deudas: [{ detalle: 'Deuda de la concesión N° 906' }, { detalle: 'Deuda de la concesión N° 906' }, { detalle: 'Deuda de la concesión N° 1204' }],
     });
-    expect(asunto).toBe('Deuda pendiente — expediente 123/332-2026');
+    expect(asunto).toBe('Aviso de deuda — expediente 123/332-2026');
     expect(cuerpo).toContain('Estimado/a Medina, Juan Carlos:');
     expect(cuerpo).toContain('trámite «Alta de concesión» del expediente 123/332-2026');
-    expect(cuerpo).toMatch(/Canon de riego 2025: \$\s?125\.000,00/);
-    expect(cuerpo).toMatch(/Total: \$\s?175\.000,50/);
+    expect(cuerpo).toContain('  - Deuda de la concesión N° 906\n  - Deuda de la concesión N° 1204\n');
+    expect(cuerpo).toContain('acérquese a la Oficina de Recaudación');
+    expect(cuerpo).not.toMatch(/\$|Total|monto/i);
   });
 
-  it('sin monto no muestra importe ni total, y suma lo que agregó Recaudación', () => {
-    const { cuerpo } = armarAvisoDeuda({ ...base, deudas: [{ detalle: 'Tasa al uso del agua', monto: null }], observaciones: 'Puede pagar en Brígido Terán 636.' });
-    expect(cuerpo).toContain('  - Tasa al uso del agua\n');
-    expect(cuerpo).not.toContain('Total');
-    expect(cuerpo).toContain('Puede pagar en Brígido Terán 636.');
+  it('agrega lo que escribió Recaudación', () => {
+    const { cuerpo } = armarAvisoDeuda({ ...base, deudas: [{ detalle: 'Deuda de la concesión N° 906' }], observaciones: 'Atención de 8 a 13 h.' });
+    expect(cuerpo).toContain('Atención de 8 a 13 h.');
   });
 });
 
@@ -105,5 +101,41 @@ describe('Recaudación: deuda de las concesiones de los titulares', () => {
         { concesionId: '10', tieneDeuda: true },
       ]),
     ).toThrow('más de una vez');
+  });
+});
+
+describe('Recaudación: Apto / No apto', () => {
+  const concesiones = [
+    { id: '10', numero: '906' },
+    { id: '11', numero: null },
+  ];
+  const sinDeuda = new Map([
+    ['10', false],
+    ['11', false],
+  ]);
+  const conDeuda = new Map([
+    ['10', true],
+    ['11', false],
+  ]);
+
+  it('Apto sin deudas pasa', () => {
+    expect(() => validarDecisionDeuda('APTO', concesiones, sinDeuda, [], undefined)).not.toThrow();
+    expect(() => validarDecisionDeuda('APTO', [], new Map(), [], undefined)).not.toThrow();
+  });
+
+  it('Apto con una concesión marcada con deuda: corresponde No apto', () => {
+    expect(() => validarDecisionDeuda('APTO', concesiones, conDeuda, [], undefined)).toThrow('Marcó deuda en la concesión N° 906: corresponde «No apto».');
+  });
+
+  it('Apto con deudas anteriores sin cancelar', () => {
+    expect(() => validarDecisionDeuda('APTO', concesiones, sinDeuda, [{ detalle: 'Canon 2024' }], undefined)).toThrow(/registre el pago antes de marcar «Apto»/);
+  });
+
+  it('No apto exige la concesión con deuda y el motivo', () => {
+    expect(() => validarDecisionDeuda('NO_APTO', concesiones, sinDeuda, [], 'Debe canon')).toThrow('Para «No apto», marque en qué concesión está la deuda.');
+    expect(() => validarDecisionDeuda('NO_APTO', [], new Map(), [], 'Debe canon')).toThrow(/no hay deuda para marcar «No apto»/);
+    expect(() => validarDecisionDeuda('NO_APTO', concesiones, conDeuda, [], '  ')).toThrow('Indique el motivo del «No apto» (qué se adeuda).');
+    expect(() => validarDecisionDeuda('NO_APTO', concesiones, conDeuda, [], 'Canon 2025 impago')).not.toThrow();
+    expect(() => validarDecisionDeuda('NO_APTO', [], new Map(), [{ detalle: 'Canon 2024' }], 'Deuda anterior')).not.toThrow();
   });
 });

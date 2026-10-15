@@ -1,4 +1,5 @@
 // Texto del correo con que Recaudación avisa la deuda a un titular. Función pura (se prueba sola).
+// Solo informa en qué concesión hay deuda: NO lleva montos (el detalle se ve en Recaudación).
 
 export interface DatosAvisoDeuda {
   /** «123/332-2026». */
@@ -7,35 +8,27 @@ export interface DatosAvisoDeuda {
   tramite: string;
   /** Nombre del titular («Medina, Juan Carlos» o la razón social). */
   titular: string;
-  deudas: { detalle: string; monto: number | null }[];
-  /** Lo que agregó Recaudación (ej: dónde y cómo pagar). */
+  /** Una por deuda (ej: «Deuda de la concesión N° 906»). */
+  deudas: { detalle: string }[];
+  /** Lo que agregó Recaudación (ej: horario de atención). */
   observaciones?: string;
 }
 
-const pesos = (monto: number) => monto.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' });
-
 export function armarAvisoDeuda(d: DatosAvisoDeuda): { asunto: string; cuerpo: string } {
-  //1.- Una línea por deuda, con el monto si se conoce.
-  const lineas = d.deudas.map((deuda) => `  - ${deuda.detalle}${deuda.monto === null ? '' : `: ${pesos(deuda.monto)}`}`);
-
-  //2.- El total, si todas las deudas tienen monto.
-  const conMonto = d.deudas.filter((deuda) => deuda.monto !== null);
-  const total = conMonto.length === d.deudas.length && d.deudas.length > 1 ? `\nTotal: ${pesos(conMonto.reduce((s, deuda) => s + deuda.monto!, 0))}\n` : '';
-
-  //3.- El texto completo.
+  const lineas = [...new Set(d.deudas.map((deuda) => deuda.detalle))].map((detalle) => `  - ${detalle}`);
   const cuerpo = [
     `Estimado/a ${d.titular}:`,
     '',
-    `Le informamos que el trámite «${d.tramite}» del expediente ${d.expediente} se encuentra en espera en la Oficina de Recaudación de la Dirección de Recursos Hídricos, porque se registra la siguiente deuda a su nombre:`,
+    `Le informamos que el trámite «${d.tramite}» del expediente ${d.expediente} se encuentra en espera en la Oficina de Recaudación de la Dirección de Recursos Hídricos, porque se registra deuda a su nombre en:`,
     '',
     ...lineas,
-    total,
-    'El trámite continuará cuando la deuda esté regularizada.',
+    '',
+    'Para conocer el detalle y regularizarla, acérquese a la Oficina de Recaudación. El trámite continuará cuando la deuda esté regularizada.',
     ...(d.observaciones ? ['', d.observaciones] : []),
     '',
     'Dirección de Recursos Hídricos de Tucumán — Av. Brígido Terán 636, San Miguel de Tucumán.',
     'Este correo se envió automáticamente: no lo responda.',
   ].join('\n');
 
-  return { asunto: `Deuda pendiente — expediente ${d.expediente}`, cuerpo };
+  return { asunto: `Aviso de deuda — expediente ${d.expediente}`, cuerpo };
 }

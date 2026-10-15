@@ -12,6 +12,7 @@ export const altaKeys = {
   situaciones: () => [...altaKeys.all, 'situaciones-legales'] as const,
   alta: (id: string) => [...altaKeys.all, 'alta', id] as const,
   historial: (id: string) => [...altaKeys.all, 'historial', id] as const,
+  emails: (id: string) => [...altaKeys.all, 'emails', id] as const,
   bandejas: () => [...altaKeys.all, 'bandeja'] as const,
   bandeja: (oficina: OficinaBackend) => [...altaKeys.bandejas(), oficina] as const,
   deudas: (personaId: string) => [...altaKeys.all, 'deudas', personaId] as const,
@@ -116,6 +117,23 @@ export function useCancelarDeuda(id: string) {
     onSuccess: () => {
       alActualizar()
       void qc.invalidateQueries({ queryKey: [...altaKeys.all, 'deudas'] })
+    },
+  })
+}
+
+/** Correos que se mandaron por el expediente (avisos de deuda, etc.). */
+export function useEmails(id: string) {
+  return useQuery({ queryKey: altaKeys.emails(id), queryFn: () => altaConcesionApi.emails(id) })
+}
+
+/** Recaudación avisa la deuda por correo a los titulares: queda en el historial y en la lista de correos. */
+export function useNotificarDeuda(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (observaciones?: string) => altaConcesionApi.notificarDeuda(id, observaciones),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: altaKeys.emails(id) })
+      void qc.invalidateQueries({ queryKey: altaKeys.historial(id) })
     },
   })
 }

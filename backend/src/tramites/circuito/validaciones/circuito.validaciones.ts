@@ -75,3 +75,35 @@ export function respuestasDeDeuda(concesiones: { id: string; numero: string | nu
   if (faltan.length) throw new BadRequestException(`Indique si tienen deuda las concesiones ${faltan.map((c) => (c.numero ? `N° ${c.numero}` : `id ${c.id}`)).join(', ')}.`);
   return porId;
 }
+
+/**
+ * Recaudación: que la decisión (Apto / No apto) sea coherente con lo marcado.
+ *   - Apto: ninguna concesión marcada con deuda y ninguna otra deuda pendiente que no se levante.
+ *   - No apto: alguna concesión marcada con deuda (o una deuda anterior pendiente) y el motivo.
+ * `otrasPendientes`: deudas de los titulares que NO se levantan con esta respuesta (sin concesión).
+ */
+export function validarDecisionDeuda(
+  resultado: 'APTO' | 'NO_APTO',
+  concesiones: { id: string; numero: string | null }[],
+  respuestas: Map<string, boolean>,
+  otrasPendientes: { detalle: string }[],
+  observaciones: string | undefined,
+): void {
+  const nombre = (c: { id: string; numero: string | null }) => (c.numero ? `N° ${c.numero}` : `id ${c.id}`);
+  const conDeuda = concesiones.filter((c) => respuestas.get(c.id));
+  if (resultado === 'APTO') {
+    if (conDeuda.length) throw new BadRequestException(`Marcó deuda en la concesión ${conDeuda.map(nombre).join(', ')}: corresponde «No apto».`);
+    if (otrasPendientes.length) {
+      throw new BadRequestException(`Quedan deudas registradas sin cancelar (${otrasPendientes.map((d) => d.detalle).join('; ')}): registre el pago antes de marcar «Apto».`);
+    }
+    return;
+  }
+  if (!conDeuda.length && !otrasPendientes.length) {
+    throw new BadRequestException(
+      concesiones.length
+        ? 'Para «No apto», marque en qué concesión está la deuda.'
+        : 'Los titulares no tienen otras concesiones ni deudas registradas: no hay deuda para marcar «No apto».',
+    );
+  }
+  if (!observaciones?.trim()) throw new BadRequestException('Indique el motivo del «No apto» (qué se adeuda).');
+}

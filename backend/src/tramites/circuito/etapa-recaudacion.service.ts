@@ -10,7 +10,7 @@ import { RecaudacionService, type ConcesionConDeuda } from '../../recaudacion/re
 import { armarAvisoDeuda } from './aviso-deuda.js';
 import type { NotificarDeudaDto, VerificacionDeudaDto } from './dto/circuito.dto.js';
 import { RegistroTramitesService } from './registro-tramites.service.js';
-import { destinoTrasVerificarDeuda, respuestasDeDeuda } from './validaciones/circuito.validaciones.js';
+import { destinoTrasVerificarDeuda, respuestasDeDeuda, validarDecisionDeuda } from './validaciones/circuito.validaciones.js';
 
 /** Resultado de notificar la deuda: a quién se mandó y quién no tiene correo. */
 export interface ResultadoAvisoDeuda {
@@ -33,14 +33,14 @@ export interface AntecedentesDeuda {
  *
  *   antecedentes    las concesiones otorgadas de los titulares (tener otra concesión solo se
  *                   informa) y si cada una tiene deuda. Por ahora la deuda es sí / no, sin monto.
- *   verificarDeuda  Recaudación responde, por cada concesión, si tiene deuda. La deuda queda
- *                   ligada a la concesión y a todos sus titulares vigentes.
- *                     - Ninguna con deuda: pasa a Distrito (o, si llegó porque cambiaron los
- *                       titulares al corregir, vuelve a la oficina que había observado).
- *                     - Alguna con deuda: NO se rechaza; el expediente queda EN ESPERA en
- *                       Recaudación, sin plazo. Recaudación puede volver a responder (ej: «ya no
- *                       tiene deuda») o se cancela la deuda (POST /api/deudas/:id/cancelar), y
- *                       entonces se reanuda.
+ *   verificarDeuda  Recaudación decide Apto / No apto y marca, por cada concesión, si tiene
+ *                   deuda (validarDecisionDeuda: tiene que ser coherente). La deuda queda ligada a
+ *                   la concesión y a todos sus titulares vigentes.
+ *                     - Apto: pasa a Distrito (o, si llegó porque cambiaron los titulares al
+ *                       corregir, vuelve a la oficina que había observado).
+ *                     - No apto: NO se rechaza; el expediente queda EN ESPERA en Recaudación, sin
+ *                       plazo. Cuando paga, Recaudación marca Apto (o se cancela la deuda con
+ *                       POST /api/deudas/:id/cancelar) y entonces se reanuda.
  *   notificarDeuda  manda un correo a cada titular con deuda pendiente.
  */
 @Injectable()
@@ -84,6 +84,12 @@ export class EtapaRecaudacionService {
       const personaIds = personas.map((p) => p.id);
       const concesiones = await this.recaudacion.concesionesDe(tx, personaIds, expediente.id);
       const respuestas = respuestasDeDeuda(concesiones, datos.concesiones);
+
+      //2.1.- La decisión (Apto / No apto) tiene que coincidir con lo marcado. Las deudas de estas
+      //      concesiones se levantan o se registran con la respuesta; las demás (sin concesión) no.
+      const antes = await this.recaudacion.pendientesDe(tx, personaIds);
+      const otrasPendientes = antes.filter((d) => !d.concesion || !respuestas.has(d.concesion.id));
+      validarDecisionDeuda(datos.resultado, concesiones, respuestas, otrasPendientes, datos.observaciones);
 
       //3.- Se registra lo respondido: primero las deudas nuevas y después las que se levantan
       //    (así, al cancelar, no se reanuda un expediente que sigue con otra deuda).
@@ -159,7 +165,7 @@ export class EtapaRecaudacionService {
         expediente: numero,
         tramite: expediente.asunto ?? 'su trámite',
         titular,
-        deudas: deudas.map((d) => ({ detalle: d.detalle, monto: d.monto === null ? null : Number(d.monto) })),
+        deudas: deudas.map((d) => ({ detalle: d.detalle })),
         observaciones: datos.observaciones,
       });
       enviados.push({ titular, ...(await this.notificaciones.enviar({ tipo: TipoEmail.AVISO_DEUDA, expediente, para: [persona.email!], asunto, cuerpo, usuario })) });

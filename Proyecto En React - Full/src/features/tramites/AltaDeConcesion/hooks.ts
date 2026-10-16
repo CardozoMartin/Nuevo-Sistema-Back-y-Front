@@ -12,6 +12,8 @@ export const altaKeys = {
   situaciones: () => [...altaKeys.all, 'situaciones-legales'] as const,
   alta: (id: string) => [...altaKeys.all, 'alta', id] as const,
   historial: (id: string) => [...altaKeys.all, 'historial', id] as const,
+  /** Bajo la clave del historial: se refresca cada vez que se refresca el historial. */
+  auditoria: (id: string) => [...altaKeys.historial(id), 'auditoria'] as const,
   emails: (id: string) => [...altaKeys.all, 'emails', id] as const,
   bandejas: () => [...altaKeys.all, 'bandeja'] as const,
   bandeja: (oficina: OficinaBackend) => [...altaKeys.bandejas(), oficina] as const,
@@ -32,6 +34,10 @@ export function useAlta(id: string | undefined) {
 
 export function useHistorial(id: string | undefined) {
   return useQuery({ queryKey: altaKeys.historial(id ?? ''), queryFn: () => altaConcesionApi.historial(id!), enabled: !!id })
+}
+
+export function useAuditoria(id: string | undefined) {
+  return useQuery({ queryKey: altaKeys.auditoria(id ?? ''), queryFn: () => altaConcesionApi.auditoria(id!), enabled: !!id })
 }
 
 /** Bandeja de una oficina; se refresca sola cada 30 s (hasta que haya eventos en vivo del backend). */
@@ -101,6 +107,19 @@ export function useDerivarCarga(id: string, alDerivar: (alta: AltaBackend) => vo
     onSuccess: (alta) => {
       alDerivar(alta)
       alActualizar(alta)
+    },
+  })
+}
+
+/** Tomar desde la bandeja (el expediente que se toma va en la llamada). */
+export function useTomarDeBandeja() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => altaConcesionApi.tomar(id),
+    onSuccess: (_r, id) => {
+      void qc.invalidateQueries({ queryKey: altaKeys.alta(id) })
+      void qc.invalidateQueries({ queryKey: altaKeys.historial(id) })
+      void qc.invalidateQueries({ queryKey: altaKeys.bandejas() })
     },
   })
 }

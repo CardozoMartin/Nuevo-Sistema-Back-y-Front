@@ -143,7 +143,7 @@ function CargaDatos({ alta }: { alta: AltaBackend }) {
       titulo: `Expediente ${alta.numeroExpediente} enviado a ${derivada.circuito.oficinaNombre}`,
       detalle: 'Queda registrado en su historial. Catastro vuelve a tenerlo si lo observan o para el cierre.',
     })
-    navigate(ROUTES.catastro.busqueda, { replace: true })
+    navigate(ROUTES.busqueda, { replace: true })
   })
 
   const ultima = SECCIONES.length - 1
@@ -161,8 +161,10 @@ function CargaDatos({ alta }: { alta: AltaBackend }) {
   const ocupado = guardar.isPending || derivar.isPending
   const errorMutacion = guardar.error ?? derivar.error
 
-  // Si volvió observado: lo que pidió corregir la oficina (última observación del historial).
-  const observacion = etapa === 'CORRECCION' ? historial.data?.filter((h) => h.tipo === 'ACTUACION' && h.resultado === 'OBSERVADO').at(-1) : undefined
+  // Si volvió observado: lo que pidió corregir la oficina (la última devolución del historial; las
+  // actuaciones de otras oficinas vienen reservadas, la devolución la ve Catastro porque la recibe).
+  const devolucion = etapa === 'CORRECCION' ? historial.data?.filter((h) => h.tipo === 'PASE' && h.esDevolucion).at(-1) : undefined
+  const observacion = devolucion?.tipo === 'PASE' ? devolucion : undefined
 
   function irA(indice: number) {
     setActual(indice)
@@ -211,7 +213,7 @@ function CargaDatos({ alta }: { alta: AltaBackend }) {
   }
 
   const textoTerminar = etapa === 'CARGA' ? 'Enviar a Recaudación' : etapa === 'CORRECCION' ? 'Reenviar' : 'Guardar y volver al expediente'
-  const destino = etapa === 'CORRECCION' ? (observacion?.tipo === 'ACTUACION' ? observacion.oficina : 'la oficina que lo observó') : 'Recaudación'
+  const destino = etapa === 'CORRECCION' ? (observacion?.oficinaOrigen ?? 'la oficina que lo observó') : 'Recaudación'
 
   return (
     <FormProvider {...form}>
@@ -220,10 +222,10 @@ function CargaDatos({ alta }: { alta: AltaBackend }) {
       <div className="flex flex-col gap-6">
         <ResumenBorrador alta={alta} />
 
-        {observacion?.tipo === 'ACTUACION' && (
+        {observacion && (
           <Alert>
             <p className="font-semibold">
-              {observacion.oficina} observó el expediente ({observacion.usuario}):
+              {observacion.oficinaOrigen} observó el expediente ({observacion.enviadoPor}):
             </p>
             <p>{observacion.observaciones}</p>
           </Alert>

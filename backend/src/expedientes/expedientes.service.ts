@@ -5,6 +5,7 @@ import { hoyISO } from '../comun/validadores/fechas.js';
 import { nombreUsuario, type Usuario } from '../seguridad/entities/usuario.entity.js';
 import { UsuariosService } from '../seguridad/usuarios.service.js';
 import { Actuacion } from './entities/actuacion.entity.js';
+import { AccionAuditoria, Auditoria } from './entities/auditoria.entity.js';
 import { Expediente } from './entities/expediente.entity.js';
 import { Movimiento } from './entities/movimiento.entity.js';
 import type { BuscarExpedientesQuery } from './dto/buscar-expedientes.query.js';
@@ -48,6 +49,36 @@ export interface PaseInput {
   esDevolucion?: boolean;
 }
 
+interface UsuarioAuditado {
+  id: string;
+  /** «Apellido, Nombre». */
+  nombre: string;
+  legajo: string;
+}
+
+/** Un paso del expediente por una oficina (auditoría). */
+interface PasoPorOficina {
+  oficina: string;
+  /** Última etapa en la que estuvo en esa oficina. */
+  etapa: string;
+  llego: Date;
+  /** Quién lo envió (null: se inició en esta oficina). */
+  enviadoPor: UsuarioAuditado | null;
+  esDevolucion: boolean;
+  tomadoPor: UsuarioAuditado | null;
+  tomadoEn: Date | null;
+  /** Cuándo salió (pase) o se cerró; null si sigue ahí. */
+  salio: Date | null;
+  /** Quién lo pasó o lo cerró. */
+  salidaPor: UsuarioAuditado | null;
+}
+
+/** Quién consulta el historial: los detalles de cada oficina solo los ve esa oficina (y los administradores). */
+export interface VisorHistorial {
+  esAdministrador: boolean;
+  oficina: { codigo: string } | null;
+}
+
 export interface ActuacionInput {
   /** Por defecto, la oficina y la etapa donde está el expediente. */
   oficina?: Oficina;
@@ -67,7 +98,8 @@ export interface ActuacionInput {
  *   tomar       la oficina donde está el expediente lo recibe: queda registrado quién y cuándo.
  *   pasar       lo envía a la etapa siguiente (o lo devuelve): nuevo movimiento.
  *   actuar      deja asentado lo que resolvió la oficina (exp_actuacion).
- *   historial   pases + actuaciones, en orden, con quién hizo cada cosa.
+ *   historial   pases + actuaciones + cambios de estado, en orden, con quién hizo cada cosa.
+ *   auditoria   quién lo inició, quién lo tuvo en cada oficina y quién lo finalizó (exp_auditoria).
  *   bandeja     expedientes que están en una oficina.
  *
  * Las reglas de cada trámite (qué valida cada oficina) están en el módulo del trámite;
@@ -114,6 +146,7 @@ export class ExpedientesService {
    *   1. Valida que el número no esté usado (409 si ya existe).
    *   2. Crea el expediente en su etapa inicial, tomado por quien lo registra.
    *   3. Asienta el movimiento de apertura (sin oficina de origen), ya recibido.
+   *   4. Auditoría: quién lo inició.
    */
   async abrir(tx: EntityManager, input: AbrirExpedienteInput): Promise<Expediente> {
     const numero = String(Number(input.numero));
@@ -169,6 +202,9 @@ export class ExpedientesService {
         recibidoEn: ahora,
       }),
     );
+
+    // Paso 4: auditoría.
+    await this.auditar(tx, expediente, AccionAuditoria.INICIO, input.usuario);
     return expediente;
   }
 
@@ -191,7 +227,7 @@ export class ExpedientesService {
    * La oficina donde está el expediente lo recibe («toma»):
    *   1. Solo un usuario de esa oficina (o un administrador).
    *   2. Si ya lo tiene otro usuario, 409: primero tiene que soltarlo (TODO) o pasarlo.
-   *   3. Queda registrado en el expediente y en la recepción del último pase.
+   *   3. Queda registrado en el expediente, en la recepción del último pase y en la auditoría.
    */
   async tomar(expedienteId: string, usuarioId: string) {
     await this.dataSource.transaction(async (tx) => {
@@ -208,6 +244,7 @@ export class ExpedientesService {
       await tx.update(Expediente, expediente.id, { tomadoPor: { id: usuario.id }, tomadoEn: ahora });
       const ultimo = await tx.findOne(Movimiento, { where: { expediente: { id: expediente.id }, recibidoEn: IsNull() }, order: { fecha: 'DESC', id: 'DESC' } });
       if (ultimo) await tx.update(Movimiento, ultimo.id, { recibidoPor: { id: usuario.id }, recibidoEn: ahora });
+      await this.auditar(tx, expediente, AccionAuditoria.TOMA, usuario);
     });
     return this.resumen(expedienteId);
   }
@@ -272,15 +309,29 @@ export class ExpedientesService {
       tomadoEn: null,
       modificadoUsuarioId: p.usuario.id,
     });
+    await this.auditar(tx, expediente, p.esDevolucion ? AccionAuditoria.DEVOLUCION : AccionAuditoria.PASE, p.usuario, { oficinaDestino: destino, etapa: p.etapa });
   }
 
   /** Cambio de etapa dentro de la misma oficina (ej: Catastro, de verificación final a espera de padrón). */
   async cambiarEtapa(tx: EntityManager, expediente: Expediente, etapa: Etapa, usuario: Usuario): Promise<void> {
     await tx.update(Expediente, expediente.id, { etapa, modificadoUsuarioId: usuario.id });
+    if (etapa !== expediente.etapa) await this.auditar(tx, expediente, AccionAuditoria.CAMBIO_ETAPA, usuario, { etapa });
   }
 
   async cambiarEstado(tx: EntityManager, expediente: Expediente, estado: EstadoExpediente, usuario: Usuario, soltar = false): Promise<void> {
     await tx.update(Expediente, expediente.id, { estado, modificadoUsuarioId: usuario.id, ...(soltar ? { tomadoPor: null, tomadoEn: null } : {}) });
+    if (estado !== expediente.estado) await this.auditar(tx, expediente, AccionAuditoria.CAMBIO_ESTADO, usuario, { estadoAnterior: expediente.estado, estadoNuevo: estado });
+  }
+
+  /** Asienta una fila de auditoría (en la transacción del cambio). Por defecto, la oficina y la etapa actuales. */
+  private async auditar(
+    tx: EntityManager,
+    expediente: Expediente,
+    accion: AccionAuditoria,
+    usuario: Pick<Usuario, 'id'>,
+    extra: Partial<Pick<Auditoria, 'oficinaDestino' | 'etapa' | 'estadoAnterior' | 'estadoNuevo'>> = {},
+  ) {
+    await tx.insert(Auditoria, { expediente: { id: expediente.id }, accion, usuario: { id: usuario.id }, oficina: expediente.oficinaActual, etapa: expediente.etapa, ...extra });
   }
 
   async actuar(tx: EntityManager, expediente: Expediente, a: ActuacionInput): Promise<Actuacion> {
@@ -331,12 +382,20 @@ export class ExpedientesService {
   /**
    * Historial completo: cada pase (quién lo envió, de dónde a dónde, cuándo; quién lo
    * tomó y cuándo) y cada actuación (qué resolvió cada oficina), en orden cronológico.
+   *
+   * Seguimiento: dónde está, quién lo tomó y las fechas los ve cualquiera. Lo que hizo cada
+   * oficina (resultado, observaciones y datos de la actuación) solo lo ve esa oficina; las
+   * observaciones y el dictamen de un pase, la oficina que lo envió y la que lo recibe. Los
+   * administradores ven todo.
    */
-  async historial(expedienteId: string) {
+  async historial(expedienteId: string, visor: VisorHistorial) {
+    const ve = (...oficinas: (Oficina | null)[]) => visor.esAdministrador || (!!visor.oficina && oficinas.includes(visor.oficina.codigo as Oficina));
     if (!(await this.dataSource.manager.existsBy(Expediente, { id: expedienteId }))) throw new NotFoundException('No se encontró el expediente.');
-    const [movimientos, actuaciones] = await Promise.all([
+    const [movimientos, actuaciones, cambiosDeEstado, estados] = await Promise.all([
       this.dataSource.manager.find(Movimiento, { where: { expediente: { id: expedienteId } }, order: { fecha: 'ASC', id: 'ASC' } }),
       this.dataSource.manager.find(Actuacion, { where: { expediente: { id: expedienteId } }, order: { fecha: 'ASC', id: 'ASC' } }),
+      this.dataSource.manager.find(Auditoria, { where: { expediente: { id: expedienteId }, accion: AccionAuditoria.CAMBIO_ESTADO }, order: { fecha: 'ASC', id: 'ASC' } }),
+      this.nombresDeEstados(),
     ]);
 
     const pases = movimientos.map((m) => ({
@@ -348,50 +407,152 @@ export class ExpedientesService {
       enviadoPor: nombreUsuario(m.enviadoPor),
       recibidoPor: m.recibidoPor && nombreUsuario(m.recibidoPor),
       recibidoEn: m.recibidoEn,
-      dictamen: m.dictamen,
       esDevolucion: m.esDevolucion,
-      observaciones: m.observaciones,
+      // La apertura (sin origen) es de la oficina donde empieza.
+      ...(ve(m.oficinaOrigen ?? m.oficinaDestino, m.oficinaDestino)
+        ? { reservado: false, dictamen: m.dictamen, observaciones: m.observaciones }
+        : { reservado: true, dictamen: null, observaciones: null }),
     }));
     const hechos = actuaciones.map((a) => ({
       tipo: 'ACTUACION' as const,
       fecha: a.fecha,
       oficina: NOMBRE_OFICINA[a.oficina],
       etapa: NOMBRE_ETAPA[a.etapa],
-      actuacion: a.tipo,
-      resultado: a.resultado,
       usuario: nombreUsuario(a.usuario),
-      observaciones: a.observaciones,
-      datos: a.datos,
+      ...(ve(a.oficina)
+        ? { reservado: false, actuacion: a.tipo, resultado: a.resultado, observaciones: a.observaciones, datos: a.datos }
+        : { reservado: true, actuacion: null, resultado: null, observaciones: null, datos: null }),
+    }));
+    const estadosCambiados = cambiosDeEstado.map((c) => ({
+      tipo: 'ESTADO' as const,
+      fecha: c.fecha,
+      oficina: NOMBRE_OFICINA[c.oficina],
+      estado: c.estadoNuevo!,
+      estadoNombre: estados.get(c.estadoNuevo!) ?? c.estadoNuevo!,
+      estadoAnteriorNombre: c.estadoAnterior && (estados.get(c.estadoAnterior) ?? c.estadoAnterior),
+      usuario: nombreUsuario(c.usuario),
     }));
     // Lo que se hace en una misma transacción tiene la misma hora (PostgreSQL usa la de inicio
-    // de la transacción): en ese caso va primero la actuación (la decisión) y después el pase.
-    return [...hechos, ...pases].sort((x, y) => x.fecha.getTime() - y.fecha.getTime());
+    // de la transacción): en ese caso va primero la actuación (la decisión), después el cambio
+    // de estado y al final el pase (el sort es estable).
+    return [...hechos, ...estadosCambiados, ...pases].sort((x, y) => x.fecha.getTime() - y.fecha.getTime());
+  }
+
+  /** Nombre de cada estado según el catálogo de la base (cat_estado_expediente). */
+  private async nombresDeEstados(): Promise<Map<string, string>> {
+    const filas: { codigo: string; nombre: string }[] = await this.dataSource.query('SELECT codigo, nombre FROM cat_estado_expediente');
+    return new Map(filas.map((f) => [f.codigo, f.nombre]));
+  }
+
+  /**
+   * Auditoría del expediente (exp_auditoria), de punta a punta:
+   *   iniciado    quién lo registró, dónde y cuándo.
+   *   recorrido   cada paso por una oficina: cuándo llegó y quién lo envió, quién lo tomó y
+   *               cuándo, cuándo salió y quién lo pasó (o quién lo cerró, si terminó ahí).
+   *   finalizado  quién lo cerró (finalizado, rechazado, archivado o anulado), si ya terminó.
+   *   eventos     todas las filas, en orden, para el detalle.
+   */
+  async auditoria(expedienteId: string) {
+    if (!(await this.dataSource.manager.existsBy(Expediente, { id: expedienteId }))) throw new NotFoundException('No se encontró el expediente.');
+    const [filas, estados] = await Promise.all([
+      this.dataSource.manager.find(Auditoria, { where: { expediente: { id: expedienteId } }, order: { fecha: 'ASC', id: 'ASC' } }),
+      this.nombresDeEstados(),
+    ]);
+    const quien = (u: Usuario): UsuarioAuditado => ({ id: u.id, nombre: nombreUsuario(u), legajo: u.legajo });
+    const nombreEstado = (e: EstadoExpediente) => estados.get(e) ?? e;
+
+    const recorrido: PasoPorOficina[] = [];
+    let iniciado: { usuario: UsuarioAuditado; fecha: Date; oficina: string } | null = null;
+    let finalizado: { usuario: UsuarioAuditado; fecha: Date; oficina: string; estado: EstadoExpediente; estadoNombre: string } | null = null;
+
+    for (const f of filas) {
+      const actual = recorrido.at(-1);
+      switch (f.accion) {
+        case AccionAuditoria.INICIO:
+          // Quien lo inicia lo tiene tomado desde el primer momento.
+          iniciado = { usuario: quien(f.usuario), fecha: f.fecha, oficina: NOMBRE_OFICINA[f.oficina] };
+          recorrido.push({ oficina: NOMBRE_OFICINA[f.oficina], etapa: NOMBRE_ETAPA[f.etapa], llego: f.fecha, enviadoPor: null, esDevolucion: false, tomadoPor: quien(f.usuario), tomadoEn: f.fecha, salio: null, salidaPor: null });
+          break;
+        case AccionAuditoria.TOMA:
+          if (actual) Object.assign(actual, { tomadoPor: quien(f.usuario), tomadoEn: f.fecha });
+          break;
+        case AccionAuditoria.PASE:
+        case AccionAuditoria.DEVOLUCION:
+          if (actual) Object.assign(actual, { salio: f.fecha, salidaPor: quien(f.usuario) });
+          recorrido.push({
+            oficina: NOMBRE_OFICINA[f.oficinaDestino!],
+            etapa: NOMBRE_ETAPA[f.etapa],
+            llego: f.fecha,
+            enviadoPor: quien(f.usuario),
+            esDevolucion: f.accion === AccionAuditoria.DEVOLUCION,
+            tomadoPor: null,
+            tomadoEn: null,
+            salio: null,
+            salidaPor: null,
+          });
+          break;
+        case AccionAuditoria.CAMBIO_ESTADO:
+          if (ESTADOS_FINALES.includes(f.estadoNuevo!)) {
+            finalizado = { usuario: quien(f.usuario), fecha: f.fecha, oficina: NOMBRE_OFICINA[f.oficina], estado: f.estadoNuevo!, estadoNombre: nombreEstado(f.estadoNuevo!) };
+            if (actual) Object.assign(actual, { salio: f.fecha, salidaPor: quien(f.usuario) });
+          }
+          break;
+        case AccionAuditoria.CAMBIO_ETAPA:
+          if (actual) actual.etapa = NOMBRE_ETAPA[f.etapa];
+          break;
+      }
+    }
+
+    const eventos = filas.map((f) => ({
+      id: f.id,
+      accion: f.accion,
+      fecha: f.fecha,
+      usuario: quien(f.usuario),
+      oficina: NOMBRE_OFICINA[f.oficina],
+      oficinaDestino: f.oficinaDestino && NOMBRE_OFICINA[f.oficinaDestino],
+      etapa: NOMBRE_ETAPA[f.etapa],
+      estadoAnterior: f.estadoAnterior && nombreEstado(f.estadoAnterior),
+      estadoNuevo: f.estadoNuevo && nombreEstado(f.estadoNuevo),
+    }));
+    return { iniciado, finalizado, recorrido, eventos };
   }
 
   /**
    * Bandeja de una oficina: los expedientes que están en ella y siguen circulando, con su
-   * etapa, quién los tiene y desde cuándo están en la oficina (fecha del último pase).
+   * etapa, quién los tiene, desde cuándo están en la oficina y de qué oficina vinieron (el
+   * último pase; null si se inició ahí).
    */
   async bandeja(oficina: Oficina) {
     const expedientes = await this.dataSource.manager.find(Expediente, {
       where: { oficinaActual: oficina, estado: Not(In(ESTADOS_FINALES)) },
       order: { modificadoEn: 'ASC' },
     });
-    const desde: { expediente_id: string; desde: Date }[] = expedientes.length
-      ? await this.dataSource.query(`SELECT expediente_id, max(fecha) AS desde FROM exp_movimiento WHERE expediente_id = ANY($1) GROUP BY expediente_id`, [expedientes.map((e) => e.id)])
+    const ultimos: { expediente_id: string; fecha: Date; oficina_origen: Oficina | null; es_devolucion: boolean }[] = expedientes.length
+      ? await this.dataSource.query(
+          `SELECT DISTINCT ON (expediente_id) expediente_id, fecha, oficina_origen, es_devolucion FROM exp_movimiento
+           WHERE expediente_id = ANY($1) ORDER BY expediente_id, fecha DESC, id DESC`,
+          [expedientes.map((e) => e.id)],
+        )
       : [];
-    const desdeDe = new Map(desde.map((d) => [String(d.expediente_id), d.desde]));
-    return expedientes.map((e) => ({
-      id: e.id,
-      numero: formatearNumeroExpediente(e.numero, e.reparticion, e.anio),
-      tipoTramite: e.tipoTramite,
-      estado: e.estado,
-      etapa: e.etapa,
-      etapaNombre: NOMBRE_ETAPA[e.etapa],
-      titular: e.solicitanteNombre,
-      tomadoPor: e.tomadoPor && nombreUsuario(e.tomadoPor),
-      enLaOficinaDesde: desdeDe.get(e.id) ?? null,
-    }));
+    const ultimoDe = new Map(ultimos.map((u) => [String(u.expediente_id), u]));
+    return expedientes.map((e) => {
+      const ultimo = ultimoDe.get(e.id);
+      return {
+        id: e.id,
+        numero: formatearNumeroExpediente(e.numero, e.reparticion, e.anio),
+        tipoTramite: e.tipoTramite,
+        estado: e.estado,
+        etapa: e.etapa,
+        etapaNombre: NOMBRE_ETAPA[e.etapa],
+        titular: e.solicitanteNombre,
+        tomadoPor: e.tomadoPor && nombreUsuario(e.tomadoPor),
+        enLaOficinaDesde: ultimo?.fecha ?? null,
+        vieneDe: ultimo?.oficina_origen ?? null,
+        vieneDeNombre: ultimo?.oficina_origen ? NOMBRE_OFICINA[ultimo.oficina_origen] : null,
+        /** Volvió observado (para corregir). */
+        esDevolucion: ultimo?.es_devolucion ?? false,
+      };
+    });
   }
 
   /**

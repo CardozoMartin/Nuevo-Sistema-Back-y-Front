@@ -16,6 +16,7 @@ import { useDominio } from '@/hooks/useDominio'
 import { haceCuanto } from '@/lib/fechas'
 import { cn } from '@/lib/cn'
 import { mensajeDeError } from '@/services/api/errors'
+import { USA_JSON_SERVER } from '@/services/demo/modo'
 import type { Expediente, Oficina } from '@/types/domain'
 import { etapaActual, faltaTomar, pasoSiguiente, recepcionVigente } from '../circuito'
 import { useExpedientes, useRegistrarRevision, useTomarExpediente } from '../hooks'
@@ -29,11 +30,30 @@ interface BandejaOficinaProps {
 }
 
 /**
- * Bandeja de entrada de una oficina: expedientes pendientes que están en ella.
+ * Bandeja de entrada de una oficina. En el modo real muestra solo lo que viene del backend
+ * (children: altas, bajas…); la lista de los trámites viejos lee de json-server y solo se
+ * muestra con json-server (modo demo o `npm run dev:mock`).
+ */
+export function BandejaOficina(props: BandejaOficinaProps) {
+  return USA_JSON_SERVER ? <BandejaJsonServer {...props} /> : <BandejaBackend {...props} />
+}
+
+function BandejaBackend({ oficina, children }: BandejaOficinaProps) {
+  const info = useDominio().oficina(oficina)
+  return (
+    <>
+      <PageHeader title={`Bandeja de ${info?.nombre ?? oficina}`} description={info?.descripcionBandeja} />
+      {children}
+    </>
+  )
+}
+
+/**
+ * Bandeja de los trámites que todavía usan json-server: expedientes pendientes que están en la oficina.
  * Se actualiza sola cuando llega un expediente (evento en vivo) y marca los nuevos.
  * Los trámites con pantalla propia se abren con «Revisar»; el resto se deriva directo.
  */
-export function BandejaOficina({ oficina, children }: BandejaOficinaProps) {
+function BandejaJsonServer({ oficina, children }: BandejaOficinaProps) {
   const navigate = useNavigate()
   const dominio = useDominio()
   const { vistos, marcarBandejaVista, estadoConexion } = useNotificaciones()

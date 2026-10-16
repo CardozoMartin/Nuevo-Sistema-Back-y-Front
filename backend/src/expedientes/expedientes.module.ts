@@ -2,6 +2,7 @@ import { BadRequestException, Controller, ForbiddenException, Get, Module, Param
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsuarioActual } from '../seguridad/usuario-actual.decorator.js';
 import { Actuacion } from './entities/actuacion.entity.js';
+import { Auditoria } from './entities/auditoria.entity.js';
 import { DocumentacionPresentada } from './entities/documentacion-presentada.entity.js';
 import { Expediente } from './entities/expediente.entity.js';
 import { Movimiento } from './entities/movimiento.entity.js';
@@ -54,10 +55,19 @@ class ExpedientesController {
     return this.expedientes.resumen(String(id));
   }
 
-  /** GET /api/expedientes/:id/historial: pases y actuaciones, en orden. */
+  /** GET /api/expedientes/:id/auditoria: quién lo inició, quién lo tuvo en cada oficina y quién lo finalizó. */
+  @Get(':id/auditoria')
+  auditoria(@Param('id', ParseIntPipe) id: number) {
+    return this.expedientes.auditoria(String(id));
+  }
+
+  /**
+   * GET /api/expedientes/:id/historial: pases, actuaciones y cambios de estado, en orden. Lo que
+   * hizo cada oficina solo lo ve esa oficina (y los administradores): ver ExpedientesService.historial.
+   */
   @Get(':id/historial')
-  historial(@Param('id', ParseIntPipe) id: number) {
-    return this.expedientes.historial(String(id));
+  historial(@Param('id', ParseIntPipe) id: number, @SesionActual() sesion: UsuarioSesion) {
+    return this.expedientes.historial(String(id), sesion);
   }
 
   /** POST /api/expedientes/:id/tomar: la oficina donde está el expediente lo recibe. */
@@ -73,7 +83,7 @@ class ExpedientesController {
  * documentación presentada. La mecánica del circuito es común a todos los trámites.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Expediente, Movimiento, Actuacion, Resolucion, DocumentacionPresentada, SolicitudNumero])],
+  imports: [TypeOrmModule.forFeature([Expediente, Movimiento, Actuacion, Auditoria, Resolucion, DocumentacionPresentada, SolicitudNumero])],
   controllers: [ExpedientesController],
   providers: [ExpedientesService],
   exports: [ExpedientesService, TypeOrmModule],

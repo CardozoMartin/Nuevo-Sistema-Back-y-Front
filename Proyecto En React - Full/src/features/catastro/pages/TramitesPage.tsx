@@ -15,12 +15,6 @@ export default function TramitesPage() {
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2">
         <ActionCard
-          to={ROUTES.catastro.busqueda}
-          icon="manage_search"
-          title="Búsqueda Catastro"
-          description="Buscar concesiones por número, estado, trámite y fechas."
-        />
-        <ActionCard
           to={ROUTES.catastro.pendientes}
           icon="assignment_late"
           title="Seguimiento de expedientes"

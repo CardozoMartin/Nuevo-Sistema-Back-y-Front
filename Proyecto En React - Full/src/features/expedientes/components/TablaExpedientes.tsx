@@ -28,7 +28,7 @@ export function TablaExpedientes({ expedientes, atenuada }: { expedientes: Exped
           {expedientes.map((e) => (
             <tr key={e.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
               <td className="px-4 py-3 font-semibold tabular-nums">
-                <Link to={ROUTES.catastro.expediente(e.id)} className="text-primary hover:underline" title="Ver historial del expediente">
+                <Link to={ROUTES.expediente(e.id)} className="text-primary hover:underline" title="Ver historial del expediente">
                   {e.numero}
                 </Link>
               </td>

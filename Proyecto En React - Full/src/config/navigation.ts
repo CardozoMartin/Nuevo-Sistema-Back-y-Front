@@ -21,7 +21,6 @@ export const NAVIGATION: NavSection[] = [
           { key: 'catastro-bandeja', label: 'Bandeja', icon: 'inbox', path: ROUTES.catastro.bandeja, bandejaDe: 'catastro' },
           { key: 'catastro-tramites', label: 'Trámites', icon: 'post_add', path: ROUTES.catastro.tramites },
           { key: 'catastro-pendientes', label: 'Seguimiento', icon: 'assignment_late', path: ROUTES.catastro.pendientes },
-          { key: 'catastro-busqueda', label: 'Búsqueda', icon: 'manage_search', path: ROUTES.catastro.busqueda },
         ],
       },
       {
@@ -102,7 +101,7 @@ export const NAVIGATION: NavSection[] = [
     key: 'herramientas',
     title: 'Herramientas',
     items: [
-      { key: 'busqueda', label: 'Búsqueda de expedientes', icon: 'manage_search', path: ROUTES.busqueda },
+      { key: 'busqueda', label: 'Búsqueda general', icon: 'manage_search', path: ROUTES.busqueda },
       { key: 'visor', label: 'Visor cartográfico', icon: 'map', path: ROUTES.visor },
     ],
   },

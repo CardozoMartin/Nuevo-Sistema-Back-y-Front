@@ -1,4 +1,4 @@
-// Buscador general de expedientes (backend real: GET /expedientes/buscar). Cualquier trámite,
+// Búsqueda general de expedientes (backend real: GET /expedientes/buscar). Cualquier trámite,
 // en curso o terminado, con dónde está y de qué oficina vino.
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { ROUTES } from '@/config/routes'
@@ -59,10 +59,13 @@ export function useBuscarExpedientes(f: FiltrosExpedientes) {
   return useQuery({ queryKey: ['backend', 'expedientes', 'buscar', f], queryFn: () => buscarExpedientes(f), placeholderData: keepPreviousData })
 }
 
-/** Pantalla donde se ve cada expediente según su trámite (los que ya están en el backend real). */
+/**
+ * Consulta de cada expediente según su trámite (los que ya están en el backend real): datos,
+ * auditoría e historial. El panel de trabajo de cada oficina se abre desde su bandeja.
+ */
 const RUTA_VER: Record<string, (id: string) => string> = {
-  ALTA_CONCESION: ROUTES.tramites.altaConcesion.circuito,
-  BAJA_POZO: ROUTES.pozo.baja,
+  ALTA_CONCESION: ROUTES.consulta.alta,
+  BAJA_POZO: ROUTES.consulta.bajaPozo,
 }
 
 export const rutaVerExpediente = (e: ExpedienteEncontrado) => RUTA_VER[e.tipoTramite]?.(e.id) ?? null

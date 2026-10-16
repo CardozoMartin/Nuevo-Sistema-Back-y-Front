@@ -2,7 +2,8 @@ import { useParams } from 'react-router'
 import { EmptyState, ErrorState, LoadingState } from '@/components/feedback/States'
 import { Card } from '@/components/ui/Card'
 import { PageHeader } from '@/components/ui/PageHeader'
-import { HistorialAlta } from '@/features/tramites/AltaDeConcesion/components/circuito/HistorialAlta'
+import { RegistroExpediente } from '@/features/tramites/AltaDeConcesion/components/circuito/RegistroExpediente'
+import { DondeEsta } from '@/features/tramites/AltaDeConcesion/components/circuito/DondeEsta'
 import { cn } from '@/lib/cn'
 import { esNoEncontrado } from '@/services/api/errors'
 import { AccionesBaja } from '../components/AccionesBaja'
@@ -25,10 +26,22 @@ function Dato({ etiqueta, valor, ancho }: { etiqueta: string; valor: string | nu
 
 /** Una baja en el circuito: dónde está, qué tiene que hacer la oficina, el pozo y el historial. */
 export default function CircuitoBajaPage() {
-  const { expedienteId } = useParams()
-  const consulta = useBajaPozo(expedienteId)
+  return <ExpedienteBaja consulta={false} />
+}
 
-  if (consulta.isPending) {
+/**
+ * Desde la búsqueda general: datos, auditoría e historial, sin el panel de trabajo de la oficina
+ * ni lo que hizo cada oficina (inspección e informe técnico).
+ */
+export function ConsultaBajaPage() {
+  return <ExpedienteBaja consulta />
+}
+
+function ExpedienteBaja({ consulta }: { consulta: boolean }) {
+  const { expedienteId } = useParams()
+  const pedido = useBajaPozo(expedienteId)
+
+  if (pedido.isPending) {
     return (
       <>
         <PageHeader title={TITULO} />
@@ -36,20 +49,20 @@ export default function CircuitoBajaPage() {
       </>
     )
   }
-  if (consulta.isError) {
+  if (pedido.isError) {
     return (
       <>
         <PageHeader title={TITULO} />
-        {esNoEncontrado(consulta.error) ? (
+        {esNoEncontrado(pedido.error) ? (
           <EmptyState icon="search_off" titulo="No se encontró la baja" />
         ) : (
-          <ErrorState error={consulta.error} onRetry={() => void consulta.refetch()} reintentando={consulta.isFetching} />
+          <ErrorState error={pedido.error} onRetry={() => void pedido.refetch()} reintentando={pedido.isFetching} />
         )}
       </>
     )
   }
 
-  const b = consulta.data
+  const b = pedido.data
   const e = b.expediente
   return (
     <>
@@ -60,21 +73,34 @@ export default function CircuitoBajaPage() {
           <BarraEtapasBaja b={b} />
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-5">
-          <div className="flex flex-col gap-6 lg:col-span-3">
-            <Card className="p-6">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                  {e.estado === 'FINALIZADO' || e.estado === 'RECHAZADO' ? 'Resultado' : `${e.oficinaNombre} · ${e.etapaNombre}`}
-                </h2>
-                {e.tomadoPor && (
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    Lo tiene {e.tomadoPor.nombre} desde {new Date(e.tomadoEn!).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
-                  </span>
-                )}
-              </div>
-              <AccionesBaja b={b} />
-            </Card>
+
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-6">
+            {consulta ? (
+              <Card className="p-6">
+                <DondeEsta
+                  oficina={e.oficinaNombre}
+                  etapa={e.etapaNombre}
+                  tomadoPor={e.tomadoPor?.nombre ?? null}
+                  tomadoEn={e.tomadoEn}
+                  terminado={e.estado === 'FINALIZADO' || e.estado === 'RECHAZADO' ? ESTADO_BAJA[b.baja.estado].texto : null}
+                />
+              </Card>
+            ) : (
+              <Card className="p-6">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                    {e.estado === 'FINALIZADO' || e.estado === 'RECHAZADO' ? 'Resultado' : `${e.oficinaNombre} · ${e.etapaNombre}`}
+                  </h2>
+                  {e.tomadoPor && (
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      Lo tiene {e.tomadoPor.nombre} desde {new Date(e.tomadoEn!).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
+                    </span>
+                  )}
+                </div>
+                <AccionesBaja b={b} />
+              </Card>
+            )}
 
             <Card className="p-6">
               <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -90,7 +116,7 @@ export default function CircuitoBajaPage() {
                 <p className="mb-1 text-xs font-semibold tracking-wide text-slate-400 uppercase">Documentación presentada</p>
                 <ChecklistDocumentacion soloLectura valor={b.baja.documentacion.filter((d) => d.presentado).map((d) => d.codigo)} />
               </div>
-              {b.baja.informeTecnico && (
+              {!consulta && b.baja.informeTecnico && (
                 <dl className="mt-4 grid gap-x-6 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-2 dark:border-slate-700">
                   <Dato etiqueta="Inspección de campo" valor={b.baja.inspeccionRealizada ? `Sí, el ${formatoFecha(b.baja.fechaInspeccion!)}` : 'No'} />
                   <Dato etiqueta="Clausura física" valor={b.baja.requiereClausura === null ? null : b.baja.requiereClausura ? (b.baja.clausura ? `Hecha el ${formatoFecha(b.baja.clausura.fecha)} · acta ${b.baja.clausura.acta}` : 'Corresponde (pendiente)') : 'No corresponde'} />
@@ -117,10 +143,8 @@ export default function CircuitoBajaPage() {
             </Card>
           </div>
 
-          <Card className="p-6 lg:col-span-2">
-            <h2 className="mb-4 text-base font-bold text-slate-900 dark:text-white">Historial</h2>
-            <HistorialAlta expedienteId={e.id} />
-          </Card>
+          {/* Historial y auditoría a pedido: no ocupan la pantalla hasta que se abren. */}
+          <RegistroExpediente expedienteId={e.id} />
         </div>
       </div>
     </>

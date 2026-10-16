@@ -2,11 +2,13 @@ import { useParams } from 'react-router'
 import { EmptyState, ErrorState, LoadingState, Alert } from '@/components/feedback/States'
 import { Card } from '@/components/ui/Card'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { useDominio } from '@/hooks/useDominio'
 import { esNoEncontrado } from '@/services/api/errors'
 import { AccionesOficina } from '../components/circuito/AccionesOficina'
 import { BarraEtapas } from '../components/circuito/BarraEtapas'
+import { DondeEsta } from '../components/circuito/DondeEsta'
 import { DatosAlta } from '../components/circuito/DatosAlta'
-import { HistorialAlta } from '../components/circuito/HistorialAlta'
+import { RegistroExpediente } from '../components/circuito/RegistroExpediente'
 import { useAlta } from '../hooks'
 
 const TITULO = 'Expediente de alta de concesión'
@@ -16,8 +18,18 @@ const TITULO = 'Expediente de alta de concesión'
  * oficina que lo tiene, los datos cargados y el historial completo de pases y actuaciones.
  */
 export default function CircuitoAltaPage() {
+  return <ExpedienteAlta consulta={false} />
+}
+
+/** Desde la búsqueda general: datos, auditoría e historial, sin el panel de trabajo de la oficina. */
+export function ConsultaAltaPage() {
+  return <ExpedienteAlta consulta />
+}
+
+function ExpedienteAlta({ consulta }: { consulta: boolean }) {
   const { expedienteId } = useParams()
   const alta = useAlta(expedienteId)
+  const { estados } = useDominio()
 
   if (alta.isPending) {
     return (
@@ -56,21 +68,34 @@ export default function CircuitoAltaPage() {
           <BarraEtapas circuito={a.circuito} />
         </Card>
 
-        <div className="grid gap-6 lg:grid-cols-5">
-          <div className="flex flex-col gap-6 lg:col-span-3">
-            <Card className="p-6">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                  {a.circuito.oficinaNombre} · {a.circuito.etapaNombre}
-                </h2>
-                {a.circuito.tomadoPor && (
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    Lo tiene {a.circuito.tomadoPor.nombre} desde {new Date(a.circuito.tomadoEn!).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
-                  </span>
-                )}
-              </div>
-              <AccionesOficina alta={a} />
-            </Card>
+
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-6">
+            {consulta ? (
+              <Card className="p-6">
+                <DondeEsta
+                  oficina={a.circuito.oficinaNombre}
+                  etapa={a.circuito.etapaNombre}
+                  tomadoPor={a.circuito.tomadoPor?.nombre ?? null}
+                  tomadoEn={a.circuito.tomadoEn}
+                  terminado={['FINALIZADO', 'RECHAZADO', 'ARCHIVADO', 'ANULADO'].includes(a.circuito.estado) ? (estados.find((e) => e.codigo === a.circuito.estado)?.nombre ?? a.circuito.estado) : null}
+                />
+              </Card>
+            ) : (
+              <Card className="p-6">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                    {a.circuito.oficinaNombre} · {a.circuito.etapaNombre}
+                  </h2>
+                  {a.circuito.tomadoPor && (
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      Lo tiene {a.circuito.tomadoPor.nombre} desde {new Date(a.circuito.tomadoEn!).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
+                    </span>
+                  )}
+                </div>
+                <AccionesOficina alta={a} />
+              </Card>
+            )}
 
             <Card className="p-6">
               <h2 className="mb-4 text-base font-bold text-slate-900 dark:text-white">Datos del expediente</h2>
@@ -78,10 +103,8 @@ export default function CircuitoAltaPage() {
             </Card>
           </div>
 
-          <Card className="p-6 lg:col-span-2">
-            <h2 className="mb-4 text-base font-bold text-slate-900 dark:text-white">Historial</h2>
-            <HistorialAlta expedienteId={a.id} />
-          </Card>
+          {/* Historial y auditoría a pedido: no ocupan la pantalla hasta que se abren. */}
+          <RegistroExpediente expedienteId={a.id} />
         </div>
       </div>
     </>

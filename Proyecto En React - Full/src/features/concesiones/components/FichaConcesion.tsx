@@ -67,7 +67,7 @@ export function FichaConcesion({ concesion, mapa = true, enlaceHistorial = true 
         )}
         {enlaceHistorial && (
           <div className="col-span-2">
-            <Link to={ROUTES.catastro.concesion(concesion.id)} className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
+            <Link to={ROUTES.concesion(concesion.id)} className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
               Ver historial completo de la concesión
             </Link>
           </div>

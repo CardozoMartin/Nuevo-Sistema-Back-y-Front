@@ -2,14 +2,16 @@ import { Controller, Get, Module, Param, ParseIntPipe } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Email } from './entities/email.entity.js';
 import { NotificacionesService } from './notificaciones.service.js';
-import { ConDatosSensibles } from '../seguridad/auth.decorators.js';
+import { ConDatosSensibles, SoloOficina } from '../seguridad/auth.decorators.js';
+import { Oficina } from '../expedientes/expedientes.constantes.js';
 
 @Controller('expedientes')
 class NotificacionesController {
   constructor(private readonly notificaciones: NotificacionesService) {}
 
-  /** GET /api/expedientes/:id/emails: correos que se mandaron por el expediente. */
+  /** GET /api/expedientes/:id/emails: correos que se mandaron por el expediente (avisos de deuda: solo Recaudación). */
   @ConDatosSensibles()
+  @SoloOficina(Oficina.RECAUDACION)
   @Get(':id/emails')
   emails(@Param('id', ParseIntPipe) id: number) {
     return this.notificaciones.deExpediente(String(id));

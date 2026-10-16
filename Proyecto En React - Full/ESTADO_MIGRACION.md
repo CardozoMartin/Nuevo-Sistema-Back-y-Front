@@ -150,7 +150,7 @@ Basado en `Documentacion/ModeloDeDatos.md` (`exp_movimiento`, `con_titular.vigen
 | Bandeja | Botón **Tomar** (registra y abre) o **Revisar** si ya fue tomado; muestra «Tomado por…». |
 | `TomarExpediente` | Si se entra por URL a un expediente sin tomar, se pide tomarlo antes de ver el formulario. |
 | `expedientes/movimientos.ts` | Historial legible: inició / tomó / completó y derivó / observó / cerró. |
-| `BusquedaCatastroPage` | Buscador general (prototipo `busquedaCatastro.html`): texto, vista rápida, filtros avanzados y catastrales. |
+| `busqueda/BusquedaPage` | Búsqueda general (Herramientas, `/busqueda`): expedientes de todos los trámites contra `GET /expedientes/buscar`. Ya no hay buscador propio en Catastro. |
 | `ExpedienteDetallePage` | Consulta de un expediente (solo lectura) con su historial completo. |
 | `HistorialConcesionPage` | Cadena de titulares (desde/hasta + expediente), trámites de la concesión y línea de tiempo única. |
 

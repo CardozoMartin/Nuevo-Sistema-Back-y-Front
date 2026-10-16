@@ -10,7 +10,7 @@ import { CLASE_COLOR_ESTADO, formatearFecha } from '@/config/expedientes'
 import { useDominio } from '@/hooks/useDominio'
 import { cn } from '@/lib/cn'
 import type { ColorEstado } from '@/types/domain'
-import { POR_PAGINA, rutaVerExpediente, useBuscarExpedientes, type ExpedienteEncontrado, type FiltrosExpedientes } from '../busquedaExpedientes'
+import { POR_PAGINA, rutaVerExpediente, useBuscarExpedientes, type ExpedienteEncontrado, type FiltrosExpedientes } from '../api'
 
 function Campo({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -37,10 +37,10 @@ function EtiquetaEstado({ e }: { e: ExpedienteEncontrado }) {
 }
 
 /**
- * Buscador general de expedientes de Catastro (backend real): cualquier trámite, en curso o
- * terminado, con la oficina de la que vino y la que lo tiene. Sin filtros muestra los más recientes.
+ * Búsqueda general (backend real): expedientes de cualquier trámite, en curso o terminados, con
+ * la oficina de la que vino y la que lo tiene. Para todas las oficinas. Sin filtros muestra los más recientes.
  */
-export default function BusquedaCatastroPage() {
+export default function BusquedaPage() {
   const navigate = useNavigate()
   const d = useDominio()
   const [f, setF] = useState<FiltrosExpedientes>({})
@@ -136,8 +136,8 @@ export default function BusquedaCatastroPage() {
   return (
     <>
       <PageHeader
-        title="Buscador general de expedientes"
-        description="Catastro es el punto de entrada y cierre de todos los circuitos: consulte cualquier trámite, en curso o terminado, y en qué oficina está."
+        title="Búsqueda general"
+        description="Consulte cualquier expediente de todos los trámites, en curso o terminado, y en qué oficina está."
       />
 
       <div className="flex flex-col gap-6">

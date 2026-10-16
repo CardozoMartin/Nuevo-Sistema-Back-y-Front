@@ -9,11 +9,6 @@ export const ROUTES = {
     bandeja: '/catastro/bandeja',
     tramites: '/catastro/tramites',
     pendientes: '/catastro/pendientes',
-    busqueda: '/catastro/busqueda',
-    /** Historial completo de una concesión (titulares y trámites a lo largo del tiempo). */
-    concesion: (concesionId: string) => `/catastro/busqueda/concesion/${concesionId}`,
-    /** Consulta de un expediente (solo lectura, con su historial). */
-    expediente: (expedienteId: string) => `/catastro/busqueda/expediente/${expedienteId}`,
   },
 
   recaudacion: '/recaudacion',
@@ -93,8 +88,20 @@ export const ROUTES = {
     baja: (expedienteId: string) => `/pozo/bajas/${expedienteId}`,
   },
 
+  /** Búsqueda general: expedientes de todos los trámites, para todas las oficinas. */
   busqueda: '/busqueda',
+  /** Historial completo de una concesión (titulares y trámites a lo largo del tiempo). */
+  concesion: (concesionId: string) => `/busqueda/concesion/${concesionId}`,
+  /** Consulta de un expediente (solo lectura, con su historial). */
+  expediente: (expedienteId: string) => `/busqueda/expediente/${expedienteId}`,
+  /** Consulta desde la búsqueda (backend real): datos, auditoría e historial, sin el panel de la oficina. */
+  consulta: {
+    alta: (expedienteId: string) => `/busqueda/alta/${expedienteId}`,
+    bajaPozo: (expedienteId: string) => `/busqueda/baja-pozo/${expedienteId}`,
+  },
   visor: '/visor',
+  /** El visor con la ficha de una concesión abierta (y el mapa centrado en ella). */
+  visorConcesion: (concesionId: string) => `/visor?concesion=${concesionId}`,
   configuracion: '/configuracion',
 
   /** Informática: administración del acceso (solo administradores). */

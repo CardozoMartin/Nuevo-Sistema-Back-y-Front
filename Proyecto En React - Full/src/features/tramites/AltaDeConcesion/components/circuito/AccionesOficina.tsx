@@ -181,7 +181,13 @@ function AccionRecaudacion({ alta, enEspera }: { alta: AltaBackend; enEspera: bo
     <div className="flex flex-col gap-4">
       {enEspera && (
         <>
-          <Alert tone="info">El expediente está en espera por deuda. Cuando el titular pague, marque «Apto»: se levanta la deuda y pasa a {siguiente}.</Alert>
+          <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 dark:border-red-500/30 dark:bg-red-500/10">
+            <Icon name="pause_circle" className="mt-0.5 text-red-600 dark:text-red-300" />
+            <div className="text-sm text-red-800 dark:text-red-200">
+              <p className="font-semibold">No apto · pendiente de pago</p>
+              <p>El expediente queda pausado en Recaudación. Cuando el titular pague, marque «Apto»: se levanta la deuda y pasa a {siguiente}.</p>
+            </div>
+          </div>
           <AvisoDeudaPorEmail alta={alta} deudores={[...new Set([...concesiones.filter((c) => c.tieneDeuda).flatMap((c) => c.deTitulares), ...otrasDeudas.map((d) => d.personaId)])]} />
         </>
       )}
@@ -228,6 +234,16 @@ function AccionRecaudacion({ alta, enEspera }: { alta: AltaBackend; enEspera: bo
                   </p>
                   <p className="text-xs text-slate-400">De {c.deTitulares.map(nombreDe).join(' y ')}, titular del alta.</p>
                 </div>
+                {/* La ficha completa (ubicación, usos, caudal, padrones, polígono) en el visor, en otra pestaña para no perder el expediente. */}
+                <a
+                  href={ROUTES.visorConcesion(c.id)}
+                  target="_blank"
+                  rel="noopener"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-semibold text-primary hover:bg-primary/5 dark:border-slate-700"
+                >
+                  <Icon name="map" className="text-[18px]!" />
+                  Ver concesión
+                </a>
                 {decision === 'NO_APTO' && (
                   <label className="flex shrink-0 items-center gap-2 rounded-md border border-slate-200 px-3 py-1.5 text-sm font-semibold dark:border-slate-700">
                     <input type="checkbox" className="size-4 accent-red-600" checked={tieneDeuda(c)} onChange={(e) => setMarcadas({ ...marcadas, [c.id]: e.target.checked })} />

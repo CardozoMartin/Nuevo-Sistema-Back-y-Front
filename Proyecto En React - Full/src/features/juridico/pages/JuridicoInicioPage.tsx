@@ -1,6 +1,6 @@
 import { BandejaOficina } from '@/features/expedientes/components/BandejaOficina'
 import { BandejaRegistrosPozo } from '@/features/pozo/CircuitoPozo/components/BandejaRegistrosPozo'
-import { BandejaAltas } from '@/features/tramites/AltaDeConcesion/components/BandejaAltas'
+import { BandejaExpedientes } from '@/features/expedientes/components/BandejaExpedientes'
 import { BandejaBajasPozo } from '@/features/pozo/BajaDePozo/components/BandejaBajasPozo'
 import { EmpresasPendientesPanel } from '@/features/pozo/EmpresasPerforadoras/components/EmpresasPendientesPanel'
 
@@ -8,7 +8,7 @@ import { EmpresasPendientesPanel } from '@/features/pozo/EmpresasPerforadoras/co
 export default function JuridicoInicioPage() {
   return (
     <BandejaOficina oficina="juridico">
-      <BandejaAltas oficina="juridico" />
+      <BandejaExpedientes oficina="juridico" />
       <BandejaRegistrosPozo oficina="juridico" />
       <BandejaBajasPozo oficina="juridico" />
       <EmpresasPendientesPanel oficina="juridico" />

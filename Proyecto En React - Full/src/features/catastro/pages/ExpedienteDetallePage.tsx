@@ -37,7 +37,7 @@ export default function ExpedienteDetallePage() {
   if (query.isError) {
     return esNoEncontrado(query.error) ? (
       <EmptyState icon="search_off" titulo="No se encontró el expediente">
-        <Button size="sm" onClick={() => navigate(ROUTES.catastro.busqueda)}>
+        <Button size="sm" onClick={() => navigate(ROUTES.busqueda)}>
           Volver a la búsqueda
         </Button>
       </EmptyState>
@@ -63,7 +63,7 @@ export default function ExpedienteDetallePage() {
           <div className="flex flex-wrap items-center gap-2">
             <EstadoBadge estadoId={e.estadoId} />
             {concesionId && (
-              <Button size="sm" variant="secondary" iconLeft="history" onClick={() => navigate(ROUTES.catastro.concesion(concesionId))}>
+              <Button size="sm" variant="secondary" iconLeft="history" onClick={() => navigate(ROUTES.concesion(concesionId))}>
                 Historial de la concesión
               </Button>
             )}

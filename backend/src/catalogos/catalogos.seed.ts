@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Caracter, CODIGOS_SERVICIO, SECCIONES_CATASTRALES, SERVICIOS } from '../concesiones/concesiones.constantes.js';
-import { EstadoExpediente, TipoTramite } from '../expedientes/expedientes.constantes.js';
+import { EstadoExpediente, Oficina, TipoTramite } from '../expedientes/expedientes.constantes.js';
 import { GrupoOpcion } from './entities/opcion.entity.js';
 
 /** Departamento → localidad → distritos, el mismo formato que usa el frontend. */
@@ -86,6 +86,14 @@ export const TRAMITES_MENU_CATASTRO: Partial<Record<TipoTramite, { descripcion: 
   [TipoTramite.REUBICACION]: { descripcion: 'Traslado de derechos de uso a una nueva ubicación física.', icono: 'move_location' },
   [TipoTramite.AMPLIACION_REDUCCION]: { descripcion: 'Ajustes en superficie, caudal o alcance de la concesión vigente.', icono: 'tune' },
   [TipoTramite.PERMISO_USO]: { descripcion: 'Permiso precario de uso del agua.', icono: 'verified' },
+};
+
+/**
+ * Plazos iniciales (días corridos en la oficina), por oficina, para todos los trámites.
+ * Por ahora solo Recaudación, 10 días en cada trámite; después se ajusta trámite por trámite en la base.
+ */
+export const PLAZOS_INICIALES: Partial<Record<Oficina, number>> = {
+  [Oficina.RECAUDACION]: 10,
 };
 
 export const ESTADOS_EXPEDIENTE_INICIALES: Record<EstadoExpediente, { nombre: string; color: string; pendiente: boolean }> = {

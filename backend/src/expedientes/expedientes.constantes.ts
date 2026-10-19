@@ -208,9 +208,17 @@ export enum ResultadoActuacion {
   OBSERVADO = 'OBSERVADO',
   SIN_DEUDA = 'SIN_DEUDA',
   CON_DEUDA = 'CON_DEUDA',
+  /**
+   * Recaudación no pudo cobrar la deuda y le dio curso igual, con una nota de por qué. La deuda
+   * sigue pendiente; las oficinas siguientes ven el aviso y la nota.
+   */
+  CURSO_CON_DEUDA = 'CURSO_CON_DEUDA',
   /** Para actuaciones que registran un dato (número de concesión, resolución, padrón). */
   REGISTRADO = 'REGISTRADO',
 }
+
+/** Verificaciones de deuda con las que el expediente sigue: sin deuda, o con curso autorizado por Recaudación. */
+export const DEUDA_VERIFICADA = [ResultadoActuacion.SIN_DEUDA, ResultadoActuacion.CURSO_CON_DEUDA];
 
 /** "123/332-2026": número sin ceros a la izquierda, igual que el frontend. */
 export const formatearNumeroExpediente = (numero: string, reparticion: string, anio: number) =>

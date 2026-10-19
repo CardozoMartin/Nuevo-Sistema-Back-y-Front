@@ -1,7 +1,7 @@
 // Lo que manda cada oficina al actuar sobre un expediente. Los comparten todos los trámites
 // (alta de concesión, baja de pozo, y los que vengan).
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { Texto } from '../../../comun/validadores/texto.js';
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -38,6 +38,15 @@ export class VerificacionDeudaDto {
 
   @IsOptional() @Texto() @IsString() @MaxLength(2000)
   observaciones?: string;
+}
+
+/** Recaudación le da curso a un expediente con deuda: la nota de por qué es obligatoria. */
+export class CursoConDeudaDto {
+  @Texto()
+  @IsString({ message: 'Explique por qué se le da curso con deuda.' })
+  @MinLength(10, { message: 'Explique por qué se le da curso con deuda (al menos 10 caracteres).' })
+  @MaxLength(2000)
+  observaciones: string;
 }
 
 /** Distrito y Jurídico: apto, no apto u observado (con observado y no apto, el motivo es obligatorio). */

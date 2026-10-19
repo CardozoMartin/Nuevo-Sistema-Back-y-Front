@@ -26,7 +26,9 @@ class ExpedientesController {
     if (!Object.values(Oficina).includes(oficina as Oficina)) throw new BadRequestException(`Oficina desconocida: ${oficina}.`);
     // Cada oficina ve solo su bandeja (el administrador, todas).
     if (!sesion.esAdministrador && sesion.oficina?.codigo !== oficina) throw new ForbiddenException('Solo puede ver la bandeja de su oficina.');
-    return this.expedientes.bandeja(oficina as Oficina);
+    // El jefe de un distrito ve solo los expedientes de su distrito.
+    const soloDistrito = oficina === Oficina.DISTRITO && !sesion.esAdministrador ? (sesion.distrito?.id ?? null) : null;
+    return this.expedientes.bandeja(oficina as Oficina, soloDistrito);
   }
 
   /**

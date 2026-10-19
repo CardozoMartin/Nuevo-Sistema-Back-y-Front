@@ -14,6 +14,7 @@ const USUARIO_DEMO: UsuarioSesion = {
   email: 'demo@drh.local',
   oficina: null,
   rol: null,
+  distrito: null,
   esAdministrador: true,
   debeCambiarClave: false,
   permisos: [],

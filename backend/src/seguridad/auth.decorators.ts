@@ -37,6 +37,8 @@ export interface UsuarioSesion {
   email: string;
   oficina: { codigo: string; nombre: string } | null;
   rol: { codigo: string; nombre: string } | null;
+  /** Solo jefes de Distrito: el distrito que atiende (null: todos). */
+  distrito: { id: number; codigo: string; nombre: string } | null;
   esAdministrador: boolean;
   debeCambiarClave: boolean;
   permisos: string[];

@@ -64,6 +64,7 @@ export class PermisosService {
       email: u.email,
       oficina: u.oficina ? { codigo: u.oficina.codigo, nombre: u.oficina.nombre } : null,
       rol: u.rol ? { codigo: u.rol.codigo, nombre: u.rol.nombre } : null,
+      distrito: u.distrito ? { id: u.distrito.id, codigo: u.distrito.codigo, nombre: u.distrito.nombre } : null,
       esAdministrador: u.esAdministrador,
       debeCambiarClave: u.debeCambiarClave,
       permisos: await this.permisosDe(u),

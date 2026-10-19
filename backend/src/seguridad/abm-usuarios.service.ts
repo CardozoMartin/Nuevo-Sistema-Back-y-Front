@@ -1,7 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, DataSource, Not, Repository } from 'typeorm';
+import { Distrito } from '../catalogos/entities/distrito.entity.js';
 import { USUARIO_SISTEMA } from '../comun/usuario-sistema.js';
+import { Oficina } from '../expedientes/expedientes.constantes.js';
 import { AuthService } from './auth.service.js';
 import { cifrarClave, claveTemporal } from './claves.js';
 import { permisoDeLaOficina } from './permisos.constantes.js';
@@ -20,6 +22,7 @@ const comoListado = (u: Usuario, permisos: string[] = []) => ({
   email: u.email,
   oficina: u.oficina ? { codigo: u.oficina.codigo, nombre: u.oficina.nombre } : null,
   rol: u.rol ? { codigo: u.rol.codigo, nombre: u.rol.nombre } : null,
+  distrito: u.distrito ? { codigo: u.distrito.codigo, nombre: u.distrito.nombre } : null,
   esAdministrador: u.esAdministrador,
   activo: u.activo,
   debeCambiarClave: u.debeCambiarClave,
@@ -51,7 +54,7 @@ export class AbmUsuariosService {
   ) {}
 
   async listar(q: ListarUsuariosQuery) {
-    const consulta = this.usuarios.createQueryBuilder('u').leftJoinAndSelect('u.oficina', 'oficina').leftJoinAndSelect('u.rol', 'rol');
+    const consulta = this.usuarios.createQueryBuilder('u').leftJoinAndSelect('u.oficina', 'oficina').leftJoinAndSelect('u.rol', 'rol').leftJoinAndSelect('u.distrito', 'distrito');
     if (q.texto) {
       const t = `%${q.texto.replace(/[%_\\]/g, '\\$&')}%`;
       consulta.andWhere(new Brackets((w) => w.where('u.legajo ILIKE :t OR u.apellido ILIKE :t OR u.nombre ILIKE :t OR u.email ILIKE :t', { t })));
@@ -157,6 +160,11 @@ export class AbmUsuariosService {
     if (dto.rol && !rol) throw new BadRequestException(`No existe el rol ${dto.rol}.`);
     if (!dto.esAdministrador && (!oficina || !rol)) throw new BadRequestException('Elija la oficina y el rol del usuario.');
 
+    // El distrito solo corresponde a la oficina Distrito (sin distrito: atiende todos).
+    if (dto.distrito && oficina?.codigo !== Oficina.DISTRITO) throw new BadRequestException('El distrito solo se asigna a usuarios de la oficina Distrito.');
+    const distrito = dto.distrito ? await this.dataSource.manager.findOneBy(Distrito, { codigo: dto.distrito, activo: true }) : null;
+    if (dto.distrito && !distrito) throw new BadRequestException(`No existe el distrito ${dto.distrito}.`);
+
     return {
       legajo: dto.legajo.toUpperCase(),
       apellido: dto.apellido,
@@ -165,6 +173,7 @@ export class AbmUsuariosService {
       esAdministrador: dto.esAdministrador ?? false,
       oficina,
       rol,
+      distrito,
     };
   }
 }

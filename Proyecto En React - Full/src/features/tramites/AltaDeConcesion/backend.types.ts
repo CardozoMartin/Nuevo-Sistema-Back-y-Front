@@ -31,8 +31,20 @@ export interface TitularBackend {
   telefono: string | null
 }
 
+/** Recaudación le dio curso con deuda: su nota y las deudas, con el estado de hoy. */
+export interface AvisoDeudaBackend {
+  fecha: string
+  usuario: string
+  observaciones: string
+  deudas: { id: string; detalle: string; titular: string; pendiente: boolean; canceladaEn: string | null }[]
+  /** false si después se pagó todo. */
+  sigueConDeuda: boolean
+}
+
 export interface AltaBackend {
   id: string
+  /** Recaudación le dio curso con deuda (null: pasó sin deuda o todavía no pasó). El modo demo no lo informa. */
+  avisoDeuda?: AvisoDeudaBackend | null
   /** El usuario no tiene «Ver datos sensibles»: documentos enmascarados, sin contacto ni domicilios. */
   datosSensiblesOcultos?: boolean
   numeroExpediente: string
@@ -237,6 +249,22 @@ export interface ExpedienteEnBandeja {
   vieneDeNombre?: string | null
   /** Volvió observado, para corregir. */
   esDevolucion?: boolean
+  /** Recaudación le dio curso con deuda. */
+  cursoConDeuda?: boolean
+  /** Solo en la bandeja de Distrito: el distrito de la ubicación (null: sin ubicación cargada). */
+  distrito?: string | null
+  /** Plazo del trámite en la oficina (null o ausente: la oficina no tiene plazo para ese trámite). */
+  plazo?: PlazoEnOficina | null
+}
+
+export interface PlazoEnOficina {
+  dias: number
+  transcurridos: number
+  /** Negativo: días de atraso. */
+  restantes: number
+  /** AAAA-MM-DD */
+  vence: string
+  semaforo: 'EN_PLAZO' | 'POR_VENCER' | 'VENCIDO'
 }
 
 export interface DeudaBackend {

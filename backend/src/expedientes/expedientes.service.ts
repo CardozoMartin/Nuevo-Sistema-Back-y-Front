@@ -1,7 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, In, IsNull, Not, type EntityManager } from 'typeorm';
 import { esViolacionDeUnicidad } from '../comun/errores-db.js';
 import { hoyISO } from '../comun/validadores/fechas.js';
+import type { TipoPersona } from '../concesiones/concesiones.constantes.js';
+import { nombrePersona } from '../personas/entities/persona.entity.js';
 import { nombreUsuario, type Usuario } from '../seguridad/entities/usuario.entity.js';
 import { UsuariosService } from '../seguridad/usuarios.service.js';
 import { Actuacion } from './entities/actuacion.entity.js';
@@ -9,6 +11,7 @@ import { AccionAuditoria, Auditoria } from './entities/auditoria.entity.js';
 import { Expediente } from './entities/expediente.entity.js';
 import { Movimiento } from './entities/movimiento.entity.js';
 import type { BuscarExpedientesQuery } from './dto/buscar-expedientes.query.js';
+import { calcularPlazo, compararPorPlazo } from './plazos.js';
 import {
   Dictamen,
   ESTADOS_FINALES,
@@ -24,6 +27,18 @@ import {
   TipoActuacion,
   TipoTramite,
 } from './expedientes.constantes.js';
+
+/** Recaudación le dio curso al expediente con deuda (ver ExpedientesService.avisoDeuda). */
+export interface AvisoDeuda {
+  fecha: Date;
+  /** Quién de Recaudación le dio curso. */
+  usuario: string;
+  /** Por qué se le dio curso con deuda. */
+  observaciones: string;
+  deudas: { id: string; detalle: string; titular: string; pendiente: boolean; canceladaEn: Date | null }[];
+  /** false si después se pagó todo. */
+  sigueConDeuda: boolean;
+}
 
 export interface AbrirExpedienteInput {
   numero: string;
@@ -234,6 +249,7 @@ export class ExpedientesService {
       const expediente = await this.bloquear(tx, expedienteId);
       if (ESTADOS_FINALES.includes(expediente.estado)) throw new ConflictException(`El expediente está ${expediente.estado.toLowerCase()}: ya no circula.`);
       const usuario = await this.usuarios.exigirDeOficina(usuarioId, expediente.oficinaActual);
+      await this.exigirDistrito(tx, expediente, usuario);
 
       if (expediente.tomadoPor) {
         if (expediente.tomadoPor.id === usuario.id) return; // ya lo tenía
@@ -250,6 +266,36 @@ export class ExpedientesService {
   }
 
   /**
+   * Distrito de cada expediente: el de la ubicación vigente de su concesión (cat_distrito.id).
+   * Sin ubicación cargada (o trámites sin concesión, como los de pozos) no tiene distrito.
+   */
+  async distritosDe(tx: EntityManager, expedienteIds: string[]): Promise<Map<string, { id: number; nombre: string }>> {
+    if (!expedienteIds.length) return new Map();
+    const filas: { expediente_id: string; id: number; nombre: string }[] = await tx.query(
+      `SELECT DISTINCT ON (c.expediente_id) c.expediente_id, d.id, d.nombre
+         FROM con_concesion c
+         JOIN con_inmueble i ON i.concesion_id = c.id AND i.vigente
+         JOIN cat_distrito d ON d.id = i.distrito_id
+        WHERE c.expediente_id = ANY($1::bigint[])
+        ORDER BY c.expediente_id, c.id`,
+      [expedienteIds],
+    );
+    return new Map(filas.map((f) => [String(f.expediente_id), { id: Number(f.id), nombre: f.nombre }]));
+  }
+
+  /**
+   * En la oficina Distrito, un jefe con distrito asignado solo trabaja los expedientes de su
+   * distrito. Los que no tienen distrito (sin ubicación) los puede trabajar cualquiera.
+   */
+  private async exigirDistrito(tx: EntityManager, expediente: Expediente, usuario: Usuario): Promise<void> {
+    if (expediente.oficinaActual !== Oficina.DISTRITO || usuario.esAdministrador || !usuario.distrito) return;
+    const distrito = (await this.distritosDe(tx, [expediente.id])).get(expediente.id);
+    if (distrito && distrito.id !== usuario.distrito.id) {
+      throw new ForbiddenException(`El expediente es del ${distrito.nombre}: lo trabaja el jefe de ese distrito (usted atiende el ${usuario.distrito.nombre}).`);
+    }
+  }
+
+  /**
    * Exige que el expediente esté en la etapa indicada, circulando, y que lo tenga tomado
    * el usuario que actúa. Devuelve el usuario. Lo usan todas las acciones de las oficinas.
    */
@@ -261,6 +307,7 @@ export class ExpedientesService {
       throw new ConflictException(`El expediente está ${expediente.estado.replace('_', ' ').toLowerCase()}: no se puede avanzar.`);
     }
     const usuario = await this.usuarios.exigirDeOficina(usuarioId, expediente.oficinaActual);
+    await this.exigirDistrito(this.dataSource.manager, expediente, usuario);
     if (expediente.tomadoPor?.id !== usuario.id && !usuario.esAdministrador) {
       throw new ConflictException(
         expediente.tomadoPor ? `El expediente lo tiene tomado ${nombreUsuario(expediente.tomadoPor)}.` : 'Primero hay que tomar el expediente.',
@@ -350,9 +397,9 @@ export class ExpedientesService {
   }
 
   /** Última actuación de un tipo (ej: la última observación, para saber a dónde reenviar). */
-  ultimaActuacion(tx: EntityManager, expedienteId: string, tipos: TipoActuacion[], resultado?: ResultadoActuacion): Promise<Actuacion | null> {
+  ultimaActuacion(tx: EntityManager, expedienteId: string, tipos: TipoActuacion[], resultado?: ResultadoActuacion | ResultadoActuacion[]): Promise<Actuacion | null> {
     return tx.findOne(Actuacion, {
-      where: { expediente: { id: expedienteId }, tipo: In(tipos), ...(resultado ? { resultado } : {}) },
+      where: { expediente: { id: expedienteId }, tipo: In(tipos), ...(resultado ? { resultado: Array.isArray(resultado) ? In(resultado) : resultado } : {}) },
       order: { fecha: 'DESC', id: 'DESC' },
     });
   }
@@ -360,6 +407,40 @@ export class ExpedientesService {
   // ---------------------------------------------------------------------------
   // Consultas
   // ---------------------------------------------------------------------------
+
+  /**
+   * Si Recaudación le dio curso con deuda (su última verificación es CURSO_CON_DEUDA): quién,
+   * cuándo, su nota y las deudas que tenía, con el estado de hoy (pudo pagarlas después).
+   * null si pasó sin deuda o todavía no pasó por Recaudación.
+   */
+  async avisoDeuda(expedienteId: string): Promise<AvisoDeuda | null> {
+    const ultima = await this.ultimaActuacion(this.dataSource.manager, expedienteId, [TipoActuacion.VERIFICACION_DEUDA]);
+    if (ultima?.resultado !== ResultadoActuacion.CURSO_CON_DEUDA) return null;
+    const ids = ((ultima.datos?.deudas ?? []) as { id: string }[]).map((d) => d.id);
+    const filas: { id: string; detalle: string; estado: string; cancelado_en: Date | null; tipo_persona: string; apellido: string | null; nombre: string | null; razon_social: string | null; denominacion: string | null }[] =
+      ids.length
+        ? await this.dataSource.query(
+            `SELECT d.id, d.detalle, d.estado, d.cancelado_en, p.tipo_persona, p.apellido, p.nombre, p.razon_social, p.denominacion
+               FROM rec_deuda d JOIN per_persona p ON p.id = d.persona_id
+              WHERE d.id = ANY($1::bigint[]) ORDER BY d.id`,
+            [ids],
+          )
+        : [];
+    const deudas = filas.map((f) => ({
+      id: String(f.id),
+      detalle: f.detalle,
+      titular: nombrePersona({ tipoPersona: f.tipo_persona as TipoPersona, apellido: f.apellido, nombre: f.nombre, razonSocial: f.razon_social, denominacion: f.denominacion }),
+      pendiente: f.estado === 'PENDIENTE',
+      canceladaEn: f.cancelado_en,
+    }));
+    return {
+      fecha: ultima.fecha,
+      usuario: nombreUsuario(ultima.usuario),
+      observaciones: ultima.observaciones ?? '',
+      deudas,
+      sigueConDeuda: deudas.some((d) => d.pendiente),
+    };
+  }
 
   /** Dónde está el expediente y quién lo tiene. */
   async resumen(expedienteId: string) {
@@ -520,13 +601,18 @@ export class ExpedientesService {
   /**
    * Bandeja de una oficina: los expedientes que están en ella y siguen circulando, con su
    * etapa, quién los tiene, desde cuándo están en la oficina y de qué oficina vinieron (el
-   * último pase; null si se inició ahí).
+   * último pase; null si se inició ahí). Si la oficina tiene plazos, cada uno trae el suyo y
+   * los vencidos y por vencer van primero.
    */
-  async bandeja(oficina: Oficina) {
-    const expedientes = await this.dataSource.manager.find(Expediente, {
+  async bandeja(oficina: Oficina, soloDistritoId?: number | null) {
+    const todos = await this.dataSource.manager.find(Expediente, {
       where: { oficinaActual: oficina, estado: Not(In(ESTADOS_FINALES)) },
       order: { modificadoEn: 'ASC' },
     });
+    // En Distrito, cada expediente con el distrito de su ubicación; el jefe de un distrito ve
+    // solo los suyos (y los que no tienen distrito, para que no queden sin atender).
+    const distritos = oficina === Oficina.DISTRITO ? await this.distritosDe(this.dataSource.manager, todos.map((e) => e.id)) : new Map<string, { id: number; nombre: string }>();
+    const expedientes = soloDistritoId ? todos.filter((e) => (distritos.get(e.id)?.id ?? soloDistritoId) === soloDistritoId) : todos;
     const ultimos: { expediente_id: string; fecha: Date; oficina_origen: Oficina | null; es_devolucion: boolean }[] = expedientes.length
       ? await this.dataSource.query(
           `SELECT DISTINCT ON (expediente_id) expediente_id, fecha, oficina_origen, es_devolucion FROM exp_movimiento
@@ -535,8 +621,24 @@ export class ExpedientesService {
         )
       : [];
     const ultimoDe = new Map(ultimos.map((u) => [String(u.expediente_id), u]));
-    return expedientes.map((e) => {
+    const plazos: { tipo_tramite_codigo: string; dias: number }[] = await this.dataSource.query(
+      'SELECT tipo_tramite_codigo, dias FROM cat_plazo_oficina WHERE oficina_codigo = $1',
+      [oficina],
+    );
+    const diasDe = new Map(plazos.map((p) => [p.tipo_tramite_codigo, Number(p.dias)]));
+    // ¿Recaudación le dio curso con deuda? (su última verificación de deuda)
+    const verificaciones: { expediente_id: string; resultado: ResultadoActuacion }[] = expedientes.length
+      ? await this.dataSource.query(
+          `SELECT DISTINCT ON (expediente_id) expediente_id, resultado FROM exp_actuacion
+           WHERE expediente_id = ANY($1) AND tipo = $2 ORDER BY expediente_id, fecha DESC, id DESC`,
+          [expedientes.map((e) => e.id), TipoActuacion.VERIFICACION_DEUDA],
+        )
+      : [];
+    const cursoConDeuda = new Set(verificaciones.filter((v) => v.resultado === ResultadoActuacion.CURSO_CON_DEUDA).map((v) => String(v.expediente_id)));
+    const ahora = new Date();
+    const filas = expedientes.map((e) => {
       const ultimo = ultimoDe.get(e.id);
+      const dias = diasDe.get(e.tipoTramite);
       return {
         id: e.id,
         numero: formatearNumeroExpediente(e.numero, e.reparticion, e.anio),
@@ -551,8 +653,15 @@ export class ExpedientesService {
         vieneDeNombre: ultimo?.oficina_origen ? NOMBRE_OFICINA[ultimo.oficina_origen] : null,
         /** Volvió observado (para corregir). */
         esDevolucion: ultimo?.es_devolucion ?? false,
+        /** Solo en la bandeja de Distrito: el distrito de la ubicación (null: sin ubicación cargada). */
+        ...(oficina === Oficina.DISTRITO ? { distrito: distritos.get(e.id)?.nombre ?? null } : {}),
+        /** Recaudación le dio curso con deuda (el detalle y la nota, en el expediente). */
+        cursoConDeuda: cursoConDeuda.has(e.id),
+        /** Plazo del trámite en esta oficina (null si la oficina no tiene plazo para ese trámite). */
+        plazo: dias && ultimo ? calcularPlazo(ultimo.fecha, dias, ahora) : null,
       };
     });
+    return filas.sort(compararPorPlazo);
   }
 
   /**

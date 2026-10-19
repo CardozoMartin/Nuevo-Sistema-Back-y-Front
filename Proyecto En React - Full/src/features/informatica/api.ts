@@ -10,6 +10,8 @@ export interface UsuarioListado {
   email: string
   oficina: { codigo: string; nombre: string } | null
   rol: { codigo: string; nombre: string } | null
+  /** Solo oficina Distrito: el distrito que atiende (null: todos). */
+  distrito: { codigo: string; nombre: string } | null
   esAdministrador: boolean
   activo: boolean
   debeCambiarClave: boolean
@@ -31,6 +33,8 @@ export interface UsuarioDatos {
   esAdministrador: boolean
   oficina?: string
   rol?: string
+  /** Solo oficina Distrito: código del distrito («I»…«VII»); null o vacío: todos. */
+  distrito?: string | null
   /** Los permisos marcados para este usuario. */
   permisos?: string[]
 }
@@ -79,6 +83,15 @@ export const usuariosApi = {
   baja: async ({ id, motivo }: { id: string; motivo: string }) => (await backend.post<UsuarioListado>(`/usuarios/${id}/baja`, { motivo })).data,
   reactivar: async (id: string) => (await backend.post<UsuarioListado>(`/usuarios/${id}/reactivar`)).data,
   restablecerClave: async (id: string) => (await backend.post<ConClaveTemporal>(`/usuarios/${id}/restablecer-clave`)).data,
+}
+
+/** Distritos activos (para asignar el distrito a un jefe de Distrito). */
+export function useDistritos() {
+  return useQuery({
+    queryKey: ['catalogos', 'distritos', 'activos'],
+    queryFn: async () => (await backend.get<{ codigo: string; nombre: string; activo: boolean }[]>('/catalogos/distritos')).data.filter((d) => d.activo),
+    staleTime: Infinity,
+  })
 }
 
 export function useMatrizPermisos() {

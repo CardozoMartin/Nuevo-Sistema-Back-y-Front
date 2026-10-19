@@ -129,6 +129,69 @@ function AvisoDeudaPorEmail({ alta, deudores }: { alta: AltaBackend; deudores: s
   )
 }
 
+const MINIMO_NOTA_CURSO = 10
+
+/**
+ * En espera por deuda y no se pudo cobrar: Recaudación le da curso igual con una nota de por qué.
+ * La deuda sigue pendiente; las oficinas siguientes ven el aviso con la nota.
+ */
+function CursoConDeuda({ alta, siguiente }: { alta: AltaBackend; siguiente: string }) {
+  const [abierto, setAbierto] = useState(false)
+  const [nota, setNota] = useState('')
+  const [confirmar, setConfirmar] = useState(false)
+  const accion = useAccionAlta(alta.id, altaConcesionApi.cursoConDeuda)
+  const corta = nota.trim().length < MINIMO_NOTA_CURSO
+
+  if (!abierto) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/5">
+        <p className="text-sm text-amber-900 dark:text-amber-200">
+          <span className="font-semibold">¿No se pudo cobrar?</span> Puede darle curso igual con una nota de por qué; la deuda sigue registrada.
+        </p>
+        <Button size="sm" variant="secondary" iconLeft="forward" onClick={() => setAbierto(true)}>
+          Dar curso con deuda
+        </Button>
+      </div>
+    )
+  }
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border-2 border-amber-300 bg-amber-50/60 p-4 dark:border-amber-500/40 dark:bg-amber-500/5">
+      <div className="flex items-start gap-2">
+        <Icon name="forward" className="mt-0.5 text-amber-700 dark:text-amber-300" />
+        <div>
+          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Dar curso con deuda</p>
+          <p className="text-xs text-amber-900/80 dark:text-amber-200/80">
+            Pasa a {siguiente} aunque el titular tenga deuda. La deuda no se cancela, y {siguiente} y las demás oficinas van a ver el aviso con esta nota.
+          </p>
+        </div>
+      </div>
+      <Observaciones valor={nota} onChange={setNota} obligatorio placeholder="Por qué se le da curso sin cobrar (ej: se intentó cobrar del 10 al 20/10 sin respuesta del titular; se continúa por…)" />
+      {nota && corta && <p className="text-xs font-medium text-red-600 dark:text-red-400">Explique el motivo (al menos {MINIMO_NOTA_CURSO} caracteres).</p>}
+      {accion.error && <Alert>{mensajeDeError(accion.error)}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <Button iconRight="send" disabled={corta} loading={accion.isPending} onClick={() => setConfirmar(true)}>
+          Pasar a {siguiente} con deuda
+        </Button>
+        <Button variant="secondary" disabled={accion.isPending} onClick={() => setAbierto(false)}>
+          Cancelar
+        </Button>
+      </div>
+      <ConfirmDialog
+        open={confirmar}
+        title="¿Dar curso con deuda?"
+        message={`El expediente pasa a ${siguiente} con la deuda pendiente. Las demás oficinas van a ver el aviso y su nota. No se puede deshacer.`}
+        confirmLabel="Sí, pasar con deuda"
+        cancelLabel="Volver"
+        onConfirm={() => {
+          setConfirmar(false)
+          accion.mutate(nota.trim())
+        }}
+        onCancel={() => setConfirmar(false)}
+      />
+    </div>
+  )
+}
+
 /**
  * Recaudación: el sistema informa si los titulares tienen otras concesiones otorgadas, para
  * verificar si alguna tiene deuda. Se decide:
@@ -185,7 +248,9 @@ function AccionRecaudacion({ alta, enEspera }: { alta: AltaBackend; enEspera: bo
             <Icon name="pause_circle" className="mt-0.5 text-red-600 dark:text-red-300" />
             <div className="text-sm text-red-800 dark:text-red-200">
               <p className="font-semibold">No apto · pendiente de pago</p>
-              <p>El expediente queda pausado en Recaudación. Cuando el titular pague, marque «Apto»: se levanta la deuda y pasa a {siguiente}.</p>
+              <p>
+                El expediente queda pausado en Recaudación. Cuando el titular pague, marque «Apto»: se levanta la deuda y pasa a {siguiente}. Si no se puede cobrar, al final puede darle curso con deuda.
+              </p>
             </div>
           </div>
           <AvisoDeudaPorEmail alta={alta} deudores={[...new Set([...concesiones.filter((c) => c.tieneDeuda).flatMap((c) => c.deTitulares), ...otrasDeudas.map((d) => d.personaId)])]} />
@@ -320,6 +385,8 @@ function AccionRecaudacion({ alta, enEspera }: { alta: AltaBackend; enEspera: bo
           {decision === 'NO_APTO' ? (enEspera ? 'Guardar: sigue en espera' : 'No apto: dejar en espera') : `Apto: pasar a ${siguiente}`}
         </Button>
       </div>
+
+      {enEspera && <CursoConDeuda alta={alta} siguiente={siguiente} />}
     </div>
   )
 }

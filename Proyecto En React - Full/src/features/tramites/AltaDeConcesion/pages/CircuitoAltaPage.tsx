@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { useDominio } from '@/hooks/useDominio'
 import { esNoEncontrado } from '@/services/api/errors'
 import { AccionesOficina } from '../components/circuito/AccionesOficina'
+import { AvisoDeuda } from '../components/circuito/AvisoDeuda'
 import { BarraEtapas } from '../components/circuito/BarraEtapas'
 import { DondeEsta } from '../components/circuito/DondeEsta'
 import { DatosAlta } from '../components/circuito/DatosAlta'
@@ -67,7 +68,7 @@ function ExpedienteAlta({ consulta }: { consulta: boolean }) {
         <Card className="p-5">
           <BarraEtapas circuito={a.circuito} />
         </Card>
-
+        {a.avisoDeuda && <AvisoDeuda aviso={a.avisoDeuda} />}
 
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-6">

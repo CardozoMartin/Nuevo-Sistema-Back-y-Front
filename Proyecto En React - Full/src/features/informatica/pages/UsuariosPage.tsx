@@ -121,7 +121,10 @@ export default function UsuariosPage() {
                   <span className="block text-xs text-slate-500 dark:text-slate-400">{u.email}</span>
                   {!u.activo && u.bajaMotivo && <span className="block text-xs text-slate-400">Baja: {u.bajaMotivo}</span>}
                 </td>
-                <td className="px-4 py-3">{u.oficina?.nombre ?? '—'}</td>
+                <td className="px-4 py-3">
+                  {u.oficina?.nombre ?? '—'}
+                  {u.distrito && <span className="block text-xs text-slate-500 dark:text-slate-400">{u.distrito.nombre}</span>}
+                </td>
                 <td className="px-4 py-3">
                   {u.esAdministrador && <Etiqueta tono="azul">Administrador</Etiqueta>} {u.rol?.nombre ?? (u.esAdministrador ? '' : '—')}
                   {!u.esAdministrador && !u.esSistema && (

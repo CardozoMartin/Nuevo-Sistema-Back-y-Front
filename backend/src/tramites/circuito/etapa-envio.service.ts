@@ -1,6 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { Dictamen, EstadoExpediente, Etapa, NOMBRE_OFICINA, OFICINA_DE_ETAPA, ResultadoActuacion, TipoActuacion, type TipoTramite } from '../../expedientes/expedientes.constantes.js';
+import { DEUDA_VERIFICADA, Dictamen, EstadoExpediente, Etapa, NOMBRE_OFICINA, OFICINA_DE_ETAPA, ResultadoActuacion, TipoActuacion, type TipoTramite } from '../../expedientes/expedientes.constantes.js';
 import { ExpedientesService } from '../../expedientes/expedientes.service.js';
 import type { ObservacionesDto } from './dto/circuito.dto.js';
 import { nombrePersona } from '../../personas/entities/persona.entity.js';
@@ -50,7 +50,7 @@ export class EtapaEnvioService {
 
       //4.- ¿Cambiaron las personas del trámite? Las que Recaudación no verificó todavía.
       const personas = await this.registro.de(tipo).personasAVerificar(tx, expediente);
-      const verificacion = await this.expedientes.ultimaActuacion(tx, expediente.id, [TipoActuacion.VERIFICACION_DEUDA], ResultadoActuacion.SIN_DEUDA);
+      const verificacion = await this.expedientes.ultimaActuacion(tx, expediente.id, [TipoActuacion.VERIFICACION_DEUDA], DEUDA_VERIFICADA);
       const nuevas = personasSinVerificar(verificacion?.datos?.personas, personas.map((p) => p.id));
       const nombresNuevas = personas.filter((p) => nuevas.includes(p.id)).map(nombrePersona).join(', ');
 

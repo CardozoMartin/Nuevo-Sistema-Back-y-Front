@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
-import { Dictamen, EstadoExpediente, Etapa, formatearNumeroExpediente, ResultadoActuacion, SIGUIENTE_ETAPA, TipoActuacion, type TipoTramite } from '../../expedientes/expedientes.constantes.js';
+import { DataSource, type EntityManager } from 'typeorm';
+import { DEUDA_VERIFICADA, Dictamen, EstadoExpediente, Etapa, formatearNumeroExpediente, ResultadoActuacion, SIGUIENTE_ETAPA, TipoActuacion, type TipoTramite } from '../../expedientes/expedientes.constantes.js';
 import { Expediente } from '../../expedientes/entities/expediente.entity.js';
 import { ExpedientesService } from '../../expedientes/expedientes.service.js';
 import { NotificacionesService, type EmailRegistrado } from '../../notificaciones/notificaciones.service.js';
@@ -8,7 +8,7 @@ import { TipoEmail } from '../../notificaciones/notificaciones.constantes.js';
 import { nombrePersona } from '../../personas/entities/persona.entity.js';
 import { RecaudacionService, type ConcesionConDeuda } from '../../recaudacion/recaudacion.service.js';
 import { armarAvisoDeuda } from './aviso-deuda.js';
-import type { NotificarDeudaDto, VerificacionDeudaDto } from './dto/circuito.dto.js';
+import type { CursoConDeudaDto, NotificarDeudaDto, VerificacionDeudaDto } from './dto/circuito.dto.js';
 import { RegistroTramitesService } from './registro-tramites.service.js';
 import { destinoTrasVerificarDeuda, respuestasDeDeuda, validarDecisionDeuda } from './validaciones/circuito.validaciones.js';
 
@@ -41,6 +41,8 @@ export interface AntecedentesDeuda {
  *                     - No apto: NO se rechaza; el expediente queda EN ESPERA en Recaudación, sin
  *                       plazo. Cuando paga, Recaudación marca Apto (o se cancela la deuda con
  *                       POST /api/deudas/:id/cancelar) y entonces se reanuda.
+ *   darCursoConDeuda  si no se pudo cobrar, pasa igual con la nota de Recaudación (la deuda sigue
+ *                     pendiente y las oficinas siguientes ven el aviso).
  *   notificarDeuda  manda un correo a cada titular con deuda pendiente.
  */
 @Injectable()
@@ -117,9 +119,7 @@ export class EtapaRecaudacionService {
       //6.- Sin deuda: si estaba en espera se reanuda, y pasa a Distrito (o a la oficina que observó
       //    si vino por un cambio de titulares).
       if (actual.estado === EstadoExpediente.EN_ESPERA) await this.expedientes.cambiarEstado(tx, actual, EstadoExpediente.EN_TRAMITE, usuario);
-      const correccion = await this.expedientes.ultimaActuacion(tx, actual.id, [TipoActuacion.CORRECCION]);
-      const ultimoSinDeuda = await this.expedientes.ultimaActuacion(tx, actual.id, [TipoActuacion.VERIFICACION_DEUDA], ResultadoActuacion.SIN_DEUDA);
-      const destino = destinoTrasVerificarDeuda(correccion, ultimoSinDeuda, SIGUIENTE_ETAPA[Etapa.RECAUDACION]!);
+      const destino = await this.destino(tx, actual);
 
       //6.1.- Queda registrado A QUIÉNES y QUÉ concesiones se verificó (si cambian, se vuelve a verificar).
       await this.expedientes.actuar(tx, actual, {
@@ -131,6 +131,54 @@ export class EtapaRecaudacionService {
       });
       await this.expedientes.pasar(tx, actual, { etapa: destino, usuario, dictamen: Dictamen.APTO, observaciones: datos.observaciones });
     });
+  }
+
+  /**
+   * Recaudación no pudo cobrar la deuda y le da curso igual al expediente que estaba en espera:
+   *   1. Solo desde EN ESPERA (primero se intenta cobrar) y tomado por Recaudación.
+   *   2. Tiene que haber deuda pendiente (si no, corresponde «Apto»).
+   *   3. La deuda NO se cancela: sigue pendiente. Queda la actuación CURSO_CON_DEUDA con la nota
+   *      de por qué se le dio curso y qué deudas tenía; las oficinas siguientes la ven
+   *      (ExpedientesService.avisoDeuda) y vale como visto bueno de Recaudación para finalizar.
+   *   4. Pasa a Distrito (o a la oficina que observó, igual que con «Apto»).
+   */
+  async darCursoConDeuda(tipo: TipoTramite, expedienteId: string, datos: CursoConDeudaDto, usuarioId: string): Promise<void> {
+    await this.dataSource.transaction(async (tx) => {
+      //1.- Tomado por Recaudación y en espera por deuda.
+      const { expediente, usuario } = await this.expedientes.bloquearParaActuar(tx, expedienteId, tipo, [Etapa.RECAUDACION], usuarioId, [EstadoExpediente.EN_ESPERA]);
+
+      //2.- Las deudas pendientes de las personas del trámite.
+      const personas = await this.registro.de(tipo).personasAVerificar(tx, expediente);
+      const personaIds = personas.map((p) => p.id);
+      const pendientes = await this.recaudacion.pendientesDe(tx, personaIds);
+      if (!pendientes.length) throw new ConflictException('Los titulares ya no tienen deudas pendientes: marque «Apto» para pasarlo.');
+      const concesiones = await this.recaudacion.concesionesDe(tx, personaIds, expediente.id);
+
+      //3.- Se reanuda y queda la nota con el detalle de lo que se adeuda.
+      await this.expedientes.cambiarEstado(tx, expediente, EstadoExpediente.EN_TRAMITE, usuario);
+      const destino = await this.destino(tx, expediente);
+      await this.expedientes.actuar(tx, expediente, {
+        tipo: TipoActuacion.VERIFICACION_DEUDA,
+        resultado: ResultadoActuacion.CURSO_CON_DEUDA,
+        usuario,
+        observaciones: datos.observaciones,
+        datos: {
+          personas: personaIds,
+          concesiones: concesiones.map((c) => c.id),
+          deudas: pendientes.map((d) => ({ id: d.id, personaId: d.persona.id, concesionId: d.concesion?.id ?? null, detalle: d.detalle })),
+        },
+      });
+
+      //4.- Pasa con la nota en el pase.
+      await this.expedientes.pasar(tx, expediente, { etapa: destino, usuario, dictamen: Dictamen.APTO, observaciones: `Curso con deuda: ${datos.observaciones}` });
+    });
+  }
+
+  /** A dónde pasa al salir de Recaudación: Distrito, o la oficina que observó si volvió por un cambio de titulares. */
+  private async destino(tx: EntityManager, expediente: Expediente): Promise<Etapa> {
+    const correccion = await this.expedientes.ultimaActuacion(tx, expediente.id, [TipoActuacion.CORRECCION]);
+    const ultimaVerificada = await this.expedientes.ultimaActuacion(tx, expediente.id, [TipoActuacion.VERIFICACION_DEUDA], DEUDA_VERIFICADA);
+    return destinoTrasVerificarDeuda(correccion, ultimaVerificada, SIGUIENTE_ETAPA[Etapa.RECAUDACION]!);
   }
 
   async notificarDeuda(tipo: TipoTramite, expedienteId: string, datos: NotificarDeudaDto, usuarioId: string): Promise<ResultadoAvisoDeuda> {

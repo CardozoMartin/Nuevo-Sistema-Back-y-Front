@@ -1,7 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { DataSource, type DataSourceOptions } from 'typeorm';
-import { Etapa, Oficina, TipoActuacion } from '../expedientes/expedientes.constantes.js';
+import { Etapa, Oficina, ResultadoActuacion, TipoActuacion } from '../expedientes/expedientes.constantes.js';
 
 /** Esquemas que tienen que existir antes de crear tablas y vistas. */
 const ESQUEMAS = ['sig'];
@@ -10,12 +10,14 @@ const ESQUEMAS = ['sig'];
  * Enumerados de PostgreSQL que usan VARIAS columnas (ej: exp_oficina, en expedientes, pases
  * y actuaciones). Si se les agrega un valor, el synchronize de TypeORM intenta agregarlo una
  * vez por columna y falla en la segunda («enum label already exists»). Por eso los valores
- * nuevos se agregan antes de sincronizar.
+ * nuevos se agregan antes de sincronizar. exp_resultado_actuacion va también: así un valor
+ * nuevo se agrega sin que el synchronize recree el tipo sobre exp_actuacion.
  */
 const ENUMS_COMPARTIDOS: Record<string, string[]> = {
   exp_oficina: Object.values(Oficina),
   exp_etapa: Object.values(Etapa),
   exp_tipo_actuacion: Object.values(TipoActuacion),
+  exp_resultado_actuacion: Object.values(ResultadoActuacion),
 };
 
 /** Conexión a PostgreSQL a partir del .env (ver .env.example). */

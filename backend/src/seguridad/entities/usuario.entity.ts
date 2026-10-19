@@ -1,4 +1,5 @@
 import { Check, Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from 'typeorm';
+import { Distrito } from '../../catalogos/entities/distrito.entity.js';
 import { OficinaDrh } from './oficina.entity.js';
 import { RolDrh } from './rol.entity.js';
 
@@ -41,6 +42,14 @@ export class Usuario {
   @ManyToOne(() => RolDrh, { nullable: true, onDelete: 'RESTRICT', eager: true })
   @JoinColumn({ name: 'rol_codigo', foreignKeyConstraintName: 'fk_usuario_rol' })
   rol: Relation<RolDrh> | null;
+
+  /**
+   * Solo en la oficina Distrito: el distrito que atiende el jefe. Ve y trabaja solo los
+   * expedientes de ese distrito (el de la ubicación de la concesión). null: todos los distritos.
+   */
+  @ManyToOne(() => Distrito, { nullable: true, onDelete: 'RESTRICT', eager: true })
+  @JoinColumn({ name: 'distrito_id', foreignKeyConstraintName: 'fk_usuario_distrito' })
+  distrito: Relation<Distrito> | null;
 
   /** Puede todo, en cualquier oficina (el usuario «Sistema» y los administradores). */
   @Column({ name: 'es_administrador', default: false })

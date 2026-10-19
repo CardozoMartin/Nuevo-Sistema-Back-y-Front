@@ -5,10 +5,11 @@ import { Etapa, NOMBRE_ETAPA, NOMBRE_TIPO_TRAMITE, OFICINA_DE_ETAPA, SIGUIENTE_E
 import { OficinaDrh } from '../seguridad/entities/oficina.entity.js';
 import { UsuariosService } from '../seguridad/usuarios.service.js';
 import { CatalogosService } from './catalogos.service.js';
-import { ESTADOS_EXPEDIENTE_INICIALES, OPCIONES_INICIALES, TRAMITES_MENU_CATASTRO } from './catalogos.seed.js';
+import { ESTADOS_EXPEDIENTE_INICIALES, OPCIONES_INICIALES, PLAZOS_INICIALES, TRAMITES_MENU_CATASTRO } from './catalogos.seed.js';
 import { EstadoExpedienteCatalogo } from './entities/estado-expediente.entity.js';
 import { EtapaCatalogo } from './entities/etapa.entity.js';
 import { GrupoOpcion, Opcion } from './entities/opcion.entity.js';
+import { PlazoOficina } from './entities/plazo-oficina.entity.js';
 import { TipoTramiteCatalogo } from './entities/tipo-tramite.entity.js';
 
 /**
@@ -35,6 +36,7 @@ export class DominioService implements OnApplicationBootstrap {
     @InjectRepository(EstadoExpedienteCatalogo) private readonly estados: Repository<EstadoExpedienteCatalogo>,
     @InjectRepository(Opcion) private readonly opciones: Repository<Opcion>,
     @InjectRepository(OficinaDrh) private readonly oficinas: Repository<OficinaDrh>,
+    @InjectRepository(PlazoOficina) private readonly plazos: Repository<PlazoOficina>,
     private readonly catalogos: CatalogosService,
     private readonly usuarios: UsuariosService,
   ) {}
@@ -62,6 +64,16 @@ export class DominioService implements OnApplicationBootstrap {
 
     const estados = Object.entries(ESTADOS_EXPEDIENTE_INICIALES).map(([codigo, e], i) => ({ codigo, ...e, orden: i }));
     await this.agregarFaltantes(this.estados, estados, 'estados de expediente');
+
+    // Plazos: los que falten (oficina + trámite); los que ya están no se pisan.
+    const conPlazo = new Set((await this.plazos.find()).map((p) => `${p.oficinaCodigo}|${p.tipoTramiteCodigo}`));
+    const plazos = Object.entries(PLAZOS_INICIALES)
+      .flatMap(([oficinaCodigo, dias]) => Object.values(TipoTramite).map((tipoTramiteCodigo) => ({ oficinaCodigo, tipoTramiteCodigo, dias })))
+      .filter((p) => !conPlazo.has(`${p.oficinaCodigo}|${p.tipoTramiteCodigo}`));
+    if (plazos.length) {
+      await this.plazos.save(plazos);
+      this.logger.log(`Plazos de las oficinas cargados: ${plazos.length}.`);
+    }
 
     const existentes = new Set((await this.opciones.find()).map((o) => `${o.grupo}|${o.codigo}`));
     const opciones = Object.entries(OPCIONES_INICIALES)

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/cn'
 import { mensajeDeError } from '@/services/api/errors'
-import { permisosDeOficina, plantillaDe, type MatrizPermisos, type UsuarioDatos, type UsuarioListado } from '../api'
+import { permisosDeOficina, plantillaDe, useDistritos, type MatrizPermisos, type UsuarioDatos, type UsuarioListado } from '../api'
 
 interface Props {
   /** null: alta de un usuario nuevo. */
@@ -34,7 +34,10 @@ export function UsuarioDialog({ usuario, matriz, guardando, onGuardar, onCerrar 
     esAdministrador: usuario?.esAdministrador ?? false,
     oficina: usuario?.oficina?.codigo ?? '',
     rol: usuario?.rol?.codigo ?? '',
+    distrito: usuario?.distrito?.codigo ?? '',
   })
+  const distritos = useDistritos()
+  const esDistrito = d.oficina === 'distrito'
   const [permisos, setPermisos] = useState<string[]>(usuario?.permisos ?? [])
   const [errores, setErrores] = useState<Errores>({})
 
@@ -67,7 +70,7 @@ export function UsuarioDialog({ usuario, matriz, guardando, onGuardar, onCerrar 
     try {
       // Solo los que corresponden a la oficina elegida.
       const validos = permisos.filter((p) => disponibles.some((x) => x.codigo === p))
-      await onGuardar({ ...d, oficina: d.oficina || undefined, rol: d.rol || undefined, permisos: d.esAdministrador ? [] : validos })
+      await onGuardar({ ...d, oficina: d.oficina || undefined, rol: d.rol || undefined, distrito: esDistrito && d.distrito ? d.distrito : null, permisos: d.esAdministrador ? [] : validos })
     } catch (err) {
       setErrores({ general: mensajeDeError(err) })
     }
@@ -127,6 +130,17 @@ export function UsuarioDialog({ usuario, matriz, guardando, onGuardar, onCerrar 
               onChange={(e) => cambiarPuesto('rol', e.target.value)}
             />
           </Field>
+          {esDistrito && (
+            <Field id="u-distrito" label="Distrito que atiende" hint="Ve y trabaja solo los expedientes de ese distrito. «Todos»: los de cualquier distrito.">
+              <Select
+                id="u-distrito"
+                placeholder="Todos los distritos"
+                options={(distritos.data ?? []).map((x) => ({ value: x.codigo, label: x.nombre }))}
+                value={d.distrito ?? ''}
+                onChange={(e) => cambiar('distrito', e.target.value)}
+              />
+            </Field>
+          )}
           <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm sm:col-span-2 dark:border-slate-700">
             <input type="checkbox" className="mt-0.5 size-4" checked={d.esAdministrador} onChange={(e) => cambiar('esAdministrador', e.target.checked)} />
             <span>

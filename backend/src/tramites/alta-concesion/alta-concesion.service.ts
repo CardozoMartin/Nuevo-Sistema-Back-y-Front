@@ -60,7 +60,8 @@ export class AltaConcesionService {
 
   /** Todo lo cargado en un alta (cualquiera sea la oficina en que esté). */
   async obtener(expedienteId: string): Promise<RespuestaAlta> {
-    return armarRespuestaAlta(await this.cargarPiezas(this.dataSource.manager, expedienteId));
+    const respuesta = armarRespuestaAlta(await this.cargarPiezas(this.dataSource.manager, expedienteId));
+    return { ...respuesta, avisoDeuda: await this.expedientes.avisoDeuda(expedienteId) };
   }
 
   /** Junta el expediente, su concesión y todo lo vigente. 404 si no es un alta. */

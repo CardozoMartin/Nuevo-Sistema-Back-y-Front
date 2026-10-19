@@ -1,7 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 import type { Expediente } from '../../expedientes/entities/expediente.entity.js';
-import { EstadoExpediente, Etapa, ResultadoActuacion, SIGUIENTE_ETAPA, TipoActuacion, type TipoTramite } from '../../expedientes/expedientes.constantes.js';
+import { DEUDA_VERIFICADA, EstadoExpediente, Etapa, ResultadoActuacion, SIGUIENTE_ETAPA, TipoActuacion, type TipoTramite } from '../../expedientes/expedientes.constantes.js';
 import { ExpedientesService } from '../../expedientes/expedientes.service.js';
 import type { ObservacionesDto, PadronDto } from './dto/circuito.dto.js';
 import { RegistroTramitesService } from './registro-tramites.service.js';
@@ -11,13 +11,14 @@ import { RegistroTramitesService } from './registro-tramites.service.js';
  * actuación de cada tipo (si Distrito observó y después aprobó, vale el apto). Si alguna
  * oficina dijo «no apto», el expediente ya está rechazado y no llega hasta acá.
  */
-const VISTOS_BUENOS: [TipoActuacion, ResultadoActuacion, string][] = [
-  [TipoActuacion.VERIFICACION_DEUDA, ResultadoActuacion.SIN_DEUDA, 'Recaudación (sin deuda)'],
-  [TipoActuacion.INFORME_TECNICO, ResultadoActuacion.APTO, 'Distrito (apto)'],
-  [TipoActuacion.DICTAMEN_JURIDICO, ResultadoActuacion.APTO, 'Jurídico (apto)'],
-  [TipoActuacion.NUMERO_CONCESION, ResultadoActuacion.REGISTRADO, 'Catastro (número de concesión)'],
-  [TipoActuacion.RESOLUCION, ResultadoActuacion.REGISTRADO, 'Secretaría General (resolución)'],
-  [TipoActuacion.VERIFICACION_FINAL, ResultadoActuacion.APTO, 'Catastro (verificación final)'],
+const VISTOS_BUENOS: [TipoActuacion, ResultadoActuacion[], string][] = [
+  // Con deuda también vale si Recaudación le dio curso con su nota (CURSO_CON_DEUDA).
+  [TipoActuacion.VERIFICACION_DEUDA, DEUDA_VERIFICADA, 'Recaudación (sin deuda o con curso autorizado)'],
+  [TipoActuacion.INFORME_TECNICO, [ResultadoActuacion.APTO], 'Distrito (apto)'],
+  [TipoActuacion.DICTAMEN_JURIDICO, [ResultadoActuacion.APTO], 'Jurídico (apto)'],
+  [TipoActuacion.NUMERO_CONCESION, [ResultadoActuacion.REGISTRADO], 'Catastro (número de concesión)'],
+  [TipoActuacion.RESOLUCION, [ResultadoActuacion.REGISTRADO], 'Secretaría General (resolución)'],
+  [TipoActuacion.VERIFICACION_FINAL, [ResultadoActuacion.APTO], 'Catastro (verificación final)'],
 ];
 
 /**
@@ -76,9 +77,9 @@ export class EtapaCierreService {
    */
   async exigirVistosBuenos(tx: EntityManager, expediente: Expediente): Promise<void> {
     const faltan: string[] = [];
-    for (const [tipo, resultado, nombre] of VISTOS_BUENOS) {
+    for (const [tipo, resultados, nombre] of VISTOS_BUENOS) {
       const ultima = await this.expedientes.ultimaActuacion(tx, expediente.id, [tipo]);
-      if (ultima?.resultado !== resultado) faltan.push(nombre);
+      if (!ultima || !resultados.includes(ultima.resultado)) faltan.push(nombre);
     }
     if (faltan.length) throw new ConflictException(`No se puede finalizar: falta el visto bueno de ${faltan.join(', ')}.`);
   }

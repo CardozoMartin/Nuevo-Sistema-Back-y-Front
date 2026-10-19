@@ -45,6 +45,8 @@ export const altaConcesionApi = {
   /** Apto: pasa a la oficina siguiente. No apto: queda en espera en Recaudación (con la concesión que debe marcada). */
   recaudacion: (id: string, dto: { resultado: 'APTO' | 'NO_APTO'; concesiones: { concesionId: string; tieneDeuda: boolean }[]; observaciones?: string }) =>
     datos(backend.post<AltaBackend>(`${ALTA}/${id}/recaudacion`, dto)),
+  /** En espera por deuda y no se pudo cobrar: pasa igual con la nota de por qué (la deuda sigue pendiente). */
+  cursoConDeuda: (id: string, observaciones: string) => datos(backend.post<AltaBackend>(`${ALTA}/${id}/recaudacion/curso-con-deuda`, { observaciones })),
   dictaminar: (id: string, oficina: 'distrito' | 'juridico', dto: { resultado: ResultadoDictamen; observaciones?: string }) =>
     datos(backend.post<AltaBackend>(`${ALTA}/${id}/${oficina}`, dto)),
   numeroConcesion: (id: string) => datos(backend.post<AltaBackend>(`${ALTA}/${id}/numero-concesion`)),

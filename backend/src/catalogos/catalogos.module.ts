@@ -12,6 +12,7 @@ import { DominioService } from './dominio.service.js';
 import { EstadoExpedienteCatalogo } from './entities/estado-expediente.entity.js';
 import { EtapaCatalogo } from './entities/etapa.entity.js';
 import { Opcion } from './entities/opcion.entity.js';
+import { PlazoOficina } from './entities/plazo-oficina.entity.js';
 import { TipoTramiteCatalogo } from './entities/tipo-tramite.entity.js';
 import { OficinaDrh } from '../seguridad/entities/oficina.entity.js';
 import { Cuenca } from './entities/cuenca.entity.js';
@@ -36,7 +37,7 @@ import { UbicacionesService } from './ubicaciones.service.js';
  * (AbmSuministroController + SuministroAbmService).
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([SituacionLegal, DocumentoRequerido, TipoUso, Departamento, Localidad, Distrito, Cuenca, SuministroZona, SuministroOpcion, SuministroCanal, TipoTramiteCatalogo, EtapaCatalogo, EstadoExpedienteCatalogo, Opcion, OficinaDrh])],
+  imports: [TypeOrmModule.forFeature([SituacionLegal, DocumentoRequerido, TipoUso, Departamento, Localidad, Distrito, Cuenca, SuministroZona, SuministroOpcion, SuministroCanal, TipoTramiteCatalogo, EtapaCatalogo, EstadoExpedienteCatalogo, Opcion, OficinaDrh, PlazoOficina])],
   controllers: [CatalogosController, DominioController, AbmUbicacionesController, AbmSuministroController],
   providers: [CatalogosService, DominioService, UbicacionesService, SuministroCatalogoService, SuministroAbmService, DepartamentosService, LocalidadesService, DistritosService, CuencasService],
   exports: [CatalogosService, UbicacionesService, SuministroCatalogoService],

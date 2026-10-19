@@ -66,6 +66,13 @@ export class UsuarioDto {
   @IsNotEmpty({ message: 'Elija el rol.' })
   rol?: string;
 
+  /** Solo oficina Distrito: el distrito que atiende («I» a «VII»). Vacío: todos los distritos. */
+  @IsOptional()
+  @Texto()
+  @IsString()
+  @MaxLength(10)
+  distrito?: string | null;
+
   /**
    * Permisos del usuario (de su oficina o generales). Si no viene: en el alta, o si cambió la
    * oficina o el rol, se precargan con la plantilla del rol; si no, se dejan como estaban.

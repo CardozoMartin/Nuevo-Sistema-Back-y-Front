@@ -4,7 +4,7 @@ import { UsuarioActual } from '../../seguridad/usuario-actual.decorator.js';
 import { RecibirKml, type ArchivoSubido } from '../../sig/kml/archivo-kml.js';
 import { AltaCircuitoService } from './alta-circuito.service.js';
 import { AltaConcesionService } from './alta-concesion.service.js';
-import { DictamenDto, NotificarDeudaDto, ObservacionesDto, PadronDto, ResolucionDto, VerificacionDeudaDto } from '../circuito/dto/circuito.dto.js';
+import { CursoConDeudaDto, DictamenDto, NotificarDeudaDto, ObservacionesDto, PadronDto, ResolucionDto, VerificacionDeudaDto } from '../circuito/dto/circuito.dto.js';
 import { DatosInmuebleDto } from './dto/datos-inmueble.dto.js';
 import { GuardarTitularesDto } from './dto/guardar-titulares.dto.js';
 import { IniciarAltaDto } from './dto/iniciar-alta.dto.js';
@@ -139,6 +139,16 @@ export class AltaConcesionController {
   @RequierePermiso(Permiso.DEUDA_VERIFICAR)
   recaudacion(@Param('id', ParseIntPipe) id: number, @Body() dto: VerificacionDeudaDto, @UsuarioActual() usuarioId: string) {
     return this.circuito.verificarDeuda(String(id), dto, usuarioId);
+  }
+
+  /**
+   * Recaudación: el expediente está en espera por deuda y no se pudo cobrar → pasa igual a
+   * Distrito con la nota de por qué ({ observaciones }). La deuda sigue pendiente.
+   */
+  @Post(':id/recaudacion/curso-con-deuda')
+  @RequierePermiso(Permiso.DEUDA_VERIFICAR)
+  cursoConDeuda(@Param('id', ParseIntPipe) id: number, @Body() dto: CursoConDeudaDto, @UsuarioActual() usuarioId: string) {
+    return this.circuito.darCursoConDeuda(String(id), dto, usuarioId);
   }
 
   /** Recaudación: avisa por correo a los titulares con deuda pendiente (cada envío queda registrado). */

@@ -37,6 +37,7 @@ export class AuthService {
       .addSelect('u.claveHash')
       .leftJoinAndSelect('u.oficina', 'oficina')
       .leftJoinAndSelect('u.rol', 'rol')
+      .leftJoinAndSelect('u.distrito', 'distrito')
       .where('upper(u.legajo) = upper(:id) OR lower(u.email) = lower(:id)', { id })
       .getOne();
     if (!usuario || !usuario.activo || !usuario.claveHash) throw new UnauthorizedException(INCORRECTO);

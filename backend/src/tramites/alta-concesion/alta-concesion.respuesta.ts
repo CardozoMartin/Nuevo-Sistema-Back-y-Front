@@ -10,6 +10,7 @@ import type { Concesion } from '../../concesiones/entities/concesion.entity.js';
 import type { Punto } from '../../concesiones/entities/punto.entity.js';
 import type { PoligonoVigente } from '../../concesiones/poligonos.service.js';
 import type { DocumentacionPresentada } from '../../expedientes/entities/documentacion-presentada.entity.js';
+import type { AvisoDeuda } from '../../expedientes/expedientes.service.js';
 import type { Expediente } from '../../expedientes/entities/expediente.entity.js';
 import type { SolicitudNumero } from '../../expedientes/entities/solicitud-numero.entity.js';
 import { formatearNumeroExpediente, NOMBRE_ETAPA, NOMBRE_OFICINA } from '../../expedientes/expedientes.constantes.js';
@@ -210,4 +211,7 @@ export function armarRespuestaAlta(piezas: PiezasAlta) {
   };
 }
 
-export type RespuestaAlta = ReturnType<typeof armarRespuestaAlta>;
+export type RespuestaAlta = ReturnType<typeof armarRespuestaAlta> & {
+  /** Recaudación le dio curso con deuda: la nota y las deudas (lo ven todas las oficinas). */
+  avisoDeuda: AvisoDeuda | null;
+};

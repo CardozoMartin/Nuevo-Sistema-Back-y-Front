@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Etapa, TipoTramite } from '../../expedientes/expedientes.constantes.js';
-import type { DictamenDto, NotificarDeudaDto, ObservacionesDto, PadronDto, ResolucionDto, VerificacionDeudaDto } from '../circuito/dto/circuito.dto.js';
+import type { CursoConDeudaDto, DictamenDto, NotificarDeudaDto, ObservacionesDto, PadronDto, ResolucionDto, VerificacionDeudaDto } from '../circuito/dto/circuito.dto.js';
 import { EtapaCierreService } from '../circuito/etapa-cierre.service.js';
 import { EtapaDictamenService } from '../circuito/etapa-dictamen.service.js';
 import { EtapaEnvioService } from '../circuito/etapa-envio.service.js';
@@ -20,6 +20,7 @@ const ALTA = TipoTramite.ALTA_CONCESION;
  *   Catastro            enviar ─────────────────────────────────────► Recaudación
  *   Recaudación         por cada concesión otorgada de los titulares: ¿tiene deuda? (sí / no)
  *                       ninguna ► Distrito  |  alguna ► EN ESPERA hasta que se levante la deuda
+ *                       si no se puede cobrar: curso con deuda (con nota) ► Distrito, con aviso
  *                       notificarDeuda: correo a los titulares con deuda
  *   Distrito            APTO ► Jurídico   |  OBSERVADO ► Catastro corrige  |  NO_APTO ► RECHAZADO
  *   Jurídico            APTO ► Secretaría |  OBSERVADO ► Catastro corrige  |  NO_APTO ► RECHAZADO
@@ -56,6 +57,11 @@ export class AltaCircuitoService {
 
   async verificarDeuda(id: string, datos: VerificacionDeudaDto, usuarioId: string): Promise<RespuestaAlta> {
     await this.recaudacion.verificarDeuda(ALTA, id, datos, usuarioId);
+    return this.alta.obtener(id);
+  }
+
+  async darCursoConDeuda(id: string, datos: CursoConDeudaDto, usuarioId: string): Promise<RespuestaAlta> {
+    await this.recaudacion.darCursoConDeuda(ALTA, id, datos, usuarioId);
     return this.alta.obtener(id);
   }
 

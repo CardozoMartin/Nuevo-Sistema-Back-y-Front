@@ -24,6 +24,7 @@ const valor = (v: string | null | undefined) => (v?.trim() ? normalizarValor(v) 
  * de la concesión (paso 3), y los canales tienen que ser un camino de su árbol. Si la ubicación
  * no tiene catálogo, solo se cargan la observación y el caudal.
  */
+
 @Injectable()
 export class SuministroAltaService {
   constructor(

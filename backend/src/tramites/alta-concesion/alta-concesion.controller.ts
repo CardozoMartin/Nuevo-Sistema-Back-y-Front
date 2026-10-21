@@ -39,36 +39,29 @@ export class AltaConcesionController {
     private readonly circuito: AltaCircuitoService,
   ) {}
 
-  // ---------------------------------------------------------------------------
-  // Consultas
-  // ---------------------------------------------------------------------------
 
-  /** Todo lo cargado del alta, dónde está y qué pasos de la carga están completos. */
+  //Todo lo cargado del alta, dónde está y qué pasos de la carga están completos.
   @Get(':id')
   @ConDatosSensibles()
   obtener(@Param('id', ParseIntPipe) id: number) {
     return this.alta.obtener(String(id));
   }
 
-  // ---------------------------------------------------------------------------
-  // Catastro: carga de datos (cada PUT guarda una sección completa)
-  // ---------------------------------------------------------------------------
-
-  /** Paso 1: registra el expediente en papel e inicia el alta. */
+  //Paso 1.1: registra el expediente en papel e inicia el alta.
   @Post()
   @RequierePermiso(Permiso.ALTA_INICIAR)
   iniciar(@Body() dto: IniciarAltaDto, @UsuarioActual() usuarioId: string) {
     return this.inicio.iniciar(dto, usuarioId);
   }
 
-  /** Paso 2: titulares (personas únicas por documento) y domicilios legales. */
+  //Paso 1.2: titulares (personas únicas por documento) y domicilios legales.
   @Put(':id/titulares')
   @RequierePermiso(Permiso.ALTA_CARGAR)
   guardarTitulares(@Param('id', ParseIntPipe) id: number, @Body() dto: GuardarTitularesDto, @UsuarioActual() usuarioId: string) {
     return this.titulares.guardar(String(id), dto, usuarioId);
   }
 
-  /** Paso 3: ubicación de la concesión. multipart/form-data: departamento, localidad y distrito + «archivo» (KML/GeoJSON, optativo). */
+  //Paso 1.3: ubicación de la concesión. multipart/form-data: departamento, localidad y distrito + «archivo» (KML/GeoJSON, optativo).
   @Put(':id/ubicacion')
   @UseInterceptors(RecibirKml())
   @RequierePermiso(Permiso.ALTA_CARGAR)
@@ -84,46 +77,45 @@ export class AltaConcesionController {
     return this.ubicacion.guardar(String(id), dto, usuarioId, archivo);
   }
 
-  /** Paso 4: inmueble (datos catastrales + registro de dominio). */
+  //Paso 1.4: inmueble (datos catastrales + registro de dominio).
   @Put(':id/inmueble')
   @RequierePermiso(Permiso.ALTA_CARGAR)
   guardarInmueble(@Param('id', ParseIntPipe) id: number, @Body() dto: DatosInmuebleDto, @UsuarioActual() usuarioId: string) {
     return this.inmueble.guardar(String(id), dto, usuarioId);
   }
 
-  /** Paso 5: usos, magnitudes, desagüe y punto de entrega. */
+  //Paso 1.5: usos, magnitudes, desagüe y punto de entrega.
   @Put(':id/usos')
   @RequierePermiso(Permiso.ALTA_CARGAR)
   guardarUsos(@Param('id', ParseIntPipe) id: number, @Body() dto: UsosDto, @UsuarioActual() usuarioId: string) {
     return this.usos.guardar(String(id), dto, usuarioId);
   }
 
-  /** Paso 6: suministro (fuente, sistema, canales) y caudal asignado. */
+  //Paso 1.6: suministro (fuente, sistema, canales) y caudal asignado.
   @Put(':id/suministro')
   @RequierePermiso(Permiso.ALTA_CARGAR)
   guardarSuministro(@Param('id', ParseIntPipe) id: number, @Body() dto: SuministroDto, @UsuarioActual() usuarioId: string) {
     return this.suministro.guardar(String(id), dto, usuarioId);
   }
 
-  // ---------------------------------------------------------------------------
   // Circuito por las oficinas
-  // ---------------------------------------------------------------------------
 
-  /** Catastro: termina la carga y lo envía a Recaudación. */
+
+  //Catastro: termina la carga preliminar y lo envía a Recaudación.
   @Post(':id/enviar')
   @RequierePermiso(Permiso.ALTA_CARGAR)
   enviar(@Param('id', ParseIntPipe) id: number, @Body() dto: ObservacionesDto, @UsuarioActual() usuarioId: string) {
     return this.circuito.enviar(String(id), dto, usuarioId);
   }
 
-  /** Catastro: corrigió lo observado y lo reenvía a la oficina que lo observó. */
+  // Catastro: corrigió lo observado y lo reenvía a la oficina que lo observó.
   @Post(':id/reenviar')
   @RequierePermiso(Permiso.ALTA_CARGAR)
   reenviar(@Param('id', ParseIntPipe) id: number, @Body() dto: ObservacionesDto, @UsuarioActual() usuarioId: string) {
     return this.circuito.reenviar(String(id), dto, usuarioId);
   }
 
-  /** Recaudación: concesiones otorgadas de los titulares (tener otra solo se informa) y si tienen deuda. */
+  // Recaudación: concesiones otorgadas de los titulares (tener otra solo se informa) y si tienen deuda.
   @Get(':id/recaudacion')
   @ConDatosSensibles()
   @SoloOficina(Oficina.RECAUDACION)

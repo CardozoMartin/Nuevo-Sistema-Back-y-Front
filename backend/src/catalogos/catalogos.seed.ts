@@ -2,7 +2,7 @@
 // (mock-server/db.json → situacionesLegales, usos). Se cargan solo si la tabla está vacía.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Caracter, CODIGOS_SERVICIO, SECCIONES_CATASTRALES, SERVICIOS } from '../concesiones/concesiones.constantes.js';
+import { Caracter, CODIGOS_SERVICIO, EstadoConcesion, SECCIONES_CATASTRALES, SERVICIOS } from '../concesiones/concesiones.constantes.js';
 import { EstadoExpediente, Oficina, TipoTramite } from '../expedientes/expedientes.constantes.js';
 import { GrupoOpcion } from './entities/opcion.entity.js';
 
@@ -104,6 +104,15 @@ export const ESTADOS_EXPEDIENTE_INICIALES: Record<EstadoExpediente, { nombre: st
   [EstadoExpediente.RECHAZADO]: { nombre: 'Rechazado', color: 'gris', pendiente: false },
   [EstadoExpediente.ARCHIVADO]: { nombre: 'Archivado', color: 'gris', pendiente: false },
   [EstadoExpediente.ANULADO]: { nombre: 'Anulado', color: 'gris', pendiente: false },
+};
+
+export const ESTADOS_CONCESION_INICIALES: Record<EstadoConcesion, { nombre: string; color: string }> = {
+  [EstadoConcesion.EN_TRAMITE]: { nombre: 'En trámite', color: 'azul' },
+  [EstadoConcesion.VIGENTE]: { nombre: 'Vigente', color: 'verde' },
+  [EstadoConcesion.MODIFICADA]: { nombre: 'Modificada', color: 'ambar' },
+  [EstadoConcesion.DENEGADA]: { nombre: 'Denegada', color: 'rojo' },
+  [EstadoConcesion.ANULADA]: { nombre: 'Anulada', color: 'gris' },
+  [EstadoConcesion.ARCHIVADA]: { nombre: 'Archivada', color: 'gris' },
 };
 
 /** Listas cortas (cat_opcion). Circunscripciones y secciones: las mismas que valida el alta. */

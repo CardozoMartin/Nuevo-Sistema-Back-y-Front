@@ -51,7 +51,7 @@ export interface TramiteInfo {
   icono: string
 }
 
-export type ColorEstado = 'azul' | 'ambar' | 'verde' | 'gris'
+export type ColorEstado = 'azul' | 'ambar' | 'verde' | 'gris' | 'rojo'
 
 export interface EstadoInfo {
   id: EstadoExpediente

@@ -9,6 +9,8 @@ export const ROUTES = {
     bandeja: '/catastro/bandeja',
     tramites: '/catastro/tramites',
     pendientes: '/catastro/pendientes',
+    /** Consulta de concesiones con filtros (backend real). */
+    concesiones: '/catastro/concesiones',
   },
 
   recaudacion: '/recaudacion',

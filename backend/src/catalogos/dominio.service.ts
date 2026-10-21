@@ -5,7 +5,8 @@ import { Etapa, NOMBRE_ETAPA, NOMBRE_TIPO_TRAMITE, OFICINA_DE_ETAPA, SIGUIENTE_E
 import { OficinaDrh } from '../seguridad/entities/oficina.entity.js';
 import { UsuariosService } from '../seguridad/usuarios.service.js';
 import { CatalogosService } from './catalogos.service.js';
-import { ESTADOS_EXPEDIENTE_INICIALES, OPCIONES_INICIALES, PLAZOS_INICIALES, TRAMITES_MENU_CATASTRO } from './catalogos.seed.js';
+import { ESTADOS_CONCESION_INICIALES, ESTADOS_EXPEDIENTE_INICIALES, OPCIONES_INICIALES, PLAZOS_INICIALES, TRAMITES_MENU_CATASTRO } from './catalogos.seed.js';
+import { EstadoConcesionCatalogo } from './entities/estado-concesion.entity.js';
 import { EstadoExpedienteCatalogo } from './entities/estado-expediente.entity.js';
 import { EtapaCatalogo } from './entities/etapa.entity.js';
 import { GrupoOpcion, Opcion } from './entities/opcion.entity.js';
@@ -34,6 +35,7 @@ export class DominioService implements OnApplicationBootstrap {
     @InjectRepository(TipoTramiteCatalogo) private readonly tramites: Repository<TipoTramiteCatalogo>,
     @InjectRepository(EtapaCatalogo) private readonly etapas: Repository<EtapaCatalogo>,
     @InjectRepository(EstadoExpedienteCatalogo) private readonly estados: Repository<EstadoExpedienteCatalogo>,
+    @InjectRepository(EstadoConcesionCatalogo) private readonly estadosConcesion: Repository<EstadoConcesionCatalogo>,
     @InjectRepository(Opcion) private readonly opciones: Repository<Opcion>,
     @InjectRepository(OficinaDrh) private readonly oficinas: Repository<OficinaDrh>,
     @InjectRepository(PlazoOficina) private readonly plazos: Repository<PlazoOficina>,
@@ -64,6 +66,9 @@ export class DominioService implements OnApplicationBootstrap {
 
     const estados = Object.entries(ESTADOS_EXPEDIENTE_INICIALES).map(([codigo, e], i) => ({ codigo, ...e, orden: i }));
     await this.agregarFaltantes(this.estados, estados, 'estados de expediente');
+
+    const estadosConcesion = Object.entries(ESTADOS_CONCESION_INICIALES).map(([codigo, e], i) => ({ codigo, ...e, orden: i }));
+    await this.agregarFaltantes(this.estadosConcesion, estadosConcesion, 'estados de concesión');
 
     // Plazos: los que falten (oficina + trámite); los que ya están no se pisan.
     const conPlazo = new Set((await this.plazos.find()).map((p) => `${p.oficinaCodigo}|${p.tipoTramiteCodigo}`));

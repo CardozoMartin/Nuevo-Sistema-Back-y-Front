@@ -21,6 +21,7 @@ export const NAVIGATION: NavSection[] = [
           { key: 'catastro-bandeja', label: 'Bandeja', icon: 'inbox', path: ROUTES.catastro.bandeja, bandejaDe: 'catastro' },
           { key: 'catastro-tramites', label: 'Trámites', icon: 'post_add', path: ROUTES.catastro.tramites },
           { key: 'catastro-pendientes', label: 'Seguimiento', icon: 'assignment_late', path: ROUTES.catastro.pendientes },
+          { key: 'catastro-concesiones', label: 'Consulta de concesiones', icon: 'manage_search', path: ROUTES.catastro.concesiones },
         ],
       },
       {

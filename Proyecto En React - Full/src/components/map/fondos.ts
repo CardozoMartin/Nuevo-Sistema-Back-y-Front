@@ -38,7 +38,8 @@ export const FONDOS: Record<NombreFondo, () => L.Layer> = {
 }
 
 // ---------------------------------------------------------------------------
-// Fondos del visor: los dos de siempre más las variantes del IGN y OpenStreetMap.
+// Fondos del visor: los dos de siempre más Google Híbrido, el topográfico de Esri, las
+// variantes del IGN y OpenStreetMap.
 // Cada uno trae una miniatura (una tesela de Tucumán) para el selector de mapas base.
 // ---------------------------------------------------------------------------
 
@@ -57,10 +58,25 @@ export interface FondoVisor {
 }
 
 export const FONDOS_VISOR: FondoVisor[] = [
-  { id: 'satelite', nombre: 'Satélite', descripcion: 'Imagen Esri con rutas y lugares', miniatura: `${ESRI}/World_Imagery/MapServer/tile/10/591/325`, crear: FONDOS[SATELITE] },
+  { id: 'satelite', nombre: 'Satélite Esri', descripcion: 'Imagen Esri con rutas y lugares', miniatura: `${ESRI}/World_Imagery/MapServer/tile/10/591/325`, crear: FONDOS[SATELITE] },
+  {
+    id: 'google',
+    nombre: 'Google Híbrido',
+    descripcion: 'Imagen de Google con calles y nombres',
+    miniatura: 'https://mt1.google.com/vt/lyrs=y&x=325&y=591&z=10',
+    crear: () =>
+      L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { subdomains: '0123', maxZoom: 21, maxNativeZoom: 20, attribution: 'Imágenes © Google' }),
+  },
   { id: 'argenmap', nombre: 'Argenmap', descripcion: 'Mapa oficial del IGN', miniatura: miniaturaIgn('capabaseargenmap'), crear: FONDOS[ARGENMAP] },
   { id: 'gris', nombre: 'Argenmap gris', descripcion: 'Resalta las capas propias', miniatura: miniaturaIgn('mapabase_gris'), crear: () => capaIgn('mapabase_gris') },
-  { id: 'topo', nombre: 'Topográfico', descripcion: 'Relieve y curvas de nivel (IGN)', miniatura: miniaturaIgn('mapabase_topo'), crear: () => capaIgn('mapabase_topo') },
+  {
+    id: 'topo-esri',
+    nombre: 'Topográfico Esri',
+    descripcion: 'Relieve, caminos y lugares (Esri)',
+    miniatura: `${ESRI}/World_Topo_Map/MapServer/tile/10/591/325`,
+    crear: () => L.tileLayer(`${ESRI}/World_Topo_Map/MapServer/tile/{z}/{y}/{x}`, { ...opcionesEsri, attribution: 'Mapa © Esri' }),
+  },
+  { id: 'topo', nombre: 'Topográfico IGN', descripcion: 'Relieve y curvas de nivel (IGN)', miniatura: miniaturaIgn('mapabase_topo'), crear: () => capaIgn('mapabase_topo') },
   { id: 'oscuro', nombre: 'Argenmap oscuro', descripcion: 'Para trabajar de noche', miniatura: miniaturaIgn('argenmap_oscuro'), crear: () => capaIgn('argenmap_oscuro') },
   {
     id: 'osm',
@@ -86,7 +102,7 @@ export function ponerFondoVisor(m: L.Map, id: string, anterior: L.Layer | null, 
   teselas.on('tileerror', () => {
     if (cargo || ++errores < ERRORES_PARA_CAMBIAR || !m.hasLayer(capa)) return
     teselas.off('tileerror')
-    const reemplazo = fondo.id === 'satelite' ? FONDOS_VISOR[1] : FONDOS_VISOR[0]
+    const reemplazo = FONDOS_VISOR.find((f) => f.id === (fondo.id === 'satelite' ? 'argenmap' : 'satelite'))!
     onFalla(`${fondo.nombre} no responde: se muestra ${reemplazo.nombre}.`, reemplazo.id)
   })
   return capa.addTo(m)

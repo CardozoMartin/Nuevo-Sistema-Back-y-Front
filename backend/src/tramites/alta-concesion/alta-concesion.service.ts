@@ -46,8 +46,6 @@ export interface AltaEditable {
  *   Paso 4  InmuebleAltaService    datos catastrales (matrícula sin duplicar) + dominio
  *   Paso 5  UsosAltaService        carácter, período, desagüe, usos con su caudal y punto de entrega
  *   Paso 6  SuministroAltaService  fuente → sistema → canales en cascada y caudal asignado
- *
- * El circuito por las oficinas (envío, Recaudación, Distrito…) está en AltaCircuitoService.
  */
 @Injectable()
 export class AltaConcesionService {

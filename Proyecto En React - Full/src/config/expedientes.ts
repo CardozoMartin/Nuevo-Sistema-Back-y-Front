@@ -6,6 +6,7 @@ export const CLASE_COLOR_ESTADO: Record<ColorEstado, string> = {
   ambar: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
   verde: 'bg-green-50 text-green-700 dark:bg-green-500/15 dark:text-green-300',
   gris: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+  rojo: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300',
 }
 
 /**

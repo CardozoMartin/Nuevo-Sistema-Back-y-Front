@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { MultiPolygon } from 'geojson';
 import type { EntityManager } from 'typeorm';
 import { SRID_POSGAR, SRID_WGS84 } from '../sig/sig.constantes.js';
-import type { OrigenPoligono } from './concesiones.constantes.js';
+import { PublicacionMapa, type OrigenPoligono } from './concesiones.constantes.js';
 
 export interface NuevoPoligono {
   concesionId: string;
@@ -15,6 +15,10 @@ export interface NuevoPoligono {
   archivo: { nombre: string; ruta: string; sha256: string; bytes: number } | null;
   /** Sistema de coordenadas en que vino el archivo (SistemaCoordenadas). */
   sistemaOrigen?: string | null;
+  /** Por defecto PENDIENTE: lo publica en el mapa quien tiene ese permiso. Los migrados ya entran PUBLICADO. */
+  publicacion?: PublicacionMapa;
+  /** Desde cuándo rige (al reemplazar un polígono que ya tenía resolución, la fecha de esa resolución). */
+  desde?: string | null;
   usuarioId: string;
 }
 
@@ -47,9 +51,11 @@ export class PoligonosService {
       `WITH g AS (SELECT ST_Multi(ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($3), ${SRID_WGS84}), ${SRID_POSGAR})) AS geom)
        INSERT INTO con_poligono
               (concesion_id, expediente_id, geom, superficie_ha, perimetro_m, origen,
-               archivo_nombre, archivo_ruta, archivo_sha256, archivo_bytes, sistema_origen, vigente, creado_usuario_id)
+               archivo_nombre, archivo_ruta, archivo_sha256, archivo_bytes, sistema_origen, vigente, creado_usuario_id,
+               publicacion, publicacion_en, desde)
        SELECT $1, $2, g.geom, ST_Area(g.geom) / 10000, ST_Perimeter(g.geom), $4,
-              $5, $6, $7, $8, $10, true, $9
+              $5, $6, $7, $8, $10, true, $9,
+              $11::con_publicacion_mapa, CASE WHEN $11::con_publicacion_mapa = 'PUBLICADO' THEN now() END, $12::date
          FROM g
        RETURNING id`,
       [
@@ -63,6 +69,8 @@ export class PoligonosService {
         p.archivo?.bytes ?? null,
         p.usuarioId,
         p.sistemaOrigen ?? null,
+        p.publicacion ?? PublicacionMapa.PENDIENTE,
+        p.desde ?? null,
       ],
     );
     return String(fila.id);

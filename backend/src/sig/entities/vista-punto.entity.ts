@@ -3,17 +3,19 @@ import type { Point } from 'geojson';
 import { VistaConcesion } from './vista-concesion.entity.js';
 
 /**
- * Vista sig.v_puntos: el desagüe y el punto de entrega VIGENTES de cada concesión (con_punto),
+ * Vista con_v_mapa_punto (INTERNA): el desagüe y el punto de entrega VIGENTES de cada concesión (con_punto),
  * con la geometría en POSGAR 07 (EPSG:5345). La leen QGIS (clave única: punto_id) y el visor
  * web (GET /api/sig/puntos).
  *
  * `distancia_poligono_m` es un control para la oficina, como `dentro_de_concesion` en los
  * pozos: un desagüe a más de 1 km del polígono suele ser una coordenada mal tipeada. NULL si la
  * concesión todavía no tiene polígono.
+ *
+ * Como en las concesiones, lo que sale para afuera es sig.v_puntos: solo los puntos de las
+ * concesiones publicadas en el mapa.
  */
 @ViewEntity({
-  schema: 'sig',
-  name: 'v_puntos',
+  name: 'con_v_mapa_punto',
   dependsOn: [VistaConcesion],
   expression: `
     SELECT pt.id                       AS punto_id,
@@ -32,10 +34,11 @@ import { VistaConcesion } from './vista-concesion.entity.js';
            c.departamento,
            c.localidad,
            CASE WHEN c.geom IS NULL THEN NULL ELSE round(ST_Distance(pt.geom, c.geom)::numeric)::float8 END AS distancia_poligono_m,
+           COALESCE(c.publicacion = 'PUBLICADO', false) AS publicado,
            pt.geom
       FROM con_punto pt
       JOIN con_concesion cc ON cc.id = pt.concesion_id
-      LEFT JOIN sig.v_concesiones c ON c.concesion_id = pt.concesion_id
+      LEFT JOIN con_v_mapa_concesion c ON c.concesion_id = pt.concesion_id
      WHERE pt.vigente
        AND pt.geom IS NOT NULL
        AND cc.estado NOT IN ('ANULADA', 'DENEGADA')
@@ -58,5 +61,24 @@ export class VistaPunto {
   @ViewColumn() departamento: string | null;
   @ViewColumn() localidad: string | null;
   @ViewColumn({ name: 'distancia_poligono_m' }) distanciaPoligonoM: number | null;
+  @ViewColumn() publicado: boolean;
+  @ViewColumn() geom: Point;
+}
+
+/** Vista sig.v_puntos (PÚBLICA): los puntos de las concesiones publicadas en el mapa (QGIS, GeoServer). */
+@ViewEntity({
+  schema: 'sig',
+  name: 'v_puntos',
+  dependsOn: [VistaPunto],
+  expression: `
+    SELECT punto_id, tipo, sistema_carga, coord_x, coord_y, latitud, longitud, referencia, concesion_id,
+           concesion_numero, concesion_estado, expediente, titular, departamento, localidad, distancia_poligono_m, geom
+      FROM con_v_mapa_punto
+     WHERE publicado
+  `,
+})
+export class VistaPuntoPublica {
+  @ViewColumn({ name: 'punto_id' }) puntoId: string;
+  @ViewColumn({ name: 'concesion_id' }) concesionId: string;
   @ViewColumn() geom: Point;
 }

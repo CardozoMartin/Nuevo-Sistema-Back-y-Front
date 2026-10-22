@@ -46,6 +46,19 @@ export enum OrigenPoligono {
   MIGRACION = 'MIGRACION',
 }
 
+/**
+ * Si el polígono se ve en el mapa público (Argenmap, a través de GeoServer y sig.v_concesiones).
+ * Los usuarios internos lo ven siempre en el visor del sistema; afuera, solo PUBLICADO.
+ *   PENDIENTE  en trámite, o con resolución y esperando que quien publica lo verifique.
+ *   OBSERVADO  quien publica encontró un problema (nota obligatoria): Catastro corrige el KML.
+ *   PUBLICADO  verificado: se ve en Argenmap.
+ */
+export enum PublicacionMapa {
+  PENDIENTE = 'PENDIENTE',
+  OBSERVADO = 'OBSERVADO',
+  PUBLICADO = 'PUBLICADO',
+}
+
 /** Carácter del derecho de uso. */
 export enum Caracter {
   PERMANENTE = 'PERMANENTE',

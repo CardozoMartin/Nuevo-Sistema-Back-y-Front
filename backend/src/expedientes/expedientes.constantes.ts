@@ -191,6 +191,11 @@ export enum TipoActuacion {
   SOLICITUD_NUMERO = 'SOLICITUD_NUMERO',
   /** Se avisó por correo a alguien (ej: Recaudación, la deuda a los titulares). */
   NOTIFICACION = 'NOTIFICACION',
+  /**
+   * Publicación del polígono en el mapa público (Argenmap), por fuera del circuito: APTO (publicado),
+   * OBSERVADO (con nota) o REGISTRADO (Catastro reemplazó el polígono observado).
+   */
+  PUBLICACION_MAPA = 'PUBLICACION_MAPA',
 }
 
 /** Pedido del número de concesión (Secretaría General → Catastro). */

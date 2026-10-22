@@ -13,6 +13,7 @@ export enum Permiso {
   ALTA_CARGAR = 'ALTA_CARGAR',
   KML_CARGAR = 'KML_CARGAR',
   ALTA_CERRAR = 'ALTA_CERRAR',
+  MAPA_PUBLICAR = 'MAPA_PUBLICAR',
   NUMERO_ASIGNAR = 'NUMERO_ASIGNAR',
   CATALOGOS_ADMINISTRAR = 'CATALOGOS_ADMINISTRAR',
   // Recaudación
@@ -54,6 +55,12 @@ export const PERMISOS_INICIALES: Record<Permiso, DefinicionPermiso> = {
     descripcion: 'Subir el polígono de la concesión (KML / GeoJSON). Cambia lo que se ve en el visor.',
   },
   [Permiso.ALTA_CERRAR]: { oficina: Oficina.CATASTRO, grupo: 'Alta de concesión', nombre: 'Cerrar altas', descripcion: 'Verificación final y carga del padrón de Rentas.' },
+  [Permiso.MAPA_PUBLICAR]: {
+    oficina: Oficina.CATASTRO,
+    grupo: 'Alta de concesión',
+    nombre: 'Publicar en el mapa',
+    descripcion: 'Verificar el polígono de una concesión con resolución y publicarlo en Argenmap, u observarlo con una nota.',
+  },
   [Permiso.NUMERO_ASIGNAR]: { oficina: Oficina.CATASTRO, grupo: 'Alta de concesión', nombre: 'Asignar N° de concesión', descripcion: 'Cargar el número de concesión que pidió Secretaría General.' },
   [Permiso.CATALOGOS_ADMINISTRAR]: { oficina: Oficina.CATASTRO, grupo: 'Catálogos', nombre: 'Administrar catálogos', descripcion: 'Altas, cambios y bajas de ubicaciones, suministro y cauces.' },
   [Permiso.DEUDA_VERIFICAR]: { oficina: Oficina.RECAUDACION, grupo: 'Recaudación', nombre: 'Verificar deudas', descripcion: 'Verificar la deuda de los titulares, avisar y registrar pagos.' },
@@ -103,7 +110,7 @@ const DE_OFICINA: Record<Oficina, Permiso[]> = {
 
 /** Solo en la plantilla del Jefe: lo que cambia datos compartidos (el visor, los catálogos). */
 const SOLO_JEFE: Partial<Record<Oficina, Permiso[]>> = {
-  [Oficina.CATASTRO]: [Permiso.KML_CARGAR, Permiso.CATALOGOS_ADMINISTRAR],
+  [Oficina.CATASTRO]: [Permiso.KML_CARGAR, Permiso.MAPA_PUBLICAR, Permiso.CATALOGOS_ADMINISTRAR],
 };
 
 /** Plantillas iniciales (seg_rol_permiso). Solo consulta no tiene permisos. */

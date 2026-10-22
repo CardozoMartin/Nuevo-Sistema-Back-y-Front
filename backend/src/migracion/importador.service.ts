@@ -9,6 +9,7 @@ import {
   EstadoConcesion,
   OrigenConcesion,
   OrigenPoligono,
+  PublicacionMapa,
   TipoDocumento,
   TipoPersona,
 } from '../concesiones/concesiones.constantes.js';
@@ -328,6 +329,8 @@ export class ImportadorService {
             origen: OrigenPoligono.MIGRACION,
             geometria,
             archivo: null,
+            // Ya eran concesiones otorgadas: se ven en el mapa público desde la migración.
+            publicacion: PublicacionMapa.PUBLICADO,
             usuarioId: USUARIO_SISTEMA,
           });
         });

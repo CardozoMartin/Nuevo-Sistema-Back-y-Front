@@ -11,6 +11,8 @@ export const ROUTES = {
     pendientes: '/catastro/pendientes',
     /** Consulta de concesiones con filtros (backend real). */
     concesiones: '/catastro/concesiones',
+    /** Verificar y publicar en Argenmap los polígonos de las concesiones con resolución. */
+    publicacionMapa: '/catastro/publicacion-mapa',
   },
 
   recaudacion: '/recaudacion',

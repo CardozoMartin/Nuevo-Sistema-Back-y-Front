@@ -54,6 +54,12 @@ export function FichaConcesion({ concesion, pozos = [], onCerrar }: Props) {
             {p.origen === 'MIGRACION' && ' · padrón anterior'}
             {p.tipo_derecho === 'DERECHO_TRADICIONAL' && ' · derecho tradicional'}
           </p>
+          {p.publicacion !== 'PUBLICADO' && (
+            <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+              <Icon name="visibility_off" className="text-[14px]!" />
+              {p.publicacion === 'OBSERVADO' ? 'Observado: no se ve en el mapa público' : 'Solo interno: todavía no se publicó en Argenmap'}
+            </p>
+          )}
         </div>
         <button type="button" onClick={onCerrar} aria-label="Cerrar" className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700">
           <Icon name="close" className="text-[18px]!" />

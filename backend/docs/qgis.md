@@ -31,20 +31,26 @@ docker exec -i drh-postgres psql -U drh -d <DB_NAME del .env> -v clave="'LA_CLAV
 
 ## 3. La capa `sig.v_concesiones`
 
-Una fila por concesión con polígono vigente (no incluye las anuladas).
+Una fila por concesión **publicada en el mapa** (no incluye las anuladas). Es lo que sale para
+afuera de la DRH (GeoServer → Argenmap): una concesión aparece recién cuando tiene resolución y
+alguien con el permiso «Publicar en el mapa» verificó su polígono (Catastro → Publicación en el
+mapa). Las migradas del padrón anterior entran publicadas. Las altas en trámite o sin publicar
+están solo en la vista interna `con_v_mapa_concesion` (esquema public), que este usuario no ve.
+`sig.v_puntos` sigue la misma regla.
 
 | Campo | Qué es |
 |-------|--------|
 | `poligono_id` | Clave única de la fila |
 | `concesion_id`, `numero` | Concesión (el número queda vacío mientras está en trámite) |
 | `estado` | `EN_TRAMITE`, `VIGENTE`, `MODIFICADA`… |
-| `expediente`, `oficina_actual` | Expediente que la tramita y dónde está ahora |
-| `titular`, `documento`, `cantidad_titulares` | Titulares vigentes (si hay varios, separados por " / ") |
+| `expediente` | Expediente que la tramitó |
+| `titular`, `cantidad_titulares` | Titulares vigentes (si hay varios, separados por " / "). Sin documento: es un dato interno |
 | `departamento`, `localidad`, `distrito` | Ubicación administrativa |
 | `padron`, `matricula_catastral`, `parcela` | Datos catastrales |
 | `superficie_ha` | Superficie calculada por PostGIS sobre el polígono |
 | `caudal_lps`, `caracter`, `usos` | Caudal asignado y usos |
 | `origen_poligono`, `poligono_desde` | Qué trámite cargó el polígono y cuándo |
+| `publicado_en` | Cuándo se publicó en el mapa |
 
 **Sistema de referencia: POSGAR 2007 / Argentina 3 (EPSG:5345).** Es el oficial para Tucumán:
 las mediciones de QGIS (áreas, distancias) dan en metros reales. QGIS reproyecta solo si el

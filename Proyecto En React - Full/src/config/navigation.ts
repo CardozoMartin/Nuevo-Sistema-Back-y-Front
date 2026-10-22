@@ -22,6 +22,7 @@ export const NAVIGATION: NavSection[] = [
           { key: 'catastro-tramites', label: 'Trámites', icon: 'post_add', path: ROUTES.catastro.tramites },
           { key: 'catastro-pendientes', label: 'Seguimiento', icon: 'assignment_late', path: ROUTES.catastro.pendientes },
           { key: 'catastro-concesiones', label: 'Consulta de concesiones', icon: 'manage_search', path: ROUTES.catastro.concesiones },
+          { key: 'catastro-publicacion-mapa', label: 'Publicación en el mapa', icon: 'public', path: ROUTES.catastro.publicacionMapa },
         ],
       },
       {

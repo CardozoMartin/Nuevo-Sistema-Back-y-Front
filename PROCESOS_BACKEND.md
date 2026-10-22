@@ -664,6 +664,24 @@ La base `drh_sistema` del contenedor tenía el esquema anterior a 6.1 (con 1 exp
 actualizarla (deuda técnica 1). No se tocó: se creó `drh_nuevo` en el mismo contenedor y el `.env` local apunta ahí
 (`DB_NAME=drh_nuevo`), con los catálogos, los cauces y los datos de prueba cargados.
 
+#### 6.4.6 Publicación en el mapa público (Argenmap)
+
+Regla (pedida el 2026-10-22): el polígono de una concesión se ve en Argenmap recién cuando el expediente pasó por
+Recaudación, Distrito, Jurídico y Secretaría General **con número de resolución** y alguien con el permiso
+`MAPA_PUBLICAR` («Publicar en el mapa», Catastro, plantilla del Jefe) lo verificó. Los usuarios internos lo ven
+siempre en el visor del sistema; lo de afuera (GeoServer, QGIS con `drh_lector_sig`) solo ve lo publicado.
+
+- `con_poligono.publicacion`: `PENDIENTE` (al cargar) → `PUBLICADO` u `OBSERVADO` (nota obligatoria). Los migrados
+  entran `PUBLICADO`. Va por fuera del circuito de oficinas: no frena la espera del padrón.
+- Vistas: `con_v_mapa_concesion` y `con_v_mapa_punto` (internas, esquema public; las lee la API) y
+  `sig.v_concesiones` / `sig.v_puntos` (públicas: solo `PUBLICADO`, sin documento del titular ni oficina actual).
+- API `tramites/publicacion-mapa/`: `GET /api/mapa/publicacion?estado=`, `POST /:poligonoId/publicar`
+  (exige resolución y que el expediente no esté rechazado/anulado/archivado), `POST /:poligonoId/observar`
+  (si estaba publicado, lo retira) y `POST /:poligonoId/reemplazar` (multipart, permiso `KML_CARGAR`: Catastro
+  sube el KML corregido de un observado; el anterior queda en el histórico y el nuevo vuelve a `PENDIENTE`).
+- Cada acción queda en el historial del expediente: actuación `PUBLICACION_MAPA` (APTO / OBSERVADO / REGISTRADO).
+- Front: Catastro → «Publicación en el mapa» (`/catastro/publicacion-mapa`); la ficha del visor avisa «Solo interno».
+
 ### 6.5 ABM del catálogo de suministro y de los ríos y canales
 
 > **Estado:** hecho (08/10/2026). Pedido: poder agregar, corregir y dar de baja lo que haga falta del

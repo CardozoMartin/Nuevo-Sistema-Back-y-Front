@@ -37,7 +37,8 @@ import { VistaConcesion } from './vista-concesion.entity.js';
            CASE WHEN c.geom IS NULL THEN NULL ELSE ST_Within(p.geom, c.geom) END AS dentro_de_concesion,
            p.geom
       FROM poz_pozo p
-      LEFT JOIN sig.v_concesiones c ON c.concesion_id = p.concesion_id
+      -- La vista interna: el control «dentro de la concesión» vale también para las altas sin publicar.
+      LEFT JOIN con_v_mapa_concesion c ON c.concesion_id = p.concesion_id
      WHERE p.estado <> 'ANULADO'
   `,
 })

@@ -37,6 +37,9 @@ export interface AtributosConcesion {
   canal_principal: string | null
   origen_poligono: string
   poligono_desde: string
+  /** Si se ve en el mapa público (Argenmap). Adentro de la DRH se ve siempre. */
+  publicacion: 'PENDIENTE' | 'OBSERVADO' | 'PUBLICADO'
+  publicacion_en: string | null
 }
 
 export type EstadoConcesionGeo = 'EN_TRAMITE' | 'VIGENTE' | 'MODIFICADA' | 'ARCHIVADA'
@@ -99,6 +102,8 @@ export interface AtributosPunto {
   localidad: string | null
   /** Distancia al polígono de la concesión (0 si cae dentro). null: la concesión no tiene polígono. */
   distancia_poligono_m: number | null
+  /** Si su concesión está publicada en el mapa público (Argenmap). */
+  publicado: boolean
 }
 
 export type TipoPunto = 'DESAGUE' | 'ENTREGA'

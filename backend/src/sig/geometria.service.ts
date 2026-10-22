@@ -296,7 +296,7 @@ export class GeometriaService {
       `SELECT v.concesion_id, v.numero, v.estado, v.expediente, v.titular,
               ST_Area(ST_Intersection(v.geom, p.geom)) AS m2
          FROM con_poligono p
-         JOIN sig.v_concesiones v ON v.geom && p.geom AND ST_Intersects(v.geom, p.geom)
+         JOIN con_v_mapa_concesion v ON v.geom && p.geom AND ST_Intersects(v.geom, p.geom)
         WHERE p.concesion_id = $1 AND p.vigente
           AND v.concesion_id <> $1
           AND ST_Area(ST_Intersection(v.geom, p.geom)) > $2
@@ -316,7 +316,7 @@ export class GeometriaService {
       `WITH g AS (SELECT ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($1), ${SRID_WGS84}), ${SRID_POSGAR}) AS geom)
        SELECT v.concesion_id, v.numero, v.estado, v.expediente, v.titular,
               ST_Area(ST_Intersection(v.geom, g.geom)) AS m2
-         FROM sig.v_concesiones v, g
+         FROM con_v_mapa_concesion v, g
         WHERE v.geom && g.geom
           AND ST_Intersects(v.geom, g.geom)
           AND ($2::bigint IS NULL OR v.concesion_id <> $2::bigint)

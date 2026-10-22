@@ -1,6 +1,6 @@
 # Tablas de la base `drh_sistema`
 
-> Generado con `npm run db:tablas` el 8/10/2026, 11:56:36. **No editar a mano:** se vuelve a generar.
+> Generado con `npm run db:tablas` el 22/10/2026, 11:22:49. **No editar a mano:** se vuelve a generar.
 > Las tablas las crea TypeORM a partir de las entidades (`src/**/entities/*.entity.ts`); ver «Cómo se generan las tablas» en `PROCESOS_BACKEND.md`.
 
 ## Catálogos (`cat_`)
@@ -89,6 +89,35 @@
 
 - `uk_documento_requerido`: UNIQUE USING btree (situacion_legal_codigo, descripcion)
 
+### `cat_estado_concesion`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `codigo` | character varying(30) | sí |  | PK |
+| `nombre` | character varying(60) | sí |  |  |
+| `color` | character varying(20) | sí |  |  |
+| `orden` | smallint | sí | '0'::smallint |  |
+
+### `cat_estado_expediente`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `codigo` | character varying(30) | sí |  | PK |
+| `nombre` | character varying(60) | sí |  |  |
+| `color` | character varying(20) | sí |  |  |
+| `pendiente` | boolean | sí | false |  |
+| `orden` | smallint | sí | '0'::smallint |  |
+
+### `cat_etapa`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `codigo` | character varying(40) | sí |  | PK |
+| `nombre` | character varying(80) | sí |  |  |
+| `orden` | smallint | sí | '0'::smallint |  |
+| `activo` | boolean | sí | true |  |
+| `oficina_codigo` | character varying(30) | sí |  | FK → seg_oficina.codigo |
+
 ### `cat_localidad`
 
 | Columna | Tipo | Obligatoria | Por defecto | Clave |
@@ -115,6 +144,28 @@
 
 - `chk_localidad_baja`: CHECK ((activo OR ((baja_motivo IS NOT NULL) AND (baja_en IS NOT NULL))))
 
+### `cat_opcion`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `grupo` | cat_grupo_opcion | sí |  | PK |
+| `codigo` | character varying(40) | sí |  | PK |
+| `nombre` | character varying(120) | sí |  |  |
+| `orden` | smallint | sí | '0'::smallint |  |
+| `activo` | boolean | sí | true |  |
+
+### `cat_plazo_oficina`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `oficina_codigo` | character varying(30) | sí |  | PK |
+| `tipo_tramite_codigo` | character varying(40) | sí |  | PK |
+| `dias` | smallint | sí |  |  |
+
+**Controles (CHECK)**
+
+- `chk_plazo_dias`: CHECK ((dias > 0))
+
 ### `cat_situacion_legal`
 
 | Columna | Tipo | Obligatoria | Por defecto | Clave |
@@ -129,11 +180,6 @@
 
 | Columna | Tipo | Obligatoria | Por defecto | Clave |
 | --- | --- | --- | --- | --- |
-| `id` | integer | sí | nextval('cat_suministro_canal_id_seq'::regclass) | PK |
-| `nivel` | smallint | sí |  |  |
-| `nombre` | character varying(120) | sí |  |  |
-| `zona_id` | integer | sí |  | FK → cat_suministro_zona.id |
-| `padre_id` | integer | no |  | FK → cat_suministro_canal.id |
 | `activo` | boolean | sí | true |  |
 | `creado_usuario_id` | bigint | sí | '1'::bigint |  |
 | `creado_en` | timestamp with time zone | sí | now() |  |
@@ -142,6 +188,11 @@
 | `baja_motivo` | text | no |  |  |
 | `baja_en` | timestamp with time zone | no |  |  |
 | `baja_usuario_id` | bigint | no |  |  |
+| `id` | integer | sí | nextval('cat_suministro_canal_id_seq'::regclass) | PK |
+| `nivel` | smallint | sí |  |  |
+| `nombre` | character varying(120) | sí |  |  |
+| `zona_id` | integer | sí |  | FK → cat_suministro_zona.id |
+| `padre_id` | integer | no |  | FK → cat_suministro_canal.id |
 
 **Índices**
 
@@ -157,10 +208,6 @@
 
 | Columna | Tipo | Obligatoria | Por defecto | Clave |
 | --- | --- | --- | --- | --- |
-| `id` | integer | sí | nextval('cat_suministro_opcion_id_seq'::regclass) | PK |
-| `tipo` | cat_tipo_opcion_suministro | sí |  |  |
-| `nombre` | character varying(120) | sí |  |  |
-| `zona_id` | integer | sí |  | FK → cat_suministro_zona.id |
 | `activo` | boolean | sí | true |  |
 | `creado_usuario_id` | bigint | sí | '1'::bigint |  |
 | `creado_en` | timestamp with time zone | sí | now() |  |
@@ -169,6 +216,10 @@
 | `baja_motivo` | text | no |  |  |
 | `baja_en` | timestamp with time zone | no |  |  |
 | `baja_usuario_id` | bigint | no |  |  |
+| `id` | integer | sí | nextval('cat_suministro_opcion_id_seq'::regclass) | PK |
+| `tipo` | cat_tipo_opcion_suministro | sí |  |  |
+| `nombre` | character varying(120) | sí |  |  |
+| `zona_id` | integer | sí |  | FK → cat_suministro_zona.id |
 
 **Índices**
 
@@ -204,6 +255,18 @@
 **Controles (CHECK)**
 
 - `chk_suministro_zona_baja`: CHECK ((activo OR ((baja_motivo IS NOT NULL) AND (baja_en IS NOT NULL))))
+
+### `cat_tipo_tramite`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `codigo` | character varying(40) | sí |  | PK |
+| `nombre` | character varying(80) | sí |  |  |
+| `descripcion` | character varying(200) | no |  |  |
+| `icono` | character varying(40) | no |  |  |
+| `en_menu_catastro` | boolean | sí | false |  |
+| `orden` | smallint | sí | '0'::smallint |  |
+| `activo` | boolean | sí | true |  |
 
 ### `cat_tipo_uso`
 
@@ -350,12 +413,16 @@
 | `archivo_bytes` | integer | no |  |  |
 | `sistema_origen` | character varying(20) | no |  |  |
 | `vigente` | boolean | sí | true |  |
+| `desde` | date | no |  |  |
 | `hasta` | timestamp with time zone | no |  |  |
 | `creado_usuario_id` | bigint | sí |  |  |
 | `creado_en` | timestamp with time zone | sí | now() |  |
 | `concesion_id` | bigint | sí |  | FK → con_concesion.id |
 | `expediente_id` | bigint | no |  | FK → exp_expediente.id |
-| `desde` | date | no |  |  |
+| `publicacion` | con_publicacion_mapa | sí | 'PENDIENTE'::con_publicacion_mapa |  |
+| `publicacion_nota` | text | no |  |  |
+| `publicacion_usuario_id` | bigint | no |  |  |
+| `publicacion_en` | timestamp with time zone | no |  |  |
 
 **Índices**
 
@@ -375,6 +442,7 @@
 | `hasta` | date | no |  |  |
 | `id` | bigint | sí | nextval('con_punto_id_seq'::regclass) | PK |
 | `tipo` | con_tipo_punto | sí |  |  |
+| `sistema_carga` | con_sistema_coordenadas | sí | 'POSGAR_FAJA3'::con_sistema_coordenadas |  |
 | `coord_x` | numeric(12,2) | no |  |  |
 | `coord_y` | numeric(12,2) | no |  |  |
 | `geom` | geometry(Point,5345) | no |  |  |
@@ -538,6 +606,26 @@
 **Índices**
 
 - `idx_actuacion_expediente`: USING btree (expediente_id, fecha)
+
+### `exp_auditoria`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `id` | bigint | sí | nextval('exp_auditoria_id_seq'::regclass) | PK |
+| `accion` | exp_accion_auditoria | sí |  |  |
+| `fecha` | timestamp with time zone | sí | now() |  |
+| `oficina` | exp_oficina | sí |  |  |
+| `oficina_destino` | exp_oficina | no |  |  |
+| `etapa` | exp_etapa | sí |  |  |
+| `estado_anterior` | exp_estado_expediente | no |  |  |
+| `estado_nuevo` | exp_estado_expediente | no |  |  |
+| `expediente_id` | bigint | sí |  | FK → exp_expediente.id |
+| `usuario_id` | bigint | sí |  | FK → seg_usuario.id |
+
+**Índices**
+
+- `idx_auditoria_expediente`: USING btree (expediente_id, fecha)
+- `idx_auditoria_usuario`: USING btree (usuario_id, fecha)
 
 ### `exp_documentacion_presentada`
 
@@ -819,9 +907,11 @@
 | `expediente_id` | bigint | no |  | FK → exp_expediente.id |
 | `registrado_por_usuario_id` | bigint | sí |  | FK → seg_usuario.id |
 | `cancelado_por_usuario_id` | bigint | no |  | FK → seg_usuario.id |
+| `concesion_id` | bigint | no |  | FK → con_concesion.id |
 
 **Índices**
 
+- `idx_deuda_concesion`: USING btree (concesion_id, estado)
 - `idx_deuda_persona`: USING btree (persona_id, estado)
 
 ## Seguridad (`seg_`)
@@ -834,6 +924,55 @@
 | `nombre` | character varying(80) | sí |  |  |
 | `orden` | smallint | sí | '0'::smallint |  |
 | `activa` | boolean | sí | true |  |
+| `descripcion` | character varying(200) | no |  |  |
+| `descripcion_bandeja` | character varying(200) | no |  |  |
+
+### `seg_permiso`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `codigo` | character varying(40) | sí |  | PK |
+| `nombre` | character varying(80) | sí |  |  |
+| `descripcion` | character varying(250) | no |  |  |
+| `grupo` | character varying(60) | sí |  |  |
+| `orden` | smallint | sí | '0'::smallint |  |
+| `oficina_codigo` | character varying(30) | no |  | FK → seg_oficina.codigo |
+
+### `seg_rol`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `codigo` | character varying(30) | sí |  | PK |
+| `nombre` | character varying(60) | sí |  |  |
+| `descripcion` | character varying(200) | no |  |  |
+| `orden` | smallint | sí | '0'::smallint |  |
+| `activo` | boolean | sí | true |  |
+
+### `seg_rol_permiso`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `oficina_codigo` | character varying(30) | sí |  | PK |
+| `rol_codigo` | character varying(30) | sí |  | PK |
+| `permiso_codigo` | character varying(40) | sí |  | PK |
+
+### `seg_sesion`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `id` | bigint | sí | nextval('seg_sesion_id_seq'::regclass) | PK |
+| `token_hash` | character varying(64) | sí |  |  |
+| `creada_en` | timestamp with time zone | sí | now() |  |
+| `expira_en` | timestamp with time zone | sí |  |  |
+| `cerrada_en` | timestamp with time zone | no |  |  |
+| `ip` | character varying(60) | no |  |  |
+| `agente` | character varying(255) | no |  |  |
+| `usuario_id` | bigint | sí |  | FK → seg_usuario.id |
+
+**Índices**
+
+- `idx_sesion_usuario`: USING btree (usuario_id, cerrada_en)
+- `uk_sesion_token`: UNIQUE USING btree (token_hash)
 
 ### `seg_usuario`
 
@@ -848,11 +987,36 @@
 | `activo` | boolean | sí | true |  |
 | `creado_en` | timestamp with time zone | sí | now() |  |
 | `oficina_codigo` | character varying(30) | no |  | FK → seg_oficina.codigo |
+| `clave_hash` | character varying(255) | no |  |  |
+| `debe_cambiar_clave` | boolean | sí | true |  |
+| `intentos_fallidos` | smallint | sí | '0'::smallint |  |
+| `bloqueado_hasta` | timestamp with time zone | no |  |  |
+| `ultimo_acceso` | timestamp with time zone | no |  |  |
+| `baja_motivo` | text | no |  |  |
+| `baja_en` | timestamp with time zone | no |  |  |
+| `baja_usuario_id` | bigint | no |  |  |
+| `creado_usuario_id` | bigint | no |  |  |
+| `modificado_en` | timestamp with time zone | no | now() |  |
+| `modificado_usuario_id` | bigint | no |  |  |
+| `rol_codigo` | character varying(30) | no |  | FK → seg_rol.codigo |
+| `permisos_iniciados` | boolean | sí | false |  |
+| `distrito_id` | integer | no |  | FK → cat_distrito.id |
 
 **Índices**
 
 - `uk_usuario_email`: UNIQUE USING btree (email)
 - `uk_usuario_legajo`: UNIQUE USING btree (legajo)
+
+**Controles (CHECK)**
+
+- `chk_usuario_baja`: CHECK ((activo OR ((baja_motivo IS NOT NULL) AND (baja_en IS NOT NULL))))
+
+### `seg_usuario_permiso`
+
+| Columna | Tipo | Obligatoria | Por defecto | Clave |
+| --- | --- | --- | --- | --- |
+| `usuario_id` | bigint | sí |  | PK |
+| `permiso_codigo` | character varying(40) | sí |  | PK |
 
 ## Vistas
 
@@ -861,28 +1025,35 @@ Consultas guardadas que se leen como una tabla (no guardan datos). Su SQL está 
 | Vista | Columnas |
 | --- | --- |
 | `public.con_v_inmueble` | inmueble_id (bigint), concesion_id (bigint), departamento (character varying), localidad (character varying), distrito (character varying), cuenca (character varying), padron (character varying), matricula_catastral (character varying), circunscripcion (character varying), seccion (character varying), parcela (character varying), lamina (character varying), orden (character varying), desde (date) |
-| `sig.v_concesiones` | poligono_id (bigint), concesion_id (bigint), numero (character varying), estado (text), tipo_derecho (text), origen (text), anio_otorgamiento (smallint), expediente (text), oficina_actual (text), titular (text), documento (character varying), cantidad_titulares (integer), departamento (character varying), localidad (character varying), distrito (character varying), cuenca (character varying), padron (character varying), matricula_catastral (character varying), parcela (character varying), superficie_ha (double precision), caudal_lps (double precision), caracter (text), codigo_servicio (smallint), usos (text), fuente (character varying), sistema (character varying), canal_principal (character varying), origen_poligono (text), poligono_desde (date), geom (USER-DEFINED) |
+| `public.con_v_mapa_concesion` | poligono_id (bigint), concesion_id (bigint), numero (character varying), estado (text), tipo_derecho (text), origen (text), anio_otorgamiento (smallint), expediente (text), oficina_actual (text), titular (text), documento (character varying), cantidad_titulares (integer), departamento (character varying), localidad (character varying), distrito (character varying), cuenca (character varying), padron (character varying), matricula_catastral (character varying), parcela (character varying), superficie_ha (double precision), caudal_lps (double precision), caracter (text), codigo_servicio (smallint), usos (text), fuente (character varying), sistema (character varying), canal_principal (character varying), origen_poligono (text), poligono_desde (date), publicacion (text), publicacion_en (timestamp with time zone), geom (USER-DEFINED) |
+| `public.con_v_mapa_punto` | punto_id (bigint), tipo (text), sistema_carga (text), coord_x (double precision), coord_y (double precision), latitud (double precision), longitud (double precision), referencia (character varying), concesion_id (bigint), concesion_numero (character varying), concesion_estado (text), expediente (text), titular (text), departamento (character varying), localidad (character varying), distancia_poligono_m (double precision), publicado (boolean), geom (USER-DEFINED) |
+| `sig.v_concesiones` | poligono_id (bigint), concesion_id (bigint), numero (character varying), estado (text), tipo_derecho (text), origen (text), anio_otorgamiento (smallint), expediente (text), titular (text), cantidad_titulares (integer), departamento (character varying), localidad (character varying), distrito (character varying), cuenca (character varying), padron (character varying), matricula_catastral (character varying), parcela (character varying), superficie_ha (double precision), caudal_lps (double precision), caracter (text), codigo_servicio (smallint), usos (text), fuente (character varying), sistema (character varying), canal_principal (character varying), origen_poligono (text), poligono_desde (date), publicado_en (timestamp with time zone), geom (USER-DEFINED) |
 | `sig.v_pozos` | pozo_id (bigint), id_interno (character varying), alias (character varying), estado (text), origen (text), tipo_pozo (character varying), jurisdiccion_drh (boolean), profundidad_m (double precision), nivel_estatico_m (double precision), nivel_dinamico_m (double precision), caudal_m3h (double precision), caudal_lps (double precision), coord_x (double precision), coord_y (double precision), concesion_id (bigint), concesion_numero (character varying), titular (text), departamento (character varying), localidad (character varying), dentro_de_concesion (boolean), geom (USER-DEFINED) |
+| `sig.v_puntos` | punto_id (bigint), tipo (text), sistema_carga (text), coord_x (double precision), coord_y (double precision), latitud (double precision), longitud (double precision), referencia (character varying), concesion_id (bigint), concesion_numero (character varying), concesion_estado (text), expediente (text), titular (text), departamento (character varying), localidad (character varying), distancia_poligono_m (double precision), geom (USER-DEFINED) |
 
 ## Enumerados
 
 | Tipo | Valores |
 | --- | --- |
+| `cat_grupo_opcion` | CIRCUNSCRIPCION, SECCION_CATASTRAL, CARACTER, CODIGO_SERVICIO, TIPO_CONCESION, DOCUMENTO_JURIDICO |
 | `cat_tipo_opcion_suministro` | FUENTE, SISTEMA, DESAGUE |
 | `con_caracter` | PERMANENTE, EVENTUAL |
 | `con_estado_concesion` | EN_TRAMITE, DENEGADA, VIGENTE, MODIFICADA, ANULADA, ARCHIVADA |
 | `con_origen_concesion` | SISTEMA, MIGRACION |
 | `con_origen_poligono` | ALTA, AMPLIACION, REDUCCION, REUBICACION, SUBDIVISION, MIGRACION |
+| `con_publicacion_mapa` | PENDIENTE, OBSERVADO, PUBLICADO |
+| `con_sistema_coordenadas` | POSGAR_FAJA3, WGS84 |
 | `con_tipo_derecho` | CONCESION, DERECHO_TRADICIONAL, PERMISO_USO, PERMISO_POZO |
 | `con_tipo_punto` | DESAGUE, ENTREGA |
 | `emp_estado_empresa` | EN_TRAMITE, OBSERVADA, RECHAZADA, ACTIVA, BAJA |
+| `exp_accion_auditoria` | INICIO, TOMA, PASE, DEVOLUCION, CAMBIO_ETAPA, CAMBIO_ESTADO |
 | `exp_dictamen` | APTO, NO_APTO, OBSERVADO, SIN_DICTAMEN |
 | `exp_estado_expediente` | EN_TRAMITE, OBSERVADO, EN_ESPERA, FINALIZADO, RECHAZADO, ARCHIVADO, ANULADO |
 | `exp_estado_solicitud_numero` | PENDIENTE, ASIGNADA |
 | `exp_etapa` | CARGA, CORRECCION, RECAUDACION, DISTRITO, JURIDICO, SECRETARIA_GENERAL, CIERRE, ESPERA_PADRON, INICIO_POZOS, ANTECEDENTES_POZOS, EVALUACION_TECNICA_POZOS, CORRECCION_POZOS, CLAUSURA_POZOS |
 | `exp_oficina` | catastro, recaudacion, distrito, juridico, secretaria_general, pozos |
-| `exp_resultado_actuacion` | APTO, NO_APTO, OBSERVADO, SIN_DEUDA, CON_DEUDA, REGISTRADO |
-| `exp_tipo_actuacion` | CARGA_COMPLETA, CORRECCION, VERIFICACION_DEUDA, DEUDA_CANCELADA, INFORME_TECNICO, DICTAMEN_JURIDICO, NUMERO_CONCESION, RESOLUCION, VERIFICACION_FINAL, PADRON, DOCUMENTACION, ANTECEDENTES, EVALUACION_TECNICA, CLAUSURA, TOMA_CONOCIMIENTO, SOLICITUD_NUMERO, NOTIFICACION |
+| `exp_resultado_actuacion` | APTO, NO_APTO, OBSERVADO, SIN_DEUDA, CON_DEUDA, REGISTRADO, CURSO_CON_DEUDA |
+| `exp_tipo_actuacion` | CARGA_COMPLETA, CORRECCION, VERIFICACION_DEUDA, DEUDA_CANCELADA, INFORME_TECNICO, DICTAMEN_JURIDICO, NUMERO_CONCESION, RESOLUCION, VERIFICACION_FINAL, PADRON, DOCUMENTACION, ANTECEDENTES, EVALUACION_TECNICA, CLAUSURA, TOMA_CONOCIMIENTO, SOLICITUD_NUMERO, NOTIFICACION, PUBLICACION_MAPA |
 | `exp_tipo_tramite` | ALTA_CONCESION, CAMBIO_TITULARIDAD, ANULACION, AMPLIACION_REDUCCION, SUBDIVISION, REUBICACION, PERMISO_USO, AUTORIZACION_PERFORACION, REGISTRO_POZO, BAJA_POZO, REGISTRO_EMPRESA, OTRO |
 | `not_estado_email` | ENVIADO, NO_ENVIADO_PRUEBA, ERROR |
 | `not_tipo_email` | AVISO_DEUDA |

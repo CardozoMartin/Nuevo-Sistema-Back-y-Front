@@ -15,6 +15,7 @@ export const catastroRoutes: RouteObject[] = [
         { path: 'tramites', handle: { crumb: 'Trámites' }, lazy: lazyPage(() => import('./pages/TramitesPage')) },
         { path: 'pendientes', handle: { crumb: 'Seguimiento' }, lazy: lazyPage(() => import('./pages/PendientesPage')) },
         { path: 'concesiones', handle: { crumb: 'Consulta de concesiones' }, lazy: lazyPage(() => import('./pages/ConsultaConcesionesPage')) },
+        { path: 'publicacion-mapa', handle: { crumb: 'Publicación en el mapa' }, lazy: lazyPage(() => import('./pages/PublicacionMapaPage')) },
       ]),
       // Dirección vieja del buscador: ahora es la búsqueda general.
       { path: 'busqueda/*', element: <Navigate to={ROUTES.busqueda} replace /> },

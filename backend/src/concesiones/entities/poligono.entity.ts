@@ -1,7 +1,7 @@
 import { Check, Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, type Relation } from 'typeorm';
 import type { MultiPolygon } from 'geojson';
 import { Expediente } from '../../expedientes/entities/expediente.entity.js';
-import { OrigenPoligono } from '../concesiones.constantes.js';
+import { OrigenPoligono, PublicacionMapa } from '../concesiones.constantes.js';
 import { Concesion } from './concesion.entity.js';
 
 /**
@@ -90,6 +90,22 @@ export class Poligono {
 
   @Column({ type: 'timestamptz', nullable: true })
   hasta: Date | null;
+
+  // --- Publicación en el mapa público (Argenmap) ---
+
+  /** Los del alta nacen PENDIENTE; los migrados, PUBLICADO (ya eran concesiones otorgadas). */
+  @Column({ type: 'enum', enum: PublicacionMapa, enumName: 'con_publicacion_mapa', default: PublicacionMapa.PENDIENTE })
+  publicacion: PublicacionMapa;
+
+  /** La nota de quien lo observó (o lo publicó, si dejó una). */
+  @Column({ name: 'publicacion_nota', type: 'text', nullable: true })
+  publicacionNota: string | null;
+
+  @Column({ name: 'publicacion_usuario_id', type: 'bigint', nullable: true })
+  publicacionUsuarioId: string | null;
+
+  @Column({ name: 'publicacion_en', type: 'timestamptz', nullable: true })
+  publicacionEn: Date | null;
 
   @Column({ name: 'creado_usuario_id', type: 'bigint' })
   creadoUsuarioId: string;

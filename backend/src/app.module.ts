@@ -16,6 +16,7 @@ import { SeguridadModule } from './seguridad/seguridad.module.js';
 import { SigModule } from './sig/sig.module.js';
 import { AltaConcesionModule } from './tramites/alta-concesion/alta-concesion.module.js';
 import { BajaPozoModule } from './tramites/baja-pozo/baja-pozo.module.js';
+import { PublicacionMapaModule } from './tramites/publicacion-mapa/publicacion-mapa.module.js';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { BajaPozoModule } from './tramites/baja-pozo/baja-pozo.module.js';
     NotificacionesModule,
     // Trámites (circuitos sobre los datos)
     AltaConcesionModule,
+    PublicacionMapaModule,
     // Importación del padrón anterior (se usa por línea de comandos)
     MigracionModule,
     // Pozos

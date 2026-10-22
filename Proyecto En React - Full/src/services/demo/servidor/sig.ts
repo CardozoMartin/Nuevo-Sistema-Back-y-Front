@@ -48,6 +48,9 @@ function atributos(db: Db, c: ConcesionDemo): AtributosConcesion {
     canal_principal: m?.canalPrincipal ?? s?.canalPrincipal ?? null,
     origen_poligono: m ? 'MIGRACION' : 'ALTA',
     poligono_desde: c.fechaOtorgamiento ?? alta?.poligono?.desde ?? `${c.anio ?? 2000}-01-01`,
+    // La demo no emula la publicación: las otorgadas se toman como publicadas.
+    publicacion: c.estado === 'EN_TRAMITE' ? 'PENDIENTE' : 'PUBLICADO',
+    publicacion_en: null,
   }
 }
 
@@ -144,6 +147,7 @@ function puntos({ db, query }: Peticion): CapaPuntos {
             departamento: conc.departamento,
             localidad: conc.localidad,
             distancia_poligono_m: geom ? distanciaAlPoligono([p.latitud, p.longitud], geom) : null,
+            publicado: conc.c.estado !== 'EN_TRAMITE',
           },
         },
       ]

@@ -19,7 +19,8 @@ const PROPIEDADES = `json_build_object(
     'matricula_catastral', v.matricula_catastral, 'parcela', v.parcela,
     'superficie_ha', v.superficie_ha, 'caudal_lps', v.caudal_lps, 'caracter', v.caracter,
     'codigo_servicio', v.codigo_servicio, 'usos', v.usos, 'fuente', v.fuente, 'sistema', v.sistema,
-    'canal_principal', v.canal_principal, 'origen_poligono', v.origen_poligono, 'poligono_desde', v.poligono_desde)`;
+    'canal_principal', v.canal_principal, 'origen_poligono', v.origen_poligono, 'poligono_desde', v.poligono_desde,
+    'publicacion', v.publicacion, 'publicacion_en', v.publicacion_en)`;
 
 /** Un Feature GeoJSON por fila, con la geometría pasada a WGS84 (7 decimales ≈ 1 cm). */
 const FEATURE = `json_build_object(
@@ -43,7 +44,7 @@ const FEATURE_POZO = `json_build_object(
         'localidad', v.localidad, 'dentro_de_concesion', v.dentro_de_concesion))`;
 
 /**
- * Un desagüe o punto de entrega como Feature: punto en WGS84 con los atributos de sig.v_puntos.
+ * Un desagüe o punto de entrega como Feature: punto en WGS84 con los atributos de con_v_mapa_punto.
  * La geometría sale de la latitud/longitud guardada (la cargada o la calculada al guardar).
  */
 const FEATURE_PUNTO = `json_build_object(
@@ -55,10 +56,12 @@ const FEATURE_PUNTO = `json_build_object(
         'coord_x', v.coord_x, 'coord_y', v.coord_y, 'latitud', v.latitud, 'longitud', v.longitud,
         'referencia', v.referencia, 'concesion_id', v.concesion_id, 'concesion_numero', v.concesion_numero,
         'concesion_estado', v.concesion_estado, 'expediente', v.expediente, 'titular', v.titular,
-        'departamento', v.departamento, 'localidad', v.localidad, 'distancia_poligono_m', v.distancia_poligono_m))`;
+        'departamento', v.departamento, 'localidad', v.localidad, 'distancia_poligono_m', v.distancia_poligono_m,
+        'publicado', v.publicado))`;
 
 /**
- * Capas geográficas para la web, en GeoJSON. Todo el armado lo hace PostgreSQL
+ * Capas geográficas para el visor del sistema, en GeoJSON. Leen las vistas INTERNAS (todo, también
+ * lo no publicado en el mapa público): solo las piden usuarios con sesión. Todo el armado lo hace PostgreSQL
  * (json_build_object): no se pasa fila por fila por JavaScript.
  *
  * Para miles de polígonos el paso siguiente son vector tiles (ST_AsMVT); el formato de
@@ -78,7 +81,7 @@ export class CapasService {
                 'type', 'FeatureCollection',
                 'features', COALESCE(json_agg(${FEATURE} ORDER BY v.concesion_id), '[]'::json)
               ) AS capa
-         FROM sig.v_concesiones v
+         FROM con_v_mapa_concesion v
         WHERE $1::float8 IS NULL
            OR v.geom && ST_Transform(ST_MakeEnvelope($1, $2, $3, $4, ${SRID_WGS84}), ${SRID_POSGAR})`,
       recuadro ?? [null, null, null, null],
@@ -108,7 +111,7 @@ export class CapasService {
                 'type', 'FeatureCollection',
                 'features', COALESCE(json_agg(${FEATURE_PUNTO} ORDER BY v.punto_id), '[]'::json)
               ) AS capa
-         FROM sig.v_puntos v
+         FROM con_v_mapa_punto v
         WHERE $1::float8 IS NULL
            OR v.geom && ST_Transform(ST_MakeEnvelope($1, $2, $3, $4, ${SRID_WGS84}), ${SRID_POSGAR})`,
       recuadro ?? [null, null, null, null],
@@ -118,7 +121,7 @@ export class CapasService {
 
   /** Una concesión como Feature (404 si no tiene polígono vigente). */
   async concesion(concesionId: string): Promise<unknown> {
-    const [fila] = await this.dataSource.query(`SELECT ${FEATURE} AS feature FROM sig.v_concesiones v WHERE v.concesion_id = $1`, [concesionId]);
+    const [fila] = await this.dataSource.query(`SELECT ${FEATURE} AS feature FROM con_v_mapa_concesion v WHERE v.concesion_id = $1`, [concesionId]);
     if (!fila) throw new NotFoundException('La concesión no existe o no tiene polígono cargado.');
     return fila.feature;
   }
@@ -141,7 +144,7 @@ export class CapasService {
   async kmlConcesion(concesionId: string): Promise<{ nombre: string; kml: string }> {
     const [f] = await this.dataSource.query(
       `SELECT v.numero, v.expediente, v.titular, v.superficie_ha, ST_AsKML(ST_Transform(v.geom, ${SRID_WGS84}), 7) AS kml
-         FROM sig.v_concesiones v WHERE v.concesion_id = $1`,
+         FROM con_v_mapa_concesion v WHERE v.concesion_id = $1`,
       [concesionId],
     );
     if (!f) throw new NotFoundException('La concesión no existe o no tiene polígono cargado.');

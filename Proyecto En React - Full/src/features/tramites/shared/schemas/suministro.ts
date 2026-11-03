@@ -3,16 +3,20 @@ import { z } from 'zod'
 // useFieldArray necesita objetos, por eso las listas son { valor }[].
 const itemSchema = z.object({ valor: z.string() })
 
-/** Datos del suministro de agua. Las opciones salen del catálogo según la ubicación. */
+/**
+ * Datos del suministro de agua: un camino del árbol del distrito (fuente → sistema → canales →
+ * desagüe). Un nivel que la rama no tiene queda vacío.
+ */
 export const suministroSchema = z
   .object({
-    /** La primera es la fuente principal; el resto, adicionales. */
+    /** La primera es la fuente principal (de ella sale el camino); el resto, adicionales. */
     fuentes: z.array(itemSchema).min(1),
     sistemaDistribucion: z.string(),
     canalPrincipal: z.string(),
     canalSecundario: z.string(),
-    /** Terciario, cuarto y quinto (en ese orden). */
-    canalesAdicionales: z.array(itemSchema).max(3),
+    canalTerciario: z.string(),
+    canalCuarto: z.string(),
+    canalQuinto: z.string(),
     desague: z.string(),
     observacion: z.string().trim().max(1000, 'Máximo 1000 caracteres.'),
     caudalAsignado: z.string().refine((v) => v === '' || (Number.isFinite(Number(v)) && Number(v) >= 0), 'Ingrese un caudal válido.'),
@@ -33,7 +37,9 @@ export const suministroVacio = (caudalAsignado = ''): SuministroForm => ({
   sistemaDistribucion: '',
   canalPrincipal: '',
   canalSecundario: '',
-  canalesAdicionales: [],
+  canalTerciario: '',
+  canalCuarto: '',
+  canalQuinto: '',
   desague: '',
   observacion: '',
   caudalAsignado,

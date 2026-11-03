@@ -4,7 +4,6 @@ import type { SituacionLegal } from '../../../catalogos/entities/situacion-legal
 import type { TipoUso } from '../../../catalogos/entities/tipo-uso.entity.js';
 import { exigirAnioEnCurso, exigirDocumentosDeLaSituacion } from './inicio.validaciones.js';
 import { exigirAnioDominioNoFuturo } from './inmueble.validaciones.js';
-import { exigirCascadaEnOrden } from './suministro.validaciones.js';
 import { exigirDocumentosSinRepetir } from './titulares.validaciones.js';
 import { exigirPeriodoValido, exigirPuntoEntregaSiCorresponde, exigirUsosDelCatalogo, exigirUsosSinRepetir } from './usos.validaciones.js';
 
@@ -80,13 +79,5 @@ describe('Paso 5: usos', () => {
     expect(exigirPuntoEntregaSiCorresponde([riego], false)).toEqual([]);
     expect(exigirPuntoEntregaSiCorresponde([riego, pecuario], true)).toEqual([pecuario]);
     expect(() => exigirPuntoEntregaSiCorresponde([riego, pecuario], false)).toThrow('Ingrese el punto de entrega del agua (lo exige el uso Pecuario).');
-  });
-});
-
-describe('Paso 6: suministro', () => {
-  it('la cascada se completa en orden', () => {
-    expect(() => exigirCascadaEnOrden({ canalPrincipal: 'MATRIZ', canalSecundario: 'DVDO. COSSIO', canalesAdicionales: ['LOS RALOS'] })).not.toThrow();
-    expect(() => exigirCascadaEnOrden({ canalSecundario: 'DVDO. COSSIO' })).toThrow('Seleccione el canal principal antes que el secundario.');
-    expect(() => exigirCascadaEnOrden({ canalPrincipal: 'MATRIZ', canalesAdicionales: ['LOS RALOS'] })).toThrow('Seleccione el canal secundario antes que los canales siguientes.');
   });
 });

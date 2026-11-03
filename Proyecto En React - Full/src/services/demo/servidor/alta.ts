@@ -83,6 +83,8 @@ export function armarAlta(db: Db, id: string): AltaBackend {
             localidad: alta.ubicacion?.localidad ?? null,
             distrito: alta.ubicacion?.distrito ?? null,
             poligono: alta.poligono,
+            // El emulador no tiene correcciones del polígono.
+            poligonoPropuesto: null,
             superposiciones: alta.poligono ? superposiciones(db, anilloDe(alta.poligono.geojson), c.id) : [],
           }
         : null,
@@ -358,14 +360,15 @@ function usos({ db, usuario, ruta, cuerpo }: Peticion) {
 function suministro({ db, usuario, ruta, cuerpo }: Peticion) {
   const { alta } = exigirEditable(db, ruta.id, usuario)
   if (!alta.ubicacion) throw error400('Primero cargue la ubicación de la concesión (paso 3).')
-  const d = (cuerpo ?? {}) as { fuentes?: string[]; sistemaDistribucion?: string; canalPrincipal?: string; canalSecundario?: string; canalesAdicionales?: string[]; desague?: string; observacion?: string; caudalAsignado?: number }
-  if (d.canalSecundario && !d.canalPrincipal) throw error400('Para cargar el canal secundario, elija primero el principal.')
+  const d = (cuerpo ?? {}) as { fuentes?: string[]; sistemaDistribucion?: string; canalPrincipal?: string; canalSecundario?: string; canalTerciario?: string; canalCuarto?: string; canalQuinto?: string; desague?: string; observacion?: string; caudalAsignado?: number }
   alta.suministro = {
     fuentes: d.fuentes ?? [],
     sistemaDistribucion: d.sistemaDistribucion ?? null,
     canalPrincipal: d.canalPrincipal ?? null,
     canalSecundario: d.canalSecundario ?? null,
-    canalesAdicionales: d.canalesAdicionales ?? [],
+    canalTerciario: d.canalTerciario ?? null,
+    canalCuarto: d.canalCuarto ?? null,
+    canalQuinto: d.canalQuinto ?? null,
     desague: d.desague ?? null,
     observacion: d.observacion ?? null,
   }

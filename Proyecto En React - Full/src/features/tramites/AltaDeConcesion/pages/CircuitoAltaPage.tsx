@@ -1,4 +1,7 @@
-import { useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
+import { ROUTES } from '@/config/routes'
+import { Button } from '@/components/ui/Button'
+import { useSesion } from '@/features/auth/context'
 import { EmptyState, ErrorState, LoadingState, Alert } from '@/components/feedback/States'
 import { Card } from '@/components/ui/Card'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -11,6 +14,7 @@ import { DondeEsta } from '../components/circuito/DondeEsta'
 import { DatosAlta } from '../components/circuito/DatosAlta'
 import { RegistroExpediente } from '../components/circuito/RegistroExpediente'
 import { useAlta } from '../hooks'
+import { admiteCorreccion } from './CorreccionDatosPage'
 
 const TITULO = 'Expediente de alta de concesión'
 
@@ -31,6 +35,8 @@ function ExpedienteAlta({ consulta }: { consulta: boolean }) {
   const { expedienteId } = useParams()
   const alta = useAlta(expedienteId)
   const { estados } = useDominio()
+  const { puede } = useSesion()
+  const navigate = useNavigate()
 
   if (alta.isPending) {
     return (
@@ -59,6 +65,14 @@ function ExpedienteAlta({ consulta }: { consulta: boolean }) {
       <PageHeader
         title={`Expediente ${a.numeroExpediente}`}
         description={`Alta de concesión · ${a.titulares[0] ? (a.titulares[0].razonSocial ?? `${a.titulares[0].apellido}, ${a.titulares[0].nombre}`) : 'sin titular cargado'}${a.concesion.numero ? ` · Concesión N° ${a.concesion.numero}` : ''}`}
+        actions={
+          puede('ALTA_CORREGIR') &&
+          admiteCorreccion(a) && (
+            <Button size="sm" variant="secondary" iconLeft="edit_note" title="Corregir errores materiales (datos mal escritos o KML mal cargado)" onClick={() => navigate(ROUTES.tramites.altaConcesion.correccion(a.id))}>
+              Corregir datos
+            </Button>
+          )
+        }
       />
 
       <div className="flex flex-col gap-6">

@@ -61,6 +61,8 @@ export const NOMBRE_TIPO_TRAMITE: Record<TipoTramite, string> = {
  *   EN_ESPERA   pausado: Recaudación detectó deuda de un titular; sigue cuando la paga.
  *   FINALIZADO  completó el circuito con el visto bueno de todas las oficinas.
  *   RECHAZADO   una oficina dictaminó «no apto»: el trámite termina sin otorgar.
+ *   ANULADO     se inició por error y se canceló antes de salir de la oficina que lo inició:
+ *               queda en el historial, pero su número se libera para volver a usarlo.
  */
 export enum EstadoExpediente {
   EN_TRAMITE = 'EN_TRAMITE',
@@ -196,6 +198,13 @@ export enum TipoActuacion {
    * OBSERVADO (con nota) o REGISTRADO (Catastro reemplazó el polígono observado).
    */
   PUBLICACION_MAPA = 'PUBLICACION_MAPA',
+  /** La oficina que lo inició lo canceló (cargado por error) antes de enviarlo: queda ANULADO. */
+  CANCELACION = 'CANCELACION',
+  /**
+   * Corrección de un error material (dato mal escrito, KML mal cargado) por fuera del circuito,
+   * con permiso y motivo. En `datos`: la sección y cada campo con su valor anterior y el nuevo.
+   */
+  CORRECCION_DATOS = 'CORRECCION_DATOS',
 }
 
 /** Pedido del número de concesión (Secretaría General → Catastro). */

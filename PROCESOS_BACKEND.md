@@ -8,7 +8,7 @@ La documentación técnica del backend (puesta en marcha, endpoints, PostGIS, es
 (`backend/src/tramites/<tramite>/README.md`). El estado del frontend está en
 [Proyecto En React - Full/ESTADO_MIGRACION.md](Proyecto%20En%20React%20-%20Full/ESTADO_MIGRACION.md).
 
-**Última actualización:** 08/10/2026 — ABM por la API del catálogo de suministro (zonas, fuentes/sistemas/desagües y árbol de canales) y de los ríos y canales (`sig.cauce`), con baja lógica (6.5); corregida la carga del árbol (dos canales que se perdían). Antes, 07/10/2026: revisión integral del alta (6.4).
+**Última actualización:** 28/10/2026 — el catálogo de suministro pasa a ser **un árbol por distrito**, el que cargaron los jefes de Distrito, con su pantalla de administración (6.6). Antes, 08/10/2026: ABM por la API del catálogo de suministro (zonas, fuentes/sistemas/desagües y árbol de canales) y de los ríos y canales (`sig.cauce`), con baja lógica (6.5); corregida la carga del árbol (dos canales que se perdían). Antes, 07/10/2026: revisión integral del alta (6.4).
 
 ---
 
@@ -41,7 +41,7 @@ La documentación técnica del backend (puesta en marcha, endpoints, PostGIS, es
 | SIG: KML/GeoJSON, validación PostGIS, POSGAR 07, vistas `sig.v_concesiones` / `sig.v_pozos` / `sig.v_puntos`, cauces, QGIS | ✅ Hecho | ✅ |
 | Migración del padrón (importador, lotes, datos demo) | ✅ Hecho (falta el padrón real) | — |
 | **Alta de Concesión** — circuito completo; tablas con historial y carga reorganizada por pasos (6.1); oficinas como servicios reutilizables, aviso de deuda por correo y N° de concesión pedido a Catastro (6.3); revisión integral: archivo, visor, suministro contra el catálogo, cierre (6.4) | ✅ Hecho | ✅ |
-| Catálogo de suministro de riego (árbol de la DRH) en la base, con validación y vinculación de zonas (6.4) y **ABM con baja lógica** (6.5) | ✅ Hecho (78 zonas por vincular) | ✅ (mock, sin ABM) |
+| Catálogo de suministro de riego: **un árbol por distrito** (el de los jefes de Distrito), con validación del paso 6 y **ABM con baja lógica** (6.6; reemplaza al catálogo por zonas de 6.4 y 6.5) | ✅ Hecho | ✅ Pantalla «Catálogo de suministro» |
 | Ríos y canales (`sig.cauce`) con **ABM y baja lógica** por la API (6.5) | ✅ Hecho | — |
 | Catálogos de ubicación (departamentos, localidades, distritos, cuencas) con **ABM y baja lógica** (6.2) | ✅ Hecho | ✅ (mock, sin ABM) |
 | **Baja de Pozo** — de oficio y a solicitud | ✅ Hecho | ⏳ |
@@ -682,6 +682,39 @@ siempre en el visor del sistema; lo de afuera (GeoServer, QGIS con `drh_lector_s
 - Cada acción queda en el historial del expediente: actuación `PUBLICACION_MAPA` (APTO / OBSERVADO / REGISTRADO).
 - Front: Catastro → «Publicación en el mapa» (`/catastro/publicacion-mapa`); la ficha del visor avisa «Solo interno».
 
+#### 6.4.7 Corrección de errores materiales de un alta
+
+Pedido (2026-10-23): un alta ya cargada, con o sin resolución, con un dato mal escrito o un KML mal cargado tiene
+que poder corregirse con permiso, y todo tiene que quedar en el historial y la auditoría.
+
+Decisiones del usuario: solo **errores materiales** (titulares y domicilios, ubicación y polígono, inmueble,
+suministro); usos, magnitudes y caudal **no** (son lo otorgado: ampliación o reducción); agregar o quitar titulares
+es un cambio de titularidad. Sin aprobación de otra persona para los datos (permiso + motivo). Se puede **desde que
+sale de la carga** (en carga o en corrección de observaciones se edita como siempre); anulado, rechazado o archivado,
+no. El polígono corregido de una concesión **publicada** espera aprobación y, mientras tanto, en Argenmap **sigue el
+anterior**.
+
+- Permiso nuevo `ALTA_CORREGIR` («Corregir datos de altas», Catastro, plantilla del Jefe). El polígono pide además
+  `KML_CARGAR`. No hace falta tener el expediente tomado (puede estar en otra oficina o finalizado).
+- API: `PUT /api/tramites/alta-concesion/:id/correccion/{titulares|ubicacion|inmueble|suministro}`, con el mismo
+  cuerpo que la carga más `motivo` (10 a 2000 caracteres; ubicación en multipart). Reusan los pasos de la carga
+  (`exigirEditable(…, correccion)`) sin las reglas del cierre. 400 si no cambió nada.
+- Historial: actuación `CORRECCION_DATOS` (oficina Catastro) con el motivo y `datos = { seccion, cambios: [{ campo,
+  antes, despues, sensible? }] }`. Los cambios `sensible` (documento, contacto, domicilio) salen sin valores para
+  quien no tiene «Ver datos sensibles» (`GET /expedientes/:id/historial` pasó a `@ConDatosSensibles`).
+  Auditoría: acción `CORRECCION`.
+- Polígono: `con_poligono.propuesto` (índice único parcial `uk_poligono_propuesto`). Si el vigente está `PUBLICADO`, el
+  corregido entra propuesto (no vigente); si no, reemplaza al vigente y el anterior queda en el histórico (no se
+  borra). La lista de «Publicación en el mapa» trae las propuestas (`esCorreccion`, `superficieAnteriorHa`);
+  publicar una propuesta cierra el vigente y la deja vigente y publicada; observarla no toca lo publicado; reemplazarla
+  genera otra propuesta. El alta trae `ubicacion.poligonoPropuesto`.
+- Front: botón «Corregir datos» en el expediente (`/tramites/alta-concesion/:id/correccion`), secciones sin usos,
+  motivo en un diálogo por cada guardado; el historial muestra la tabla «Dato / Anterior / Corregido» y la
+  auditoría, las correcciones.
+- Verificado (23/10/2026) contra la API: rechazos (sin permiso 403, motivo corto 400, sin cambios 400, en carga
+  409, caudal 409, titular agregado 409), corrección del inmueble, polígono publicado → propuesta (Argenmap sin
+  cambios) → aprobada (reemplaza); unitarias 90.
+
 ### 6.5 ABM del catálogo de suministro y de los ríos y canales
 
 > **Estado:** hecho (08/10/2026). Pedido: poder agregar, corregir y dar de baja lo que haga falta del
@@ -735,6 +768,58 @@ del alta: 100 verificaciones.
 
 **Pendiente:** pantallas de administración en el front; a QGIS, la capa `sig.cauce` le muestra también los dados
 de baja (filtrar `"activo" = true`).
+
+### 6.6 Catálogo de suministro: un árbol por distrito
+
+> **Estado:** hecho (28/10/2026). Reemplaza al catálogo por zonas (departamento + localidad + distrito) de 6.4 y
+> 6.5. Pedido: que el sistema tenga el árbol como lo cargaron los jefes de Distrito en su proyecto de carga
+> («Formulario para pedir info»), y una pantalla para que alguien designado agregue lo que falte.
+
+#### 6.6.1 El modelo
+
+- **Un árbol por distrito**: fuente → sistema de distribución → canal principal → secundario → terciario →
+  cuarto → quinto → desagüe. Las fuentes son las raíces; cada tramo cuelga de un tramo de un **nivel anterior**,
+  no necesariamente el inmediato (una rama puede no tener algún nivel: ej. un desagüe que sale del principal).
+- Tabla `cat_suministro_nodo` (`distrito_id`, `padre_id`, `nivel` enum `cat_nivel_suministro`, `nombre`, columnas
+  comunes de catálogo con baja lógica). Únicos: la fuente en el distrito y el nombre + nivel dentro del padre.
+  CHECK: solo las fuentes no tienen padre.
+- Se carga al arrancar (si la tabla está vacía) desde `recursos/catalogos/arbol-suministro.json`, que sale **tal
+  cual** de `recursos/catalogos/Suministros_DRH.xlsx` (export de los jefes del 27/07/2026; una hoja por distrito,
+  una fila por rama) con `node scripts/catalogos/arbol-desde-excel.mjs`. Las filas que comparten el comienzo se
+  juntan; una celda vacía es un nivel que esa rama no tiene. Cargado: **342 tramos** (I 81, II 104, III 9, IV 30,
+  V 3, VI 27, VII 88), igual que el Excel.
+- Las tablas viejas (`cat_suministro_zona`, `_opcion`, `_canal`) quedan en la base sin uso (no se borraron datos);
+  se quitaron sus entidades, `recursos/catalogos/suministro.json` y `requests/catalogos/vincular-zonas.mjs`.
+
+#### 6.6.2 Qué cambia
+
+| Dónde | Antes | Ahora |
+| --- | --- | --- |
+| `GET /api/catalogos/suministro` | departamento → localidad → distrito → listas + cascada | `{ "I": [{ nombre, nivel, hijos }] }`; `?distrito=II` solo ese árbol |
+| ABM | zonas, opciones y canales | `GET …/suministro/distritos`, `GET …/distritos/:id/arbol`, `POST …/nodos` `{ distritoId, nivel, nombre, padreId? }`, `PUT/DELETE …/nodos/:id`, `POST …/nodos/:id/reactivar` (permiso «Administrar catálogos») |
+| Paso 6 del alta | las listas de la zona y los canales en orden (`canalesAdicionales`) | un **camino del árbol del distrito**: desde la fuente principal, cada nivel elegido cuelga del anterior elegido; los niveles vacíos se saltan. El DTO trae `canalTerciario`, `canalCuarto`, `canalQuinto` (ya no `canalesAdicionales`) |
+| Sin árbol | ubicación sin zona: solo observación y caudal | distrito sin árbol: igual |
+| Consulta de concesiones | filtros de fuente / sistema desde las zonas | desde el árbol **y** lo que tienen las concesiones (las migradas conservan los nombres del padrón) |
+
+- La baja de un tramo se lleva todo lo que cuelga de él; la reactivación devuelve lo que se dio de baja con él y
+  exige el padre activo. Lo dado de baja no se edita ni se vuelve a crear: se reactiva.
+- El importador del padrón no valida el suministro contra el árbol: las concesiones migradas guardan el texto
+  del padrón tal como está.
+
+**Frontend:** `Catastro → Catálogo de suministro` (solo con el permiso «Administrar catálogos» o administrador):
+el árbol de cada distrito como el Excel de los jefes (una columna por nivel, una fila por rama); al tocar un
+tramo se agrega lo que sale de él (eligiendo el nivel), se corrige o se da de baja. En el alta, el paso 6 ofrece
+el árbol del distrito: cada nivel muestra lo que cuelga del último tramo elegido y los niveles que la rama no
+tiene no aparecen.
+
+**Verificado (28/10/2026):** unitarias 91 (árbol desde las ramas, niveles salteados, caminos válidos e inválidos);
+el árbol cargado coincide tramo por tramo con el Excel; endpoints de lectura probados contra `pruebas_de_cargas`.
+`test/abm-suministro-cauces.e2e-spec.ts` y `circuito-completo.sh` quedaron actualizados al árbol, sin correr (escriben
+en la base).
+
+**Para revisar con los jefes:** en el distrito VI dos nombres vinieron con «¿?» en el export del 27/07
+(«REPRESA LOS PIZARROS¿?», «4 ¿?»); en `Suministros_DRH_ARBOL.xlsx` (18/08) ya están sin las dudas. Se corrigen
+desde la pantalla. En el distrito IV hay «MATIRZ RPG» y «ENTREGAS. EJ:56», cargados así.
 
 ---
 

@@ -19,6 +19,8 @@ const ACTUACION: Record<string, string> = {
   VERIFICACION_FINAL: 'Verificación final',
   PADRON: 'Cargó el padrón de Rentas',
   PUBLICACION_MAPA: 'Publicación en el mapa (Argenmap)',
+  CANCELACION: 'Canceló el trámite (iniciado por error)',
+  CORRECCION_DATOS: 'Corrección de datos',
   // Baja de pozo (el historial es el mismo para cualquier expediente)
   DOCUMENTACION: 'Control de documentación',
   ANTECEDENTES: 'Verificó los antecedentes',
@@ -48,16 +50,53 @@ function datoDestacado(e: ActuacionHistorial): string | null {
   if (e.actuacion === 'RESOLUCION') return `Resolución ${String(d.resolucion)} del ${String(d.fecha)}${d.decision === 'RECHAZAR' ? ' (rechaza)' : ''}`
   if (e.actuacion === 'CLAUSURA') return `Acta ${String(d.acta)} del ${String(d.fecha)}`
   if (e.actuacion === 'PADRON') return `Padrón ${String(d.padron)}`
+  if (e.actuacion === 'CORRECCION_DATOS') return `Sección: ${String(d.seccion)}`
   if (e.actuacion === 'VERIFICACION_DEUDA' && Array.isArray(d.deudas) && d.deudas.length) {
     return (d.deudas as { detalle: string }[]).map((x) => x.detalle).join(' · ')
   }
   return null
 }
 
+interface CambioCorregido {
+  campo: string
+  antes: string | null
+  despues: string | null
+  /** Dato sensible: sin el permiso «Ver datos sensibles» llega sin valores. */
+  sensible?: boolean
+}
+
+/** Los datos corregidos: cómo estaban y cómo quedaron. */
+function Cambios({ cambios }: { cambios: CambioCorregido[] }) {
+  const valor = (v: string | null, c: CambioCorregido) => (v ?? (c.sensible ? 'Dato reservado' : 'Sin dato'))
+  return (
+    <div className="mt-1.5 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+      <table className="w-full text-left text-xs">
+        <thead className="bg-slate-50 font-semibold text-slate-500 uppercase dark:bg-slate-800/60 dark:text-slate-400">
+          <tr>
+            <th className="px-3 py-1.5">Dato</th>
+            <th className="px-3 py-1.5">Anterior</th>
+            <th className="px-3 py-1.5">Corregido</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+          {cambios.map((c) => (
+            <tr key={c.campo}>
+              <td className="px-3 py-1.5 font-medium text-slate-700 dark:text-slate-200">{c.campo}</td>
+              <td className="px-3 py-1.5 text-slate-500 line-through decoration-slate-300 dark:text-slate-400">{valor(c.antes, c)}</td>
+              <td className="px-3 py-1.5 text-slate-800 dark:text-slate-100">{valor(c.despues, c)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 /** Ícono y color del punto de cada entrada. */
 function marca(e: EntradaHistorial): { icono: string; clase: string } {
   if (e.tipo === 'PASE') return e.esDevolucion ? { icono: 'undo', clase: 'bg-amber-100 text-amber-600' } : { icono: 'arrow_forward', clase: 'bg-primary/10 text-primary' }
   if (e.tipo === 'ESTADO') return { icono: 'swap_horiz', clase: 'bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300' }
+  if (e.actuacion === 'CORRECCION_DATOS') return { icono: 'edit_note', clase: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' }
   return { icono: 'gavel', clase: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' }
 }
 
@@ -119,7 +158,13 @@ export function HistorialAlta({ expedienteId }: { expedienteId: string }) {
                 {formatear(e.fecha)} · {e.usuario}
               </p>
               {datoDestacado(e) && <p className="mt-0.5 text-sm text-slate-700 dark:text-slate-300">{datoDestacado(e)}</p>}
-              {e.observaciones && <p className="mt-1 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-300">{e.observaciones}</p>}
+              {e.observaciones && (
+                <p className="mt-1 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  {e.actuacion === 'CORRECCION_DATOS' && <span className="font-semibold">Motivo: </span>}
+                  {e.observaciones}
+                </p>
+              )}
+              {e.actuacion === 'CORRECCION_DATOS' && Array.isArray(e.datos?.cambios) && <Cambios cambios={e.datos.cambios as CambioCorregido[]} />}
             </div>
           )}
         </li>

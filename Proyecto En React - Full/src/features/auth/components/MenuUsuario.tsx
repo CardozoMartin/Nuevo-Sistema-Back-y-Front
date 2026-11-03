@@ -28,25 +28,25 @@ export function MenuUsuario() {
     : `${usuario.rol?.nombre ?? 'Sin rol'} · ${usuario.oficina?.nombre ?? 'Sin oficina'}`
 
   return (
-    <div ref={caja} className="relative border-l border-white/20 pl-1.5 sm:pl-3 md:pl-4">
+    <div ref={caja} className="relative border-l border-slate-200 dark:border-white/20 pl-1.5 sm:pl-3 md:pl-4">
       <button
         type="button"
         onClick={() => setAbierto((a) => !a)}
         aria-haspopup="menu"
         aria-expanded={abierto}
-        className="flex items-center gap-3 rounded py-1 pr-1 pl-1 text-left hover:bg-white/10 sm:pl-2"
+        className="flex items-center gap-3 rounded py-1 pr-1 pl-1 text-left hover:bg-slate-100 dark:hover:bg-white/10 sm:pl-2"
       >
         <div className="hidden text-right sm:block">
-          <p className="text-sm leading-none font-semibold text-white">
+          <p className="text-sm leading-none font-semibold text-slate-800 dark:text-white">
             {usuario.nombre} {usuario.apellido}
           </p>
-          <p className="mt-1 text-xs text-white/70">{cargo}</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-white/70">{cargo}</p>
         </div>
-        <div className="flex size-9 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/25">
-          <Icon name={usuario.esAdministrador ? 'admin_panel_settings' : 'person'} className="text-xl! text-white" />
+        <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/20 dark:bg-white/15 dark:ring-white/25">
+          <Icon name={usuario.esAdministrador ? 'admin_panel_settings' : 'person'} className="text-xl! text-primary dark:text-white" />
         </div>
         <span className="hidden sm:flex">
-          <Icon name="expand_more" className="text-[18px]! text-white/70" />
+          <Icon name="expand_more" className="text-[18px]! text-slate-400 dark:text-white/70" />
         </span>
       </button>
 

@@ -17,6 +17,8 @@ export enum AccionAuditoria {
   CAMBIO_ETAPA = 'CAMBIO_ETAPA',
   /** Cambió de estado: observado, en espera, finalizado, rechazado… */
   CAMBIO_ESTADO = 'CAMBIO_ESTADO',
+  /** Se corrigieron datos por fuera del circuito (el detalle, en la actuación CORRECCION_DATOS). */
+  CORRECCION = 'CORRECCION',
 }
 
 /**

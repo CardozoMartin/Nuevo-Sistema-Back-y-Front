@@ -20,9 +20,10 @@ export const NAVIGATION: NavSection[] = [
         children: [
           { key: 'catastro-bandeja', label: 'Bandeja', icon: 'inbox', path: ROUTES.catastro.bandeja, bandejaDe: 'catastro' },
           { key: 'catastro-tramites', label: 'Trámites', icon: 'post_add', path: ROUTES.catastro.tramites },
-          { key: 'catastro-pendientes', label: 'Seguimiento', icon: 'assignment_late', path: ROUTES.catastro.pendientes },
+          // Seguimiento (ROUTES.catastro.pendientes) oculto por ahora: la ruta sigue activa.
           { key: 'catastro-concesiones', label: 'Consulta de concesiones', icon: 'manage_search', path: ROUTES.catastro.concesiones },
           { key: 'catastro-publicacion-mapa', label: 'Publicación en el mapa', icon: 'public', path: ROUTES.catastro.publicacionMapa },
+          { key: 'catastro-suministro', label: 'Catálogo de suministro', icon: 'account_tree', path: ROUTES.catastro.suministro, permiso: 'CATALOGOS_ADMINISTRAR' },
         ],
       },
       {
@@ -116,11 +117,16 @@ export const NAVIGATION_FOOTER: NavItem[] = [
 
 /**
  * Quién ve cada ítem: lo de una oficina, solo sus usuarios; lo de administración, solo los
- * administradores (que ven todo). Lo general (búsqueda, visor), todos. El backend controla igual.
+ * administradores (que ven todo); lo que pide un permiso, solo quien lo tiene. Lo general
+ * (búsqueda, visor), todos. El backend controla igual.
  */
-export function itemVisible(item: NavItem, usuario: { esAdministrador: boolean; oficina: { codigo: string } | null } | null): boolean {
+export function itemVisible(
+  item: NavItem,
+  usuario: { esAdministrador: boolean; oficina: { codigo: string } | null; permisos?: string[] } | null,
+): boolean {
   if (usuario?.esAdministrador) return true
   if (item.soloAdministrador) return false
+  if (item.permiso && !usuario?.permisos?.includes(item.permiso)) return false
   const oficina = item.oficina ?? item.roles?.find((r) => r !== 'administrador')
   return !oficina || usuario?.oficina?.codigo === oficina
 }

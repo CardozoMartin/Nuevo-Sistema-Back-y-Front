@@ -1,16 +1,16 @@
 import { useEffect, type ReactNode } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
-import { FormMaskedField, FormSelectField, FormTextareaField, toOptions } from '@/components/form'
+import { FormMaskedField, FormSelectField, FormTextareaField, toOptions, type Option } from '@/components/form'
 import { Button } from '@/components/ui/Button'
 import { Icon } from '@/components/ui/Icon'
 import { IconButton } from '@/components/ui/IconButton'
 import { useCatalogoSuministro } from '@/hooks/useCatalogos'
 import { decimalPositivo } from '@/lib/mascaras'
-import { getDatosSuministro, NIVELES_CANAL_ADICIONAL, opcionesCanalSiguiente, type UbicacionSeleccionada } from '../suministro'
+import { arbolDelDistrito, CAMPOS_CASCADA, pasosCascada, type CampoCascada, type UbicacionSeleccionada } from '../suministro'
 
 interface Props {
   prefix: string
-  /** Ubicación del inmueble: define qué fuentes, sistemas y canales se ofrecen. */
+  /** Ubicación del inmueble: el distrito define qué árbol de suministro se ofrece. */
   ubicacion: UbicacionSeleccionada
 }
 
@@ -23,83 +23,74 @@ function Aviso({ icon, children }: { icon: string; children: ReactNode }) {
   )
 }
 
-/** Fuente de agua, sistema de distribución y canales en cascada según el catálogo de riego. */
+/** Las opciones de un nivel; un valor que no está en el árbol (concesión migrada) se muestra marcado. */
+function conValorActual(opciones: string[], valor: string): Option[] {
+  const lista = toOptions(opciones)
+  return valor && !opciones.includes(valor) ? [{ value: valor, label: `${valor} (no está en el árbol)` }, ...lista] : lista
+}
+
+/**
+ * Fuente de agua y el camino por el árbol de suministro del distrito: sistema de distribución,
+ * canales y desagüe. Cada nivel ofrece lo que cuelga del último tramo elegido; los niveles que
+ * la rama no tiene no aparecen.
+ */
 export function SuministroFields({ prefix, ubicacion }: Props) {
   const n = (campo: string) => `${prefix}.${campo}`
   const { control, setValue, getValues } = useFormContext()
   const { catalogo, cargando, error } = useCatalogoSuministro()
   const fuentes = useFieldArray({ control, name: n('fuentes') })
-  const canales = useFieldArray({ control, name: n('canalesAdicionales') })
 
-  const [principal, secundario, adicionales] = useWatch({
-    control,
-    name: [n('canalPrincipal'), n('canalSecundario'), n('canalesAdicionales')],
-  }) as [string, string, { valor: string }[] | undefined]
-  const valoresAdicionales = (adicionales ?? []).map((c) => c.valor)
+  const [listaFuentes, ...valoresCascada] = useWatch({ control, name: [n('fuentes'), ...CAMPOS_CASCADA.map(n)] }) as [{ valor: string }[] | undefined, ...string[]]
+  const valores = Object.fromEntries(CAMPOS_CASCADA.map((c, i) => [c, valoresCascada[i] ?? ''])) as Record<CampoCascada, string>
+  const fuentePrincipal = listaFuentes?.[0]?.valor ?? ''
 
-  const datos = getDatosSuministro(catalogo, ubicacion)
-  const opcionesFuente = toOptions(datos?.fuentesAgua ?? [])
-  const opcionesSistema = toOptions(datos?.sistemasDistribucion ?? [])
-  const opcionesPrincipal = toOptions(Object.keys(datos?.canalesPrincipales ?? {}))
-  const opcionesSecundario = toOptions((principal && datos?.canalesPrincipales[principal]) || [])
-  const opcionesDesague = toOptions(datos?.desagues ?? [])
+  const arbol = arbolDelDistrito(catalogo, ubicacion.distrito)
+  const nombresFuente = arbol?.map((f) => f.nombre) ?? []
+  const opcionesFuente = toOptions(nombresFuente)
+  const pasos = pasosCascada(arbol, fuentePrincipal, valores)
 
-  const opcionesAdicional = (i: number) => opcionesCanalSiguiente(datos, principal, secundario, valoresAdicionales.slice(0, i))
-  const ultimoElegido = valoresAdicionales.length === 0 ? secundario : valoresAdicionales.at(-1)
-  const puedeAgregarCanal =
-    canales.fields.length < NIVELES_CANAL_ADICIONAL.length && !!ultimoElegido && opcionesAdicional(valoresAdicionales.length).length > 0
-
-  // Con una sola opción disponible se selecciona sola (igual que el prototipo).
+  // Con una sola opción se selecciona sola: la fuente (al cambiar de distrito) y el sistema (al cambiar de fuente).
   useEffect(() => {
-    if (!datos) return
-    const autocompletar = (campo: string, opciones: string[]) => {
-      if (opciones.length === 1 && !getValues(n(campo))) setValue(n(campo), opciones[0], { shouldDirty: true })
-    }
-    autocompletar('fuentes.0.valor', datos.fuentesAgua)
-    autocompletar('sistemaDistribucion', datos.sistemasDistribucion)
-    autocompletar('canalPrincipal', Object.keys(datos.canalesPrincipales))
-    autocompletar('desague', datos.desagues)
-  }, [datos]) // solo al cambiar la ubicación / catálogo
+    if (arbol?.length === 1 && !getValues(n('fuentes.0.valor'))) setValue(n('fuentes.0.valor'), arbol[0].nombre, { shouldDirty: true })
+  }, [arbol]) // solo al cambiar el distrito / catálogo
+  const sistemas = pasos.find((p) => p.campo === 'sistemaDistribucion')?.opciones
+  useEffect(() => {
+    if (sistemas?.length === 1 && !getValues(n('sistemaDistribucion'))) setValue(n('sistemaDistribucion'), sistemas[0], { shouldDirty: true })
+  }, [fuentePrincipal, sistemas?.length])
 
-  function limpiarCanalesDesde(indice: number) {
-    const aQuitar = canales.fields.map((_, i) => i).filter((i) => i >= indice)
-    if (aQuitar.length) canales.remove(aQuitar)
+  /** Cambiar un tramo invalida lo que venía después. */
+  function limpiarDesde(campo: CampoCascada | null) {
+    const desde = campo ? CAMPOS_CASCADA.indexOf(campo) + 1 : 0
+    for (const c of CAMPOS_CASCADA.slice(desde)) if (getValues(n(c))) setValue(n(c), '', { shouldDirty: true })
   }
 
-  function agregarCanal() {
-    const opciones = opcionesAdicional(canales.fields.length)
-    canales.append({ valor: opciones.length === 1 ? opciones[0] : '' })
-  }
-
-  const ubicacionCompleta = !!(ubicacion.departamento && ubicacion.localidad && ubicacion.distrito)
+  const distritoCargado = !!ubicacion.distrito
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-      {error && <Aviso icon="error">No se pudo cargar el catálogo de suministro de riego.</Aviso>}
-      {!error && cargando && <p className="text-sm text-slate-500 md:col-span-2">Cargando catálogo de suministro…</p>}
-      {!error && !cargando && !ubicacionCompleta && (
-        <Aviso icon="info">Complete la ubicación del inmueble (sección 2) para ver las fuentes y canales disponibles.</Aviso>
-      )}
-      {!error && !cargando && ubicacionCompleta && !datos && (
+      {error && <Aviso icon="error">No se pudo cargar el árbol de suministro de riego.</Aviso>}
+      {!error && cargando && <p className="text-sm text-slate-500 md:col-span-2">Cargando árbol de suministro…</p>}
+      {!error && !cargando && !distritoCargado && <Aviso icon="info">Complete la ubicación del inmueble (sección 2) para ver las fuentes y canales del distrito.</Aviso>}
+      {!error && !cargando && distritoCargado && !arbol && (
         <Aviso icon="warning">
-          No hay datos de suministro cargados para {ubicacion.localidad} ({ubicacion.departamento}), distrito {ubicacion.distrito}. Puede
-          completar la observación y el caudal asignado.
+          El distrito {ubicacion.distrito} todavía no tiene árbol de suministro cargado. Puede completar la observación y el caudal asignado.
         </Aviso>
       )}
 
-      {/* Fuentes: principal + adicionales */}
-      <div className="flex flex-col gap-3">
+      {/* Fuentes: principal (de ella sale el camino) + adicionales */}
+      <div className="flex flex-col gap-3 md:col-span-2">
         {fuentes.fields.map((field, i) => (
           <div key={field.id} className="flex items-end gap-2">
             <FormSelectField
               name={n(`fuentes.${i}.valor`)}
               label={i === 0 ? 'Fuente de agua' : `Fuente adicional ${i}`}
               hideLabel={i > 0}
-              // Obligatoria cuando la ubicación tiene catálogo (sin opciones, solo se cargan observación y caudal).
+              // Obligatoria cuando el distrito tiene árbol (sin opciones, solo se cargan observación y caudal).
               required={i === 0 && opcionesFuente.length > 0}
               placeholder="Seleccione una fuente"
-              options={opcionesFuente}
+              options={conValorActual(nombresFuente, listaFuentes?.[i]?.valor ?? '')}
               disabled={opcionesFuente.length === 0}
+              onValueChange={i === 0 ? () => limpiarDesde(null) : undefined}
               className="flex-1"
             />
             {i > 0 && <IconButton icon="delete" label="Quitar fuente" tone="danger" className="mb-1" onClick={() => fuentes.remove(i)} />}
@@ -114,57 +105,19 @@ export function SuministroFields({ prefix, ubicacion }: Props) {
         )}
       </div>
 
-      <FormSelectField
-        name={n('sistemaDistribucion')}
-        label="Sistema de distribución"
-        placeholder="Seleccione un sistema"
-        options={opcionesSistema}
-        disabled={opcionesSistema.length === 0}
-      />
-
-      <FormSelectField
-        name={n('canalPrincipal')}
-        label="Canal principal"
-        placeholder="Seleccione un canal principal"
-        options={opcionesPrincipal}
-        disabled={opcionesPrincipal.length === 0}
-        onValueChange={(cp) => {
-          const secundarios = datos?.canalesPrincipales[cp] ?? []
-          setValue(n('canalSecundario'), secundarios.length === 1 ? secundarios[0] : '', { shouldDirty: true })
-          limpiarCanalesDesde(0)
-        }}
-      />
-
-      <FormSelectField
-        name={n('canalSecundario')}
-        label="Canal secundario"
-        placeholder={principal ? 'Seleccione un canal secundario' : 'Seleccione primero un canal principal'}
-        options={opcionesSecundario}
-        disabled={opcionesSecundario.length === 0}
-        onValueChange={() => limpiarCanalesDesde(0)}
-      />
-
-      {/* Canales terciario / cuarto / quinto */}
-      {canales.fields.map((field, i) => (
+      {/* El camino por el árbol: sistema → canales → desagüe (solo los niveles que tiene la rama) */}
+      {pasos.map((p) => (
         <FormSelectField
-          key={field.id}
-          name={n(`canalesAdicionales.${i}.valor`)}
-          label={NIVELES_CANAL_ADICIONAL[i]}
-          placeholder={`Seleccione ${NIVELES_CANAL_ADICIONAL[i].toLowerCase()}`}
-          options={toOptions(opcionesAdicional(i))}
-          onValueChange={() => limpiarCanalesDesde(i + 1)}
+          key={p.campo}
+          name={n(p.campo)}
+          label={p.etiqueta}
+          placeholder={p.opciones.length ? `Seleccione ${p.etiqueta.toLowerCase()}` : 'Sin opciones en el árbol'}
+          options={conValorActual(p.opciones, valores[p.campo])}
+          onValueChange={() => limpiarDesde(p.campo)}
         />
       ))}
-      {puedeAgregarCanal && (
-        <div className="flex items-end md:col-span-2">
-          <Button size="sm" variant="secondary" iconLeft="add" onClick={agregarCanal}>
-            Agregar {NIVELES_CANAL_ADICIONAL[canales.fields.length].toLowerCase()}
-          </Button>
-        </div>
-      )}
-
-      {opcionesDesague.length > 0 && (
-        <FormSelectField name={n('desague')} label="Desagüe" placeholder="Seleccione un desagüe" options={opcionesDesague} />
+      {fuentePrincipal && arbol && pasos.length === 0 && (
+        <p className="text-sm text-slate-500 md:col-span-2 dark:text-slate-400">De esta fuente no sale ningún sistema ni canal cargado en el árbol del distrito.</p>
       )}
 
       <FormMaskedField

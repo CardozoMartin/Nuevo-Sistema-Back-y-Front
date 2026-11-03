@@ -8,7 +8,7 @@ import { caudalTotal } from '../../concesiones/caudal.js';
 import type { DatosVigentes } from '../../concesiones/datos-vigentes.js';
 import type { Concesion } from '../../concesiones/entities/concesion.entity.js';
 import type { Punto } from '../../concesiones/entities/punto.entity.js';
-import type { PoligonoVigente } from '../../concesiones/poligonos.service.js';
+import type { PoligonoPropuesto, PoligonoVigente } from '../../concesiones/poligonos.service.js';
 import type { DocumentacionPresentada } from '../../expedientes/entities/documentacion-presentada.entity.js';
 import type { AvisoDeuda } from '../../expedientes/expedientes.service.js';
 import type { Expediente } from '../../expedientes/entities/expediente.entity.js';
@@ -26,6 +26,8 @@ export interface PiezasAlta {
   /** Pedido del N° de concesión (Secretaría → Catastro). NULL si todavía no se pidió. */
   solicitudNumero: SolicitudNumero | null;
   poligono: PoligonoVigente | null;
+  /** Corrección del polígono publicado que espera aprobación para el mapa público. */
+  poligonoPropuesto: PoligonoPropuesto | null;
   superposiciones: Superposicion[];
 }
 
@@ -61,7 +63,7 @@ const coordenada = (p: Punto) => ({
  * Sección de ubicación de la concesión: departamento / localidad / distrito (nombres del
  * catálogo) y el polígono (WGS84, listo para Leaflet), con las superposiciones detectadas.
  */
-function seccionUbicacion({ datos, poligono, superposiciones }: PiezasAlta) {
+function seccionUbicacion({ datos, poligono, poligonoPropuesto, superposiciones }: PiezasAlta) {
   const i = datos.inmueble;
   if (!poligono && !i?.departamento) return null;
   return {
@@ -69,6 +71,8 @@ function seccionUbicacion({ datos, poligono, superposiciones }: PiezasAlta) {
     localidad: i?.localidad?.nombre ?? null,
     distrito: i?.distrito?.codigo ?? null,
     poligono,
+    /** Corrección del polígono que espera aprobación (mientras tanto rige y se publica `poligono`). */
+    poligonoPropuesto,
     superposiciones,
   };
 }
@@ -107,7 +111,9 @@ function seccionSuministro({ suministro: s }: DatosVigentes) {
     sistemaDistribucion: s.sistemaDistribucion,
     canalPrincipal: s.canalPrincipal,
     canalSecundario: s.canalSecundario,
-    canalesAdicionales: [s.canalTerciario, s.canalCuarto, s.canalQuinto].filter((c): c is string => c !== null),
+    canalTerciario: s.canalTerciario,
+    canalCuarto: s.canalCuarto,
+    canalQuinto: s.canalQuinto,
     desague: s.desague,
     observacion: s.observacion,
   };

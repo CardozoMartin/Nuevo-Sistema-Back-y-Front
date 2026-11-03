@@ -13,6 +13,8 @@ export const ROUTES = {
     concesiones: '/catastro/concesiones',
     /** Verificar y publicar en Argenmap los polígonos de las concesiones con resolución. */
     publicacionMapa: '/catastro/publicacion-mapa',
+    /** ABM del catálogo de suministro (zonas, fuentes, sistemas, desagües y árbol de canales). */
+    suministro: '/catastro/suministro',
   },
 
   recaudacion: '/recaudacion',
@@ -27,6 +29,8 @@ export const ROUTES = {
       datos: (expedienteId: string) => `/tramites/alta-concesion/${expedienteId}/datos`,
       /** El expediente en el circuito de oficinas (backend real): tomar, actuar, historial. */
       circuito: (expedienteId: string) => `/tramites/alta-concesion/circuito/${expedienteId}`,
+      /** Corrección de errores materiales (datos mal escritos, KML mal cargado), con permiso y motivo. */
+      correccion: (expedienteId: string) => `/tramites/alta-concesion/${expedienteId}/correccion`,
       /** Altas viejas de json-server (datos de demo anteriores al backend real). */
       gestion: (expedienteId: string) => `/tramites/alta-concesion/expediente/${expedienteId}`,
     },

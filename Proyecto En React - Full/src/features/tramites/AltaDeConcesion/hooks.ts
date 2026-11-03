@@ -124,6 +124,19 @@ export function useTomarDeBandeja() {
   })
 }
 
+/** Cancelar desde la bandeja un alta iniciada por error (el expediente y el motivo van en la llamada). */
+export function useCancelarAlta() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, observaciones }: { id: string; observaciones: string }) => altaConcesionApi.cancelar(id, observaciones),
+    onSuccess: (alta) => {
+      qc.setQueryData(altaKeys.alta(alta.id), alta)
+      void qc.invalidateQueries({ queryKey: altaKeys.historial(alta.id) })
+      void qc.invalidateQueries({ queryKey: altaKeys.bandejas() })
+    },
+  })
+}
+
 export function useTomar(id: string) {
   return useAccionAlta<void>(id, (i) => altaConcesionApi.tomar(i))
 }

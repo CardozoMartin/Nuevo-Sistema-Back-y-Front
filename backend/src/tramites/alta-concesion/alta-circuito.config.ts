@@ -68,7 +68,7 @@ export class AltaCircuitoConfig implements ConfigTramite, OnModuleInit {
       throw new BadRequestException('Falta el polígono de la concesión (KML o GeoJSON): es obligatorio para la verificación final, así la concesión queda en el visor.');
     }
 
-    //3.- El suministro tiene que seguir siendo del catálogo de la ubicación (pudo cambiar después del paso 6).
+    //3.- El suministro tiene que seguir siendo un camino del árbol del distrito (pudo cambiar después del paso 6).
     const s = piezas.datos.suministro;
     if (s) {
       const seleccion = {
@@ -76,7 +76,9 @@ export class AltaCircuitoConfig implements ConfigTramite, OnModuleInit {
         sistemaDistribucion: s.sistemaDistribucion,
         canalPrincipal: s.canalPrincipal,
         canalSecundario: s.canalSecundario,
-        canalesAdicionales: [s.canalTerciario, s.canalCuarto, s.canalQuinto].filter((c): c is string => !!c),
+        canalTerciario: s.canalTerciario,
+        canalCuarto: s.canalCuarto,
+        canalQuinto: s.canalQuinto,
         desague: s.desague,
       };
       await this.catalogoSuministro.exigirValido(tx, piezas.datos.inmueble, seleccion).catch((error: unknown) => {

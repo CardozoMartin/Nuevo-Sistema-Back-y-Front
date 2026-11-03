@@ -42,7 +42,7 @@ export const UMBRAL_DUPLICADO = 0.9;
  * Otra concesión activa cuyo polígono coincide casi por completo con el de esta
  * (≥ 90 % de la superficie de cualquiera de los dos). Devuelve el mensaje de error o null.
  */
-export async function poligonoDuplicado(tx: EntityManager, concesionId: string): Promise<string | null> {
+export async function poligonoDuplicado(tx: EntityManager, concesionId: string, poligonoId?: string): Promise<string | null> {
   const [c]: (ConcesionExistente & { porcentaje: number })[] = await tx.query(
     `SELECT c.id::text, c.numero, c.estado, e.numero || '/' || e.reparticion || '-' || e.anio AS expediente,
             round((100 * ST_Area(ST_Intersection(p.geom, o.geom)) / LEAST(ST_Area(p.geom), ST_Area(o.geom)))::numeric, 1)::float8 AS porcentaje
@@ -50,11 +50,12 @@ export async function poligonoDuplicado(tx: EntityManager, concesionId: string):
        JOIN con_poligono o ON o.vigente AND o.concesion_id <> p.concesion_id AND o.geom && p.geom AND ST_Intersects(o.geom, p.geom)
        JOIN con_concesion c ON c.id = o.concesion_id
        LEFT JOIN exp_expediente e ON e.id = c.expediente_id
-      WHERE p.concesion_id = $1 AND p.vigente AND ${ACTIVA}
+      -- El vigente de la concesión, o uno puntual (una corrección propuesta, que no es vigente).
+      WHERE p.concesion_id = $1 AND ($3::bigint IS NULL AND p.vigente OR p.id = $3::bigint) AND ${ACTIVA}
         AND ST_Area(ST_Intersection(p.geom, o.geom)) >= $2 * LEAST(ST_Area(p.geom), ST_Area(o.geom))
       ORDER BY porcentaje DESC
       LIMIT 1`,
-    [concesionId, UMBRAL_DUPLICADO],
+    [concesionId, UMBRAL_DUPLICADO, poligonoId ?? null],
   );
   return c
     ? `El polígono coincide en un ${c.porcentaje} % con ${describir(c)}: parece la misma concesión. Si es un error de dibujo, corrija el KML.`

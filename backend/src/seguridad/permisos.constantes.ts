@@ -12,6 +12,7 @@ export enum Permiso {
   ALTA_INICIAR = 'ALTA_INICIAR',
   ALTA_CARGAR = 'ALTA_CARGAR',
   KML_CARGAR = 'KML_CARGAR',
+  ALTA_CORREGIR = 'ALTA_CORREGIR',
   ALTA_CERRAR = 'ALTA_CERRAR',
   MAPA_PUBLICAR = 'MAPA_PUBLICAR',
   NUMERO_ASIGNAR = 'NUMERO_ASIGNAR',
@@ -60,6 +61,12 @@ export const PERMISOS_INICIALES: Record<Permiso, DefinicionPermiso> = {
     grupo: 'Alta de concesión',
     nombre: 'Publicar en el mapa',
     descripcion: 'Verificar el polígono de una concesión con resolución y publicarlo en Argenmap, u observarlo con una nota.',
+  },
+  [Permiso.ALTA_CORREGIR]: {
+    oficina: Oficina.CATASTRO,
+    grupo: 'Alta de concesión',
+    nombre: 'Corregir datos de altas',
+    descripcion: 'Corregir errores materiales de un alta que ya salió de la carga (con o sin resolución), con motivo. Para el polígono hace falta además «Cargar o reemplazar el KML».',
   },
   [Permiso.NUMERO_ASIGNAR]: { oficina: Oficina.CATASTRO, grupo: 'Alta de concesión', nombre: 'Asignar N° de concesión', descripcion: 'Cargar el número de concesión que pidió Secretaría General.' },
   [Permiso.CATALOGOS_ADMINISTRAR]: { oficina: Oficina.CATASTRO, grupo: 'Catálogos', nombre: 'Administrar catálogos', descripcion: 'Altas, cambios y bajas de ubicaciones, suministro y cauces.' },
@@ -110,7 +117,7 @@ const DE_OFICINA: Record<Oficina, Permiso[]> = {
 
 /** Solo en la plantilla del Jefe: lo que cambia datos compartidos (el visor, los catálogos). */
 const SOLO_JEFE: Partial<Record<Oficina, Permiso[]>> = {
-  [Oficina.CATASTRO]: [Permiso.KML_CARGAR, Permiso.MAPA_PUBLICAR, Permiso.CATALOGOS_ADMINISTRAR],
+  [Oficina.CATASTRO]: [Permiso.KML_CARGAR, Permiso.MAPA_PUBLICAR, Permiso.CATALOGOS_ADMINISTRAR, Permiso.ALTA_CORREGIR],
 };
 
 /** Plantillas iniciales (seg_rol_permiso). Solo consulta no tiene permisos. */

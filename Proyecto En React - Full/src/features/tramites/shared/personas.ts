@@ -1,6 +1,6 @@
 // Padrón de personas (per_persona del backend): una sola por documento. Al cargar un titular
-// se busca su documento; si ya está cargado, se muestra quién es (con sus concesiones y deudas)
-// y se pregunta si se cargan sus datos: así no se carga dos veces a la misma persona (ni con
+// se busca su documento; si ya está cargado, se muestran solo sus datos (las concesiones y
+// deudas las revisa Recaudación, no se muestran en la carga) y se pregunta si se cargan sus datos: así no se carga dos veces a la misma persona (ni con
 // el nombre escrito distinto).
 import { backend } from '@/services/api/backend'
 import { esNoEncontrado } from '@/services/api/errors'

@@ -78,6 +78,15 @@ export interface AltaBackend {
       archivo: { nombre: string; bytes: number } | null
       desde: string
     } | null
+    /** Corrección del polígono publicado que espera aprobación (mientras tanto rige y se publica `poligono`). */
+    poligonoPropuesto: {
+      id: string
+      superficieHa: number
+      archivo: string | null
+      publicacion: 'PENDIENTE' | 'OBSERVADO' | 'PUBLICADO'
+      nota: string | null
+      creadoEn: string
+    } | null
     superposiciones: Superposicion[]
   } | null
   inmueble: {
@@ -103,7 +112,9 @@ export interface AltaBackend {
     sistemaDistribucion: string | null
     canalPrincipal: string | null
     canalSecundario: string | null
-    canalesAdicionales: string[]
+    canalTerciario: string | null
+    canalCuarto: string | null
+    canalQuinto: string | null
     desague: string | null
     observacion: string | null
   } | null
@@ -189,7 +200,7 @@ export interface AuditoriaExpediente {
   }[]
   eventos: {
     id: string
-    accion: 'INICIO' | 'TOMA' | 'PASE' | 'DEVOLUCION' | 'CAMBIO_ETAPA' | 'CAMBIO_ESTADO'
+    accion: 'INICIO' | 'TOMA' | 'PASE' | 'DEVOLUCION' | 'CAMBIO_ETAPA' | 'CAMBIO_ESTADO' | 'CORRECCION'
     fecha: string
     usuario: UsuarioAuditado
     oficina: string

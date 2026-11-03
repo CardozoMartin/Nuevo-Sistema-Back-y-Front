@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/Icon'
 import { cn } from '@/lib/cn'
 import { CampanaNotificaciones } from '@/features/notificaciones/components/CampanaNotificaciones'
 import { IndicadorDemo } from './IndicadorDemo'
+import { LogoInstitucional, NombreCorto } from './LogoInstitucional'
 import { MenuUsuario } from '@/features/auth/components/MenuUsuario'
 import { MODO_DEMO } from '@/services/demo/modo'
 import { SelectorUsuario } from './SelectorUsuario'
@@ -17,40 +18,29 @@ interface TopnavProps {
 }
 
 /**
- * Barra institucional (todo el ancho, arriba de todo): Gobierno de Tucumán y la Dirección,
+ * Barra institucional (todo el ancho, arriba de todo): logo oficial de la Dirección,
  * con la línea celeste del portal tucuman.gob.ar. A la derecha, notificaciones, tema y usuario.
  */
 export function Topnav({ onOpenSidebar, menuSiempre = false }: TopnavProps) {
   const { theme, toggleTheme } = useTheme()
 
   return (
-    <header className="shrink-0 border-b-[3px] border-celeste bg-institucional text-white dark:bg-surface-dark">
+    <header className="shrink-0 border-b-[3px] border-celeste bg-white text-slate-700 shadow-sm dark:bg-surface-dark dark:text-white">
       <div className="flex h-16 items-center justify-between gap-4 px-3 md:px-6">
         <div className="flex min-w-0 items-center gap-2 md:gap-3">
           <button
             type="button"
             onClick={onOpenSidebar}
-            className={cn('rounded p-2 text-white/90 hover:bg-white/10', !menuSiempre && 'lg:hidden')}
+            className={cn('rounded p-2 text-slate-600 hover:bg-slate-100 dark:text-white/90 dark:hover:bg-white/10', !menuSiempre && 'lg:hidden')}
             aria-label="Abrir menú"
           >
             <Icon name="menu" />
           </button>
 
-          <Link to={ROUTES.dashboard} className="flex min-w-0 items-center gap-3">
-            <span className="hidden size-10 shrink-0 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/25 sm:flex">
-              <Icon name="water_drop" filled className="text-2xl! text-celeste" />
-            </span>
-            {/* En pantallas chicas, el nombre corto (el largo no entra al lado de los botones). */}
-            <span className="flex min-w-0 flex-col leading-tight">
-              <span className="truncate text-xs font-medium tracking-wider text-white/75 uppercase">
-                <span className="sm:hidden">Gob. de Tucumán</span>
-                <span className="hidden sm:inline">Gobierno de Tucumán</span>
-              </span>
-              <span className="truncate text-base font-semibold md:text-lg">
-                <span className="sm:hidden">Recursos Hídricos</span>
-                <span className="hidden sm:inline">Dirección de Recursos Hídricos</span>
-              </span>
-            </span>
+          <Link to={ROUTES.dashboard} className="flex min-w-0 items-center" aria-label="Inicio">
+            <LogoInstitucional />
+            {/* En pantallas chicas el logo no entra al lado de los botones: el nombre corto. */}
+            <NombreCorto />
           </Link>
         </div>
 
@@ -60,7 +50,7 @@ export function Topnav({ onOpenSidebar, menuSiempre = false }: TopnavProps) {
           <button
             type="button"
             onClick={toggleTheme}
-            className="hidden rounded p-2 text-white/90 hover:bg-white/10 sm:inline-flex"
+            className="hidden rounded p-2 text-slate-600 hover:bg-slate-100 dark:text-white/90 dark:hover:bg-white/10 sm:inline-flex"
             aria-label={theme === 'dark' ? 'Usar modo claro' : 'Usar modo oscuro'}
           >
             <Icon name={theme === 'dark' ? 'light_mode' : 'dark_mode'} />

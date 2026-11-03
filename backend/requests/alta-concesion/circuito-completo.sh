@@ -77,7 +77,7 @@ llamar GET "$API/personas?documento=23456789" $CAT; espera 200 "ahora la persona
 
 paso "3-6. Resto de la carga"
 llamar POST "$ALTA/$ID/enviar" $CAT '{}'; espera 400 "no se puede enviar incompleta"
-llamar PUT "$ALTA/$ID/suministro" $CAT @6-suministro.json; espera 400 "suministro antes de la ubicación (el catálogo depende de ella)"
+llamar PUT "$ALTA/$ID/suministro" $CAT @6-suministro.json; espera 400 "suministro antes de la ubicación (el árbol depende del distrito)"
 llamar PUT "$ALTA/$ID/ubicacion" $CAT -F "archivo=@$KML1" -F departamento=BURRUYACU -F "localidad=ALTA GRACIA" -F distrito=II; espera 200 "ubicación (KML)"
 echo "  avisos: $(campo 'r.avisos.join(" | ")')"
 POLIGONO=$(campo 'r.ubicacion.poligono.id'); CONCESION=$(campo 'r.concesion.id')
@@ -100,9 +100,9 @@ llamar PUT "$ALTA/$ID/usos" $CAT "$USOS"; espera 200 "usos (puntos dentro del po
 if [[ $(campo 'r.avisos.length') == 0 ]]; then printf '  \033[32m✔ sin avisos\033[0m\n'; else printf '  \033[31m✘ avisó: %s\033[0m\n' "$(campo 'r.avisos[0]')"; FALLOS=$((FALLOS+1)); fi
 
 paso "Suministro: tiene que ser un camino del árbol de la DRH para ALTA GRACIA (Burruyacu, II)"
-llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO LULES"]}'; espera 400 "fuente que no es de la zona"
-llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO SALI"],"canalPrincipal":"ARR. EL TIMBO","canalSecundario":"JULIAN PAZ","canalesAdicionales":["LOS RALOS","COMPUERTA 4"]}'; espera 400 "canal de otra rama del árbol"
-llamar PUT "$ALTA/$ID/suministro" $CAT @6-suministro.json; espera 200 "suministro (camino completo hasta el canal cuarto)"; echo "  pasos: $(campo 'r.pasos')"
+llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO LULES"]}'; espera 400 "fuente que no es del distrito"
+llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO CALERA"],"sistemaDistribucion":"DIQUE NIVELADOR RIO CALERA","canalPrincipal":"MATRIZ","canalSecundario":"DERIVADO NORTE","canalTerciario":"ESPINILLO"}'; espera 400 "canal de otra rama del árbol"
+llamar PUT "$ALTA/$ID/suministro" $CAT @6-suministro.json; espera 200 "suministro (camino completo hasta el canal quinto)"; echo "  pasos: $(campo 'r.pasos')"
 
 paso "Catastro envía a Recaudación"
 llamar POST "$ALTA/$ID/enviar" $CAT '{"observaciones":"Carga completa."}'; espera 201 "enviado"; echo "  ahora: $(campo 'r.circuito.oficinaNombre') · $(campo 'r.circuito.etapaNombre') · tomado: $(campo 'r.circuito.tomadoPor')"
@@ -128,7 +128,7 @@ llamar POST "$API/expedientes/$ID/tomar" $DIS; espera 201 "Distrito lo toma"
 llamar POST "$ALTA/$ID/distrito" $DIS '{"resultado":"OBSERVADO"}'; espera 400 "observar sin motivo"
 llamar POST "$ALTA/$ID/distrito" $DIS '{"resultado":"OBSERVADO","observaciones":"Corregir el caudal: el canal no tiene capacidad para 13,5 l/s."}'; espera 201 "observado"; echo "  ahora: $(campo 'r.circuito.oficinaNombre') · $(campo 'r.circuito.etapaNombre') · estado $(campo 'r.circuito.estado')"
 llamar POST "$API/expedientes/$ID/tomar" $CAT; espera 201 "Catastro lo toma"
-llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO SALI"],"sistemaDistribucion":"TOMA PROPIA","canalPrincipal":"ARR. EL TIMBO","caudalAsignado":10}'; espera 200 "Catastro corrige el caudal"
+llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO CALERA"],"sistemaDistribucion":"DIQUE NIVELADOR RIO CALERA","canalPrincipal":"MATRIZ","caudalAsignado":10}'; espera 200 "Catastro corrige el caudal"
 # Un cotitular nuevo (persona que Recaudación nunca verificó).
 TITULARES=$(node -e "const t=require('./2-titulares.json'); t.titulares.push({tipoPersona:'FISICA',tipoDocumento:'DNI',documento:'4$NUM',apellido:'Medina',nombre:'Lucía',fechaNacimiento:'1990-04-20'}); console.log(JSON.stringify(t))")
 llamar PUT "$ALTA/$ID/titulares" $CAT "$TITULARES"; espera 200 "se suma un cotitular al corregir"
@@ -174,7 +174,7 @@ llamar PUT "$ALTA/$ID/usos" $CAT "$USOS"; espera 409 "los usos y el caudal no ca
 llamar PUT "$ALTA/$ID/inmueble" $CAT "{\"catastral\":{\"matricula\":\"OTRA-$NUM\",\"parcela\":\"1-10\",\"circunscripcion\":\"II\",\"seccion\":\"B\"},\"registral\":{\"libro\":\"100\",\"folio\":\"300\",\"anio\":1990}}"; espera 409 "no se cambia la matrícula"
 llamar PUT "$ALTA/$ID/inmueble" $CAT "{\"catastral\":{\"matricula\":\"$MATRICULA\",\"parcela\":\"1-10\",\"circunscripcion\":\"II\",\"seccion\":\"B\",\"lamina\":\"14\"},\"registral\":{\"libro\":\"100\",\"folio\":\"300\",\"anio\":1990,\"serie\":\"A\"}}"; espera 200 "se completan lámina y serie"
 llamar PUT "$ALTA/$ID/ubicacion" $CAT -F "archivo=@$KML2" -F departamento=BURRUYACU -F "localidad=ALTA GRACIA" -F distrito=II; espera 409 "no se reemplaza el polígono aprobado"
-llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO SALI"],"sistemaDistribucion":"TOMA PROPIA","canalPrincipal":"ARR. EL TIMBO","caudalAsignado":12}'; espera 409 "no se cambia el caudal"
+llamar PUT "$ALTA/$ID/suministro" $CAT '{"fuentes":["RIO CALERA"],"sistemaDistribucion":"DIQUE NIVELADOR RIO CALERA","canalPrincipal":"MATRIZ","caudalAsignado":12}'; espera 409 "no se cambia el caudal"
 llamar POST "$ALTA/$ID/verificacion-final" $CAT '{"observaciones":"Datos completos."}'; espera 201 "verificación final"; echo "  ahora: $(campo 'r.circuito.etapaNombre')"
 llamar POST "$ALTA/$ID/padron" $CAT "{\"padron\":\"P-$NUM\"}"; espera 201 "padrón → FINALIZADO"
 echo "  expediente: $(campo 'r.circuito.estado') · concesión $(campo 'r.concesion.numero') $(campo 'r.concesion.estado') · resolución $(campo 'r.concesion.resolucion.numero')/$(campo 'r.concesion.resolucion.anio')"
@@ -204,7 +204,7 @@ espera 200 "titular existente reutilizado"; echo "  misma persona: $(campo 'r.ti
 llamar PUT "$ALTA/$ID2/ubicacion" $CAT -F "archivo=@$KML2" -F departamento=BURRUYACU -F "localidad=ALTA GRACIA" -F distrito=II; espera 200 "ubicación (otra parcela)"
 llamar PUT "$ALTA/$ID2/inmueble" $CAT "{\"catastral\":{\"matricula\":\"MAT-$((NUM+1))\",\"parcela\":\"9\"},\"registral\":{}}"; espera 200 "inmueble"
 llamar PUT "$ALTA/$ID2/usos" $CAT '{"desague":{"x":3630793.87,"y":7088018.41},"items":[{"uso":"agricola-riego","magnitud":4}]}'; espera 200 "usos"
-llamar PUT "$ALTA/$ID2/suministro" $CAT '{"fuentes":["RIO SALI"]}'; espera 200 "suministro"
+llamar PUT "$ALTA/$ID2/suministro" $CAT '{"fuentes":["RIO TAJAMAR"]}'; espera 200 "suministro"
 llamar POST "$ALTA/$ID2/enviar" $CAT '{}'; espera 201 "enviado"
 llamar POST "$API/expedientes/$ID2/tomar" $REC; llamar POST "$ALTA/$ID2/recaudacion" $REC '{"resultado":"SIN_DEUDA"}'; espera 201 "sin deuda"
 llamar POST "$API/expedientes/$ID2/tomar" $DIS
@@ -219,8 +219,8 @@ echo "  ubicación: $(campo 'r.ubicacion.departamento+" / "+r.ubicacion.localida
 llamar PUT "$ALTA/$ID3/ubicacion" $CAT -F departamento=CHICLIGASTA -F "localidad=GASTONA NORTE" -F distrito=II; espera 400 "distrito que no es el de la localidad"
 llamar PUT "$ALTA/$ID3/inmueble" $CAT "{\"catastral\":{\"matricula\":\"MAT-$((NUM+2))\",\"parcela\":\"3\"},\"registral\":{}}"; espera 200 "inmueble"
 llamar PUT "$ALTA/$ID3/usos" $CAT @5-usos.json; espera 200 "usos"
-llamar PUT "$ALTA/$ID3/suministro" $CAT @6-suministro.json; espera 400 "GASTONA NORTE no tiene catálogo de suministro: no se eligen fuentes ni canales"
-llamar PUT "$ALTA/$ID3/suministro" $CAT '{"fuentes":[],"observacion":"La zona no figura en el catálogo de suministro.","caudalAsignado":8}'; espera 200 "suministro: solo observación y caudal"
+llamar PUT "$ALTA/$ID3/suministro" $CAT @6-suministro.json; espera 400 "fuentes de otro distrito (el V tiene su propio árbol)"
+llamar PUT "$ALTA/$ID3/suministro" $CAT '{"fuentes":["RIO MEDINA"],"sistemaDistribucion":"CANAL SAN MARTIN NORTE","caudalAsignado":8}'; espera 200 "suministro del árbol del distrito V"
 llamar POST "$ALTA/$ID3/enviar" $CAT '{}'; espera 201 "enviada a Recaudación sin polígono"
 
 paso "Polígono obligatorio para la verificación final: la tercera alta llega al cierre sin KML"

@@ -4,7 +4,8 @@ import { UsuarioActual } from '../../seguridad/usuario-actual.decorator.js';
 import { RecibirKml, type ArchivoSubido } from '../../sig/kml/archivo-kml.js';
 import { AltaCircuitoService } from './alta-circuito.service.js';
 import { AltaConcesionService } from './alta-concesion.service.js';
-import { CursoConDeudaDto, DictamenDto, NotificarDeudaDto, ObservacionesDto, PadronDto, ResolucionDto, VerificacionDeudaDto } from '../circuito/dto/circuito.dto.js';
+import { CancelarInicioDto, CursoConDeudaDto, DictamenDto, NotificarDeudaDto, ObservacionesDto, PadronDto, ResolucionDto, VerificacionDeudaDto } from '../circuito/dto/circuito.dto.js';
+import { CorregirInmuebleDto, CorregirSuministroDto, CorregirTitularesDto, CorregirUbicacionDto } from './dto/correccion.dto.js';
 import { DatosInmuebleDto } from './dto/datos-inmueble.dto.js';
 import { GuardarTitularesDto } from './dto/guardar-titulares.dto.js';
 import { IniciarAltaDto } from './dto/iniciar-alta.dto.js';
@@ -98,8 +99,61 @@ export class AltaConcesionController {
     return this.suministro.guardar(String(id), dto, usuarioId);
   }
 
+  // Corrección de errores materiales (por fuera del circuito)
+  //
+  // Desde que el alta sale de la carga (con o sin resolución): datos mal escritos o un KML mal
+  // cargado. Permiso «Corregir datos de altas»; el polígono, además, «Cargar o reemplazar el KML».
+  // Cada una pide el motivo y queda en el historial con el antes y el después, y en la auditoría.
+  // Los usos y el caudal no se corrigen: son lo otorgado (ampliación o reducción).
+
+  @Put(':id/correccion/titulares')
+  @RequierePermiso(Permiso.ALTA_CORREGIR)
+  corregirTitulares(@Param('id', ParseIntPipe) id: number, @Body() { motivo, ...dto }: CorregirTitularesDto, @UsuarioActual() usuarioId: string) {
+    return this.titulares.guardar(String(id), dto, usuarioId, motivo);
+  }
+
+  /**
+   * multipart/form-data. Si viene «archivo» y el polígono vigente ya está publicado, el corregido
+   * espera la aprobación de quien publica en el mapa (mientras tanto, afuera se ve el anterior).
+   */
+  @Put(':id/correccion/ubicacion')
+  @UseInterceptors(RecibirKml())
+  @RequierePermiso(Permiso.ALTA_CORREGIR)
+  corregirUbicacion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() { motivo, ...dto }: CorregirUbicacionDto,
+    @UsuarioActual() usuarioId: string,
+    @SesionActual() sesion: UsuarioSesion,
+    @UploadedFile() archivo?: ArchivoSubido,
+  ) {
+    if (archivo) exigirPermiso(sesion, Permiso.KML_CARGAR);
+    return this.ubicacion.guardar(String(id), dto, usuarioId, archivo, motivo);
+  }
+
+  @Put(':id/correccion/inmueble')
+  @RequierePermiso(Permiso.ALTA_CORREGIR)
+  corregirInmueble(@Param('id', ParseIntPipe) id: number, @Body() { motivo, ...dto }: CorregirInmuebleDto, @UsuarioActual() usuarioId: string) {
+    return this.inmueble.guardar(String(id), dto, usuarioId, motivo);
+  }
+
+  @Put(':id/correccion/suministro')
+  @RequierePermiso(Permiso.ALTA_CORREGIR)
+  corregirSuministro(@Param('id', ParseIntPipe) id: number, @Body() { motivo, ...dto }: CorregirSuministroDto, @UsuarioActual() usuarioId: string) {
+    return this.suministro.guardar(String(id), dto, usuarioId, motivo);
+  }
+
   // Circuito por las oficinas
 
+
+  /**
+   * Catastro: cancela un alta iniciada por error, antes de enviarla ({ observaciones }: el motivo).
+   * El expediente queda ANULADO en el historial y su número se puede volver a registrar.
+   */
+  @Post(':id/cancelar')
+  @RequierePermiso(Permiso.ALTA_INICIAR)
+  cancelar(@Param('id', ParseIntPipe) id: number, @Body() dto: CancelarInicioDto, @UsuarioActual() usuarioId: string) {
+    return this.circuito.cancelarInicio(String(id), dto, usuarioId);
+  }
 
   //Catastro: termina la carga preliminar y lo envía a Recaudación.
   @Post(':id/enviar')

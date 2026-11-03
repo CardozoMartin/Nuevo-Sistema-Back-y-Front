@@ -39,7 +39,8 @@ export function AuditoriaExpediente({ expedienteId }: { expedienteId: string }) 
   const auditoria = useAuditoria(expedienteId)
   if (auditoria.isPending) return <LoadingState mensaje="Cargando auditoría…" className="py-6" />
   if (auditoria.isError) return <ErrorState error={auditoria.error} onRetry={() => void auditoria.refetch()} className="py-6" />
-  const { iniciado, finalizado, recorrido } = auditoria.data
+  const { iniciado, finalizado, recorrido, eventos } = auditoria.data
+  const correcciones = eventos.filter((e) => e.accion === 'CORRECCION')
 
   return (
     <div className="flex flex-col gap-4">
@@ -119,6 +120,23 @@ export function AuditoriaExpediente({ expedienteId }: { expedienteId: string }) 
           </tbody>
         </table>
       </div>
+
+      {correcciones.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-500/30 dark:bg-amber-500/5">
+          <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-200">
+            <Icon name="edit_note" className="text-[18px]!" />
+            Correcciones de datos ({correcciones.length})
+          </p>
+          <ul className="flex flex-col gap-1 text-sm">
+            {correcciones.map((c) => (
+              <li key={c.id} className="text-slate-700 dark:text-slate-300">
+                <span className="tabular-nums">{formatear(c.fecha)}</span> · <Quien u={c.usuario} /> · {c.oficina}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">El motivo y el detalle de cada dato corregido están en el historial.</p>
+        </div>
+      )}
     </div>
   )
 }

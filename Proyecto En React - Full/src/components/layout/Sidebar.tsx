@@ -22,7 +22,10 @@ interface SidebarProps {
 export function Sidebar({ open, onClose, flotante = false }: SidebarProps) {
   // Cada usuario ve su oficina y lo general (el administrador, todo); las secciones vacías no se muestran.
   const { usuario } = useSesion()
-  const secciones = NAVIGATION.map((s) => ({ ...s, items: s.items.filter((i) => itemVisible(i, usuario)) })).filter((s) => s.items.length)
+  const secciones = NAVIGATION.map((s) => ({
+    ...s,
+    items: s.items.filter((i) => itemVisible(i, usuario)).map((i) => (i.children ? { ...i, children: i.children.filter((c) => itemVisible(c, usuario)) } : i)),
+  })).filter((s) => s.items.length)
   const resumen = useResumenBandejas()
   const getBadge = (item: NavItem): BadgeItem | undefined => {
     if (!item.bandejaDe) return undefined

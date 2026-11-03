@@ -27,6 +27,8 @@ export function ocultarDatosSensibles<T>(respuesta: T): T {
   const recorrer = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(recorrer);
     if (!v || typeof v !== 'object' || v instanceof Date) return v;
+    // Un campo corregido marcado sensible (historial de correcciones): sin el antes ni el después.
+    if ((v as { sensible?: unknown }).sensible === true) return { ...v, antes: null, despues: null };
     return Object.fromEntries(
       Object.entries(v).map(([k, x]) => {
         if (DOCUMENTO.test(k)) return [k, enmascararDocumento(x)];

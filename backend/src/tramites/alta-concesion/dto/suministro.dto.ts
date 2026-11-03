@@ -1,16 +1,16 @@
-// Paso 6 del alta: suministro de agua (la cascada fuente → sistema → canales).
+// Paso 6 del alta: suministro de agua (un camino del árbol: fuente → sistema → canales → desagüe).
 import { ArrayMaxSize, ArrayUnique, IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { Texto, TextoLista } from '../../../comun/validadores/texto.js';
-import { MAX_CANALES_ADICIONALES } from '../../../concesiones/concesiones.constantes.js';
 
 /**
- * Los valores salen del catálogo de suministro de la ubicación de la concesión (paso 3) y el
- * service los valida contra ese árbol (GET /api/catalogos/suministro?departamento=&localidad=&distrito=).
+ * Los valores salen del árbol de suministro del distrito de la concesión (paso 3) y el service
+ * valida que sean un camino de ese árbol (GET /api/catalogos/suministro?distrito=). Un nivel
+ * puede quedar vacío si la rama no lo tiene (ej: terciario sin secundario).
  */
 export class SuministroDto {
   /**
-   * La primera es la fuente principal; el resto, adicionales. Sin repetir. Obligatoria si la
-   * ubicación tiene catálogo de suministro; vacía si no lo tiene (se controla en el service).
+   * La primera es la fuente principal (de ella sale el camino); el resto, adicionales. Sin
+   * repetir. Obligatoria si el distrito tiene árbol; vacía si no lo tiene (se controla en el service).
    */
   @ArrayUnique({ message: 'Hay fuentes repetidas.' })
   @MaxLength(120, { each: true })
@@ -30,17 +30,16 @@ export class SuministroDto {
   @IsOptional() @Texto() @IsString() @MaxLength(120)
   canalSecundario?: string;
 
-  /** Terciario, cuarto y quinto, en ese orden. */
-  @MaxLength(120, { each: true })
-  @IsNotEmpty({ each: true, message: 'Seleccione el canal o quítelo de la lista.' })
-  @IsString({ each: true })
-  @ArrayMaxSize(MAX_CANALES_ADICIONALES, { message: `Se pueden cargar hasta ${MAX_CANALES_ADICIONALES} canales después del secundario.` })
-  @IsArray()
-  @IsOptional()
-  @TextoLista()
-  canalesAdicionales?: string[];
+  @IsOptional() @Texto() @IsString() @MaxLength(120)
+  canalTerciario?: string;
 
-  /** Dónde desagua (ej: "MISMA PROPIEDAD"). */
+  @IsOptional() @Texto() @IsString() @MaxLength(120)
+  canalCuarto?: string;
+
+  @IsOptional() @Texto() @IsString() @MaxLength(120)
+  canalQuinto?: string;
+
+  /** Dónde desagua: el último nivel del árbol, cuelga del último tramo elegido. */
   @IsOptional() @Texto() @IsString() @MaxLength(120)
   desague?: string;
 

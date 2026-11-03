@@ -22,11 +22,12 @@ const leerJson = <T>(archivo: string): T => JSON.parse(readFileSync(join(CARPETA
 export const leerUbicacionesIniciales = () => leerJson<CatalogoUbicaciones>('localidades-distritos.json');
 
 /**
- * Catálogo de suministro de riego entregado por la DRH (departamento → localidad → distrito →
- * fuentes, sistemas, canales, desagües). Copia SIN TOCAR de mock-server/seed/suministroCatalogo.json
- * del frontend; la normalización la hace normalizarCatalogo (suministro/arbol-suministro.ts).
+ * Árbol de suministro que cargaron los jefes de Distrito: código del distrito → ramas (fuente,
+ * sistema, canal principal … quinto, desagüe; null = la rama no tiene ese nivel). Sale TAL CUAL
+ * de recursos/catalogos/Suministros_DRH.xlsx (scripts/catalogos/arbol-desde-excel.mjs); el árbol
+ * lo arma arbolDesdeRamas (suministro/arbol-suministro.ts).
  */
-export const leerSuministroInicial = () => leerJson<Record<string, Record<string, Record<string, Record<string, unknown>>>>>('suministro.json');
+export const leerArbolSuministroInicial = () => leerJson<Record<string, (string | null)[][]>>('arbol-suministro.json');
 
 /** Cuencas hídricas que aparecen en el padrón. A CONFIRMAR con la DRH. */
 export const leerCuencasIniciales = () => leerJson<string[]>('cuencas.json');

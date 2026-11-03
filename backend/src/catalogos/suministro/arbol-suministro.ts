@@ -1,214 +1,137 @@
-// El catálogo de suministro de riego como árbol: lectura del archivo de la DRH y las reglas para
-// validar el suministro de una concesión. Funciones puras (se prueban sin base: npm test).
+// El catálogo de suministro de riego como árbol por distrito: lectura de lo que cargaron los
+// jefes de Distrito y las reglas para validar el suministro de una concesión. Funciones puras
+// (se prueban sin base: npm test).
 import { BadRequestException } from '@nestjs/common';
-import { NIVELES_CANAL } from '../entities/suministro-canal.entity.js';
+import { NIVELES_SUMINISTRO, NivelSuministro, nombreDeNivel } from '../entities/suministro-nodo.entity.js';
 
-/**
- * Cascada de canales tal como la usa el frontend: cada canal → sus derivaciones. En el último
- * nivel con hijos (el canal cuarto) la lista de canales quintos viene como array.
- */
-export interface NodoCascada {
-  [canal: string]: NodoCascada | string[];
-}
-
-/** Lo que el formulario ofrece para una zona (mismo formato que /catalogoSuministro de json-server). */
-export interface DatosSuministro {
-  fuentesAgua: string[];
-  sistemasDistribucion: string[];
-  /** Canal principal → canales secundarios. */
-  canalesPrincipales: Record<string, string[]>;
-  cascada: NodoCascada;
-  desagues: string[];
-}
-
-/** departamento → localidad → distrito → datos. */
-export type CatalogoSuministro = Record<string, Record<string, Record<string, DatosSuministro>>>;
-
-/** Un canal del árbol con sus derivaciones (lo que se guarda en cat_suministro_canal). */
-export interface CanalArbol {
+/** Un tramo del árbol con lo que cuelga de él (lo que recibe el formulario del alta). */
+export interface NodoArbol {
   nombre: string;
-  hijos: CanalArbol[];
+  nivel: NivelSuministro;
+  hijos: NodoArbol[];
 }
 
-/** Lo que manda el formulario en el paso 6 (solo los campos que salen del catálogo). */
+/** Código del distrito («I» … «VII») → sus fuentes, cada una con su árbol. */
+export type CatalogoSuministro = Record<string, NodoArbol[]>;
+
+/** Lo que manda el formulario en el paso 6 (solo los campos que salen del árbol). */
 export interface SeleccionSuministro {
+  /** La primera es la principal: de ella sale el camino; las demás son fuentes adicionales. */
   fuentes?: string[];
   sistemaDistribucion?: string | null;
   canalPrincipal?: string | null;
   canalSecundario?: string | null;
-  canalesAdicionales?: string[] | null;
+  canalTerciario?: string | null;
+  canalCuarto?: string | null;
+  canalQuinto?: string | null;
   desague?: string | null;
 }
 
+/** El campo de la selección que corresponde a cada nivel después de la fuente, en orden. */
+export const CAMPO_DE_NIVEL: [NivelSuministro, Exclude<keyof SeleccionSuministro, 'fuentes'>][] = [
+  [NivelSuministro.SISTEMA, 'sistemaDistribucion'],
+  [NivelSuministro.CANAL_PRINCIPAL, 'canalPrincipal'],
+  [NivelSuministro.CANAL_SECUNDARIO, 'canalSecundario'],
+  [NivelSuministro.CANAL_TERCIARIO, 'canalTerciario'],
+  [NivelSuministro.CANAL_CUARTO, 'canalCuarto'],
+  [NivelSuministro.CANAL_QUINTO, 'canalQuinto'],
+  [NivelSuministro.DESAGUE, 'desague'],
+];
+
 const alfabetico = new Intl.Collator('es');
 
-/** Mismo criterio que el mock del frontend (build-db.mjs): sin espacios de más y en mayúsculas. */
+/** Sin espacios de más y en mayúsculas (el mismo criterio con que se muestra en el formulario). */
 export const normalizarValor = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim().toUpperCase();
 
-/** Para comparar nombres de localidades escritos distinto: sin tildes, sin «*» y en mayúsculas. */
-export const claveLocalidad = (v: string) =>
-  normalizarValor(v)
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/\*/g, '')
-    .trim();
-
-/** Largo máximo de un nombre del catálogo (columna `nombre` de las tablas cat_suministro_*). */
+/** Largo máximo de un nombre del catálogo (columna `nombre` de cat_suministro_nodo). */
 export const MAX_NOMBRE_SUMINISTRO = 120;
 
 /**
- * Texto que NO es un canal ni una fuente: el archivo de la DRH trae, mezcladas como canales
- * secundarios, líneas copiadas de su página web («2. COSTO: ESTAMPILLAS PROVINCIALES $ 30»,
- * «6. E-MAIL: CATASTRO@…», «FORMULARIOS», «… (CLIC AQUÍ PARA DESCARGAR …)»). Se descartan.
+ * Texto que NO es un tramo de la red: líneas copiadas de la página web de la DRH
+ * («2. COSTO: ESTAMPILLAS PROVINCIALES $ 30», «6. E-MAIL: CATASTRO@…», «FORMULARIOS»).
  */
 export function esTextoAjeno(nombre: string): boolean {
   return /^\d+\.\s/.test(nombre) || /^FORMULARIOS?$/.test(nombre) || /CLIC AQU[IÍ]|@|\$/.test(nombre) || nombre.length > MAX_NOMBRE_SUMINISTRO;
 }
 
 /**
- * Lee el árbol de la DRH (recursos/catalogos/suministro.json) y lo normaliza igual que el
- * frontend: nombres en mayúsculas, sin repetidos, ordenados; «desagies» (sic) → desagues.
- * Además descarta los textos ajenos (ver esTextoAjeno) y los anota en `descartados`.
+ * Arma el árbol de un distrito con las ramas del Excel de los jefes (recursos/catalogos/
+ * arbol-suministro.json): una fila por rama, una columna por nivel (fuente, sistema, canal
+ * principal … quinto, desagüe). Las filas comparten el comienzo («RIO SALI > SAN JOSE > …»):
+ * los tramos iguales se juntan. Una celda vacía es un nivel que esa rama no tiene: el tramo
+ * siguiente cuelga del último con valor. Los nombres van como están (solo mayúsculas y sin
+ * espacios de más). Una rama sin fuente no se puede colgar: se anota en `descartadas`.
  */
-export function normalizarCatalogo(crudo: Record<string, Record<string, Record<string, Record<string, unknown>>>>, descartados: string[] = []): CatalogoSuministro {
-  const valido = (nombre: string) => {
-    if (!nombre) return false;
-    if (!esTextoAjeno(nombre)) return true;
-    descartados.push(nombre);
-    return false;
-  };
-  const lista = (xs: unknown) => [...new Set((Array.isArray(xs) ? xs : []).map(normalizarValor).filter(valido))].sort(alfabetico.compare);
-  // Dos canales hermanos pueden quedar con el mismo nombre al normalizar («DVDO.  NORTE» y
-  // «DVDO. NORTE»): se juntan sus derivaciones en lugar de pisar las del primero.
-  const comoNodo = (n: NodoCascada | string[]): NodoCascada => (Array.isArray(n) ? Object.fromEntries(n.map((h) => [h, {}])) : n);
-  const juntar = (a: NodoCascada | string[], b: NodoCascada | string[]): NodoCascada | string[] => {
-    if (Array.isArray(a) && Array.isArray(b)) return lista([...a, ...b]);
-    const salida = { ...comoNodo(a) };
-    for (const [nombre, hijos] of Object.entries(comoNodo(b))) salida[nombre] = nombre in salida ? juntar(salida[nombre], hijos) : hijos;
-    return salida;
-  };
-  const cascada = (nodo: unknown): NodoCascada => {
-    const salida: NodoCascada = {};
-    for (const [canal, hijos] of Object.entries((nodo ?? {}) as Record<string, unknown>)) {
-      const nombre = normalizarValor(canal);
-      if (!valido(nombre)) continue;
-      const normalizado = Array.isArray(hijos) ? lista(hijos) : cascada(hijos);
-      salida[nombre] = nombre in salida ? juntar(salida[nombre], normalizado) : normalizado;
+export function arbolDesdeRamas(ramas: (string | null)[][], descartadas: string[] = []): NodoArbol[] {
+  const raices: NodoArbol[] = [];
+  for (const rama of ramas) {
+    const valores = NIVELES_SUMINISTRO.map((_, i) => normalizarValor(rama[i]));
+    if (!valores[0]) {
+      if (valores.some(Boolean)) descartadas.push(valores.filter(Boolean).join(' > '));
+      continue;
     }
-    return salida;
-  };
-
-  const catalogo: CatalogoSuministro = {};
-  for (const [departamento, localidades] of Object.entries(crudo)) {
-    for (const [localidad, distritos] of Object.entries(localidades)) {
-      for (const [distrito, datos] of Object.entries(distritos)) {
-        const principales = (datos.canalesPrincipales ?? {}) as Record<string, unknown>;
-        ((catalogo[normalizarValor(departamento)] ??= {})[normalizarValor(localidad)] ??= {})[normalizarValor(distrito)] = {
-          fuentesAgua: lista(datos.fuentesAgua),
-          sistemasDistribucion: lista(datos.sistemasDistribucion),
-          canalesPrincipales: Object.fromEntries(
-            Object.entries(principales)
-              .map(([p, sec]) => [normalizarValor(p), sec] as const)
-              .filter(([p]) => valido(p))
-              .map(([p, sec]) => [p, lista(sec)]),
-          ),
-          cascada: cascada(datos.cascada),
-          desagues: lista(datos.desagies ?? datos.desagues),
-        };
-      }
-    }
+    let destino = raices;
+    valores.forEach((nombre, i) => {
+      if (!nombre) return;
+      const nivel = NIVELES_SUMINISTRO[i].nivel;
+      let nodo = destino.find((n) => n.nivel === nivel && n.nombre === nombre);
+      if (!nodo) destino.push((nodo = { nombre, nivel, hijos: [] }));
+      destino = nodo.hijos;
+    });
   }
-  return catalogo;
+  ordenarArbol(raices);
+  return raices;
 }
 
-/**
- * Árbol de canales de una zona. Junta las dos fuentes del archivo, que se superponen:
- * `canalesPrincipales` (principal → secundarios) y `cascada` (principal → secundario → … → quinto).
- * Corta en el nivel 5 (canal quinto): el formulario no tiene más niveles.
- */
-export function arbolDeCanales(datos: DatosSuministro): CanalArbol[] {
-  const agregar = (destino: CanalArbol[], nombre: string): CanalArbol => {
-    let canal = destino.find((c) => c.nombre === nombre);
-    if (!canal) destino.push((canal = { nombre, hijos: [] }));
-    return canal;
-  };
-  const recorrer = (nodo: NodoCascada | string[], destino: CanalArbol[], nivel: number) => {
-    if (nivel > NIVELES_CANAL.length) return;
-    for (const nombre of Array.isArray(nodo) ? nodo : Object.keys(nodo)) {
-      const canal = agregar(destino, nombre);
-      if (!Array.isArray(nodo)) recorrer(nodo[nombre], canal.hijos, nivel + 1);
-    }
-  };
-
-  const raiz: CanalArbol[] = [];
-  for (const [principal, secundarios] of Object.entries(datos.canalesPrincipales)) {
-    const canal = agregar(raiz, principal);
-    for (const s of secundarios) agregar(canal.hijos, s);
-  }
-  recorrer(datos.cascada, raiz, 1);
-
-  const ordenar = (canales: CanalArbol[]) => canales.sort((a, b) => alfabetico.compare(a.nombre, b.nombre)).forEach((c) => ordenar(c.hijos));
-  ordenar(raiz);
-  return raiz;
+/** Alfabético en cada nivel (como lo muestra el formulario). */
+export function ordenarArbol<T extends { nombre: string; hijos: T[] }>(nodos: T[]): T[] {
+  nodos.sort((a, b) => alfabetico.compare(a.nombre, b.nombre)).forEach((n) => ordenarArbol(n.hijos));
+  return nodos;
 }
 
-/**
- * Lo inverso: del árbol guardado a lo que usa el formulario (canalesPrincipales + cascada).
- * En la cascada, el canal cuarto lleva la lista de quintos como array (formato del frontend).
- */
-export function datosDeArbol(canales: CanalArbol[]): Pick<DatosSuministro, 'canalesPrincipales' | 'cascada'> {
-  const cascada = (hijos: CanalArbol[], nivel: number): NodoCascada =>
-    Object.fromEntries(hijos.map((c) => [c.nombre, nivel === 4 ? c.hijos.map((h) => h.nombre) : cascada(c.hijos, nivel + 1)]));
-  return {
-    canalesPrincipales: Object.fromEntries(canales.map((c) => [c.nombre, c.hijos.map((h) => h.nombre)])),
-    cascada: cascada(canales, 1),
-  };
-}
-
-const tieneValor = (v: string | null | undefined) => !!v?.trim();
+const tieneValor = (v: string | null | undefined): v is string => !!v?.trim();
 
 /**
- * El suministro elegido tiene que existir en el catálogo de la zona de la concesión:
- *   1. Sin zona (no hay catálogo para esa ubicación): el formulario no ofrece opciones, así que
- *      solo se cargan la observación y el caudal. Si vienen fuentes o canales, 400.
- *   2. Con zona: al menos una fuente; cada fuente, el sistema y el desagüe, de sus listas.
- *   3. Los canales tienen que ser un CAMINO del árbol: el principal de la zona, el secundario
- *      que deriva de ese principal, el terciario de ese secundario, y así.
- * `lugar` es la ubicación escrita para los mensajes (ej: «LULES, LULES, distrito IV»).
+ * El suministro elegido tiene que ser un camino del árbol del distrito de la concesión:
+ *   1. Sin árbol (el distrito todavía no lo tiene cargado): solo se cargan la observación y el
+ *      caudal. Si vienen fuentes o canales, 400.
+ *   2. Con árbol: al menos una fuente, y cada fuente, una del distrito.
+ *   3. Desde la fuente principal, cada nivel elegido cuelga del anterior elegido. Un nivel que
+ *      no se eligió se salta (la rama no lo tiene), y el camino puede terminar en cualquier tramo.
+ * `lugar` es el distrito escrito para los mensajes (ej: «el distrito I»).
  */
-export function exigirSuministroDelCatalogo(datos: DatosSuministro | null, s: SeleccionSuministro, lugar: string): void {
-  const canales = [s.canalPrincipal, s.canalSecundario, ...(s.canalesAdicionales ?? [])].filter(tieneValor) as string[];
-
-  //1.- Sin catálogo para la ubicación.
-  if (!datos) {
-    const cargados = [...(s.fuentes ?? []), s.sistemaDistribucion, s.desague, ...canales].filter(tieneValor);
+export function exigirSuministroDelArbol(arbol: NodoArbol[] | null, s: SeleccionSuministro, lugar: string): void {
+  //1.- Sin árbol para el distrito.
+  if (!arbol?.length) {
+    const cargados = [...(s.fuentes ?? []), ...CAMPO_DE_NIVEL.map(([, campo]) => s[campo])].filter(tieneValor);
     if (cargados.length) {
       throw new BadRequestException(
-        `No hay catálogo de suministro para ${lugar}: solo se pueden cargar la observación y el caudal asignado. ` +
-          'Si la zona existe en el catálogo con otro nombre, Catastro tiene que vincularla a la localidad.',
+        `No hay árbol de suministro cargado para ${lugar}: solo se pueden cargar la observación y el caudal asignado. ` +
+          'Catastro lo puede cargar en «Catálogo de suministro».',
       );
     }
     return;
   }
 
-  //2.- Fuentes, sistema y desagüe, de las listas de la zona.
+  //2.- Las fuentes, del distrito.
   if (!s.fuentes?.length) throw new BadRequestException('Seleccione al menos una fuente de agua.');
-  const exigirDeLista = (valor: string | null | undefined, opciones: string[], que: string) => {
-    if (tieneValor(valor) && !opciones.includes(normalizarValor(valor))) throw new BadRequestException(`${que} «${valor}» no está en el catálogo de suministro de ${lugar}.`);
-  };
-  for (const fuente of s.fuentes) exigirDeLista(fuente, datos.fuentesAgua, 'La fuente de agua');
-  exigirDeLista(s.sistemaDistribucion, datos.sistemasDistribucion, 'El sistema de distribución');
-  exigirDeLista(s.desague, datos.desagues, 'El desagüe');
-
-  //3.- Los canales, un camino del árbol desde el principal.
-  let opciones = arbolDeCanales(datos);
-  canales.forEach((nombre, nivel) => {
-    const canal = opciones.find((c) => c.nombre === normalizarValor(nombre));
-    if (!canal) {
-      const padre = nivel > 0 ? ` que deriva del ${NIVELES_CANAL[nivel - 1]} «${canales[nivel - 1]}»` : '';
-      const validas = opciones.length ? ` Opciones: ${opciones.map((c) => c.nombre).join(', ')}.` : ' No tiene derivaciones en el catálogo.';
-      throw new BadRequestException(`El ${NIVELES_CANAL[nivel]} «${nombre}»${padre} no está en el catálogo de suministro de ${lugar}.${validas}`);
-    }
-    opciones = canal.hijos;
+  const fuentes = s.fuentes.map((f) => {
+    const nodo = arbol.find((n) => n.nombre === normalizarValor(f));
+    if (!nodo) throw new BadRequestException(`La fuente de agua «${f}» no está en el árbol de suministro de ${lugar}.`);
+    return nodo;
   });
+
+  //3.- El camino desde la fuente principal.
+  let actual = fuentes[0];
+  for (const [nivel, campo] of CAMPO_DE_NIVEL) {
+    const valor = s[campo];
+    if (!tieneValor(valor)) continue;
+    const hijo = actual.hijos.find((h) => h.nivel === nivel && h.nombre === normalizarValor(valor));
+    if (!hijo) {
+      const opciones = actual.hijos.filter((h) => h.nivel === nivel).map((h) => h.nombre);
+      const validas = opciones.length ? ` Opciones: ${opciones.join(', ')}.` : ` De «${actual.nombre}» no sale ningún ${nombreDeNivel(nivel)}.`;
+      throw new BadRequestException(`El ${nombreDeNivel(nivel)} «${valor}» no sale de «${actual.nombre}» en el árbol de suministro de ${lugar}.${validas}`);
+    }
+    actual = hijo;
+  }
 }

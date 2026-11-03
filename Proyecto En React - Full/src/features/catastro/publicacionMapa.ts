@@ -1,9 +1,9 @@
 // Publicación de los polígonos en el mapa público (Argenmap). Backend real: /api/mapa/publicacion.
 // Una concesión se publica recién con resolución y verificada por alguien con el permiso
 // «Publicar en el mapa»; los usuarios internos la ven siempre en el visor del sistema.
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { sigKeys } from '@/features/visor/hooks'
-import { api } from '@/services/api/client'
+import { backend } from '@/services/api/backend'
 
 export type EstadoPublicacion = 'PENDIENTE' | 'OBSERVADO' | 'PUBLICADO'
 
@@ -16,6 +16,7 @@ export interface PoligonoParaPublicar {
   expedienteEstado: string | null
   titular: string | null
   departamento: string | null
+  localidad: string | null
   distrito: string | null
   superficieHa: number
   publicacion: EstadoPublicacion
@@ -27,7 +28,27 @@ export interface PoligonoParaPublicar {
   resolucion: string | null
   resolucionFecha: string | null
   listoParaPublicar: boolean
+  /** Corrección de un polígono publicado: al aprobarla lo reemplaza (mientras tanto sigue el publicado). */
+  esCorreccion: boolean
+  superficieAnteriorHa: number | null
 }
+
+/** Filtros de la lista: ids de los catálogos de GET /api/concesiones/filtros. */
+export interface FiltrosPublicacion {
+  texto?: string
+  departamento?: string
+  distrito?: string
+  localidad?: string
+}
+
+export interface ListaParaPublicar {
+  items: PoligonoParaPublicar[]
+  total: number
+  pagina: number
+  porPagina: number
+}
+
+export const POLIGONOS_POR_PAGINA = 20
 
 export const ESTADOS_PUBLICACION: Record<EstadoPublicacion, { nombre: string; clases: string }> = {
   PENDIENTE: { nombre: 'Sin publicar', clases: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' },
@@ -36,28 +57,31 @@ export const ESTADOS_PUBLICACION: Record<EstadoPublicacion, { nombre: string; cl
 }
 
 const publicacionApi = {
-  async listar(estado?: EstadoPublicacion): Promise<PoligonoParaPublicar[]> {
-    const { data } = await api.get<PoligonoParaPublicar[]>('/mapa/publicacion', { params: estado ? { estado } : undefined })
+  async listar(params: Record<string, unknown>): Promise<ListaParaPublicar> {
+    const { data } = await backend.get<ListaParaPublicar>('/mapa/publicacion', { params })
     return data
   },
   async publicar(poligonoId: string, observaciones?: string) {
-    await api.post(`/mapa/publicacion/${poligonoId}/publicar`, { observaciones: observaciones || undefined })
+    await backend.post(`/mapa/publicacion/${poligonoId}/publicar`, { observaciones: observaciones || undefined })
   },
   async observar(poligonoId: string, observaciones: string) {
-    await api.post(`/mapa/publicacion/${poligonoId}/observar`, { observaciones })
+    await backend.post(`/mapa/publicacion/${poligonoId}/observar`, { observaciones })
   },
   async reemplazar(poligonoId: string, archivo: File): Promise<{ poligonoId: string; avisos: string[] }> {
     const datos = new FormData()
     datos.append('archivo', archivo)
-    const { data } = await api.post<{ poligonoId: string; avisos: string[] }>(`/mapa/publicacion/${poligonoId}/reemplazar`, datos)
+    const { data } = await backend.post<{ poligonoId: string; avisos: string[] }>(`/mapa/publicacion/${poligonoId}/reemplazar`, datos, { headers: { 'Content-Type': 'multipart/form-data' } })
     return data
   },
 }
 
 const CLAVE = ['mapa', 'publicacion'] as const
 
-export function usePoligonosParaPublicar(estado?: EstadoPublicacion) {
-  return useQuery({ queryKey: [...CLAVE, estado ?? 'pendientes'], queryFn: () => publicacionApi.listar(estado) })
+export function usePoligonosParaPublicar(estado: EstadoPublicacion | undefined, filtros: FiltrosPublicacion, pagina: number) {
+  const params = Object.fromEntries(
+    Object.entries({ estado, ...filtros, texto: filtros.texto?.trim(), pagina, porPagina: POLIGONOS_POR_PAGINA }).filter(([, v]) => v !== undefined && v !== ''),
+  )
+  return useQuery({ queryKey: [...CLAVE, params], queryFn: () => publicacionApi.listar(params), placeholderData: keepPreviousData })
 }
 
 /** Publicar, observar o reemplazar: refresca la lista y las capas del visor. */

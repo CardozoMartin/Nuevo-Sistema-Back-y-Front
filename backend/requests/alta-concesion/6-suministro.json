@@ -1,9 +1,10 @@
 {
-  "fuentes": ["ARR. EL TIMBO", "RIO SALI"],
-  "sistemaDistribucion": "ARR. EL TIMBO",
-  "canalPrincipal": "ARR. EL TIMBO",
-  "canalSecundario": "PROPIO",
-  "canalesAdicionales": ["LOS RALOS", "COMPUERTA 4"],
-  "desague": "AL ARR. EL TIMBO",
+  "fuentes": ["RIO CALERA", "RIO TAJAMAR"],
+  "sistemaDistribucion": "DIQUE NIVELADOR RIO CALERA",
+  "canalPrincipal": "MATRIZ",
+  "canalSecundario": "DERIVADO SUR",
+  "canalTerciario": "ESPINILLO",
+  "canalCuarto": "TAQUELLO",
+  "canalQuinto": "PROPIO",
   "observacion": ""
 }

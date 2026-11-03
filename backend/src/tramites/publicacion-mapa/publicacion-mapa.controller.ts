@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
-import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Texto } from '../../comun/validadores/texto.js';
 import { PublicacionMapa } from '../../concesiones/concesiones.constantes.js';
 import { RequierePermiso } from '../../seguridad/auth.decorators.js';
@@ -11,6 +12,25 @@ import { PublicacionMapaService } from './publicacion-mapa.service.js';
 export class FiltroPublicacionDto {
   @IsOptional() @IsIn(Object.values(PublicacionMapa), { message: 'estado: PENDIENTE, OBSERVADO o PUBLICADO.' })
   estado?: PublicacionMapa;
+
+  /** N° de concesión, de expediente o de resolución, titular, documento o padrón. */
+  @IsOptional() @Texto() @IsString() @MaxLength(100, { message: 'La búsqueda admite hasta 100 caracteres.' })
+  texto?: string;
+
+  @IsOptional() @Type(() => Number) @IsInt({ message: 'Departamento desconocido.' })
+  departamento?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt({ message: 'Distrito desconocido.' })
+  distrito?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt({ message: 'Localidad desconocida.' })
+  localidad?: number;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1)
+  pagina: number = 1;
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100, { message: 'Se pueden pedir hasta 100 por página.' })
+  porPagina: number = 20;
 }
 
 export class NotaPublicacionDto {
@@ -31,10 +51,13 @@ export class ObservarPublicacionDto {
 export class PublicacionMapaController {
   constructor(private readonly publicacion: PublicacionMapaService) {}
 
-  /** GET /api/mapa/publicacion?estado=: pendientes y observados (por defecto), o los de un estado. */
+  /**
+   * GET /api/mapa/publicacion?estado=&texto=&departamento=&distrito=&localidad=&pagina=&porPagina=:
+   * pendientes y observados (por defecto), o los de un estado; paginado.
+   */
   @Get()
   listar(@Query() filtro: FiltroPublicacionDto) {
-    return this.publicacion.listar(filtro.estado);
+    return this.publicacion.listar(filtro);
   }
 
   /** POST /api/mapa/publicacion/:id/publicar { observaciones? }: verificado, se ve en Argenmap. */

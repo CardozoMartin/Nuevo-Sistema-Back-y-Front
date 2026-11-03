@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 import { UbicacionesService, type UbicacionValidada } from '../../../catalogos/ubicaciones.service.js';
 import { Domicilio } from '../../../concesiones/entities/domicilio.entity.js';
@@ -33,20 +33,26 @@ export class TitularesAltaService {
     private readonly ubicaciones: UbicacionesService,
   ) {}
 
-  async guardar(expedienteId: string, datos: GuardarTitularesDto, usuarioId: string): Promise<RespuestaAlta> {
+  /** Con `motivo`: corrección de un error material por fuera del circuito (queda en el historial con el antes y el después). */
+  async guardar(expedienteId: string, datos: GuardarTitularesDto, usuarioId: string, motivo?: string): Promise<RespuestaAlta> {
     //1.- Se valida que un mismo documento no figure dos veces como titular.
     exigirDocumentosSinRepetir(datos.titulares);
 
     await this.dataSource.transaction(async (tx) => {
       //2.- Se valida que Catastro pueda editar: etapa editable y expediente tomado por quien guarda.
-      const { expediente, concesion, usuario } = await this.alta.exigirEditable(tx, expedienteId, usuarioId);
+      const editable = await this.alta.exigirEditable(tx, expedienteId, usuarioId, !!motivo);
+      const { expediente, concesion, usuario } = editable;
+      const antes = motivo ? await this.alta.instantanea(tx, expedienteId, 'titulares') : null;
+
+      //2.1.- Una corrección arregla datos mal escritos: agregar o quitar titulares es un cambio de titularidad.
+      if (motivo) await this.exigirMismaCantidad(tx, concesion, datos);
 
       //3.- Se valida cada domicilio contra el catálogo (departamento → localidad → distrito).
       const ubicaciones: UbicacionValidada[] = [];
       for (const domicilio of datos.domicilios) ubicaciones.push(await this.ubicaciones.exigirUbicacion(domicilio, tx));
 
       //3.1.- En el cierre, lo aprobado en la resolución no cambia.
-      if (expediente.etapa === Etapa.CIERRE) await this.exigirSoloCompletar(tx, concesion, datos, ubicaciones);
+      if (expediente.etapa === Etapa.CIERRE && !editable.correccion) await this.exigirSoloCompletar(tx, concesion, datos, ubicaciones);
 
       //4.- Cada titular se busca por documento: si ya existe se reutiliza (y se actualizan sus
       //    datos), si no, se crea. Para precargar el formulario: GET /api/personas?documento=…
@@ -75,10 +81,23 @@ export class TitularesAltaService {
         solicitanteDocumento: personas[0].documento,
         modificadoUsuarioId: usuario.id,
       });
+
+      //9.- Corrección: el motivo y el antes / después, en el historial y la auditoría.
+      if (motivo && antes) await this.alta.registrarCorreccion(tx, editable, 'titulares', antes, motivo);
     });
 
-    //9.- Se devuelve el alta actualizada.
+    //10.- Se devuelve el alta actualizada.
     return this.alta.obtener(expedienteId);
+  }
+
+  /** Corrección: la misma cantidad de titulares (sumar o sacar uno corresponde a un cambio de titularidad). */
+  private async exigirMismaCantidad(tx: EntityManager, concesion: Concesion, datos: GuardarTitularesDto): Promise<void> {
+    const actuales = await tx.count(Titular, { where: { concesion: { id: concesion.id }, vigente: true } });
+    if (actuales !== datos.titulares.length) {
+      throw new ConflictException(
+        `La concesión tiene ${actuales} titular${actuales === 1 ? '' : 'es'}: en una corrección solo se arreglan sus datos. Para agregar o quitar titulares corresponde un trámite de cambio de titularidad.`,
+      );
+    }
   }
 
   /**

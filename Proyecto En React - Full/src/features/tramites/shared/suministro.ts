@@ -1,8 +1,4 @@
-import type { CatalogoSuministro, DatosSuministro, NodoCascada } from '@/services/catalogos'
-
-export const NIVELES_CANAL_ADICIONAL = ['Canal terciario', 'Canal cuarto', 'Canal quinto'] as const
-
-const collator = new Intl.Collator('es')
+import { NIVELES_SUMINISTRO, type CatalogoSuministro, type NivelSuministro, type NodoSuministro } from '@/services/catalogos'
 
 export interface UbicacionSeleccionada {
   departamento: string
@@ -10,23 +6,52 @@ export interface UbicacionSeleccionada {
   distrito: string
 }
 
-export function getDatosSuministro(catalogo: CatalogoSuministro | null, u: UbicacionSeleccionada): DatosSuministro | null {
-  if (!catalogo || !u.departamento || !u.localidad || !u.distrito) return null
-  return catalogo[u.departamento]?.[u.localidad]?.[u.distrito] ?? null
+/** Los campos del formulario para cada nivel después de la fuente, en orden. */
+export const CAMPOS_CASCADA = [
+  'sistemaDistribucion',
+  'canalPrincipal',
+  'canalSecundario',
+  'canalTerciario',
+  'canalCuarto',
+  'canalQuinto',
+  'desague',
+] as const
+
+export type CampoCascada = (typeof CAMPOS_CASCADA)[number]
+
+/** El árbol del distrito de la concesión (null si el distrito no tiene árbol cargado). */
+export function arbolDelDistrito(catalogo: CatalogoSuministro | null, distrito: string): NodoSuministro[] | null {
+  if (!catalogo || !distrito) return null
+  const arbol = catalogo[distrito]
+  return arbol?.length ? arbol : null
+}
+
+export interface PasoCascada {
+  campo: CampoCascada
+  nivel: NivelSuministro
+  etiqueta: string
+  /** Lo que cuelga del último tramo elegido con este nivel. */
+  opciones: string[]
 }
 
 /**
- * Opciones del próximo canal adicional recorriendo la cascada:
- * principal → secundario → (canales adicionales ya elegidos) → ?
- * El último nivel de la cascada es una lista de strings en lugar de un objeto.
+ * Los niveles que se ofrecen, recorriendo el árbol desde la fuente principal: en cada nivel, lo
+ * que cuelga del último tramo elegido. Un nivel que la rama no tiene no se muestra (se saltea),
+ * y si el tramo tiene hijos de varios niveles se ofrecen todos (ej: un secundario y un terciario
+ * directo del principal). Un valor que no está en el árbol (concesiones migradas) no corta el
+ * camino pero tampoco lo sigue.
  */
-export function opcionesCanalSiguiente(datos: DatosSuministro | null, principal: string, secundario: string, previos: string[]): string[] {
-  if (!datos || !principal || !secundario) return []
-  let nodo: NodoCascada | string[] | undefined = datos.cascada[principal]
-  for (const canal of [secundario, ...previos]) {
-    if (!nodo || Array.isArray(nodo) || !canal) return []
-    nodo = nodo[canal]
-  }
-  if (!nodo) return []
-  return (Array.isArray(nodo) ? [...nodo] : Object.keys(nodo)).filter(Boolean).sort(collator.compare)
+export function pasosCascada(arbol: NodoSuministro[] | null, fuente: string, valores: Partial<Record<CampoCascada, string>>): PasoCascada[] {
+  let actual = arbol?.find((n) => n.nombre === fuente)
+  const pasos: PasoCascada[] = []
+  CAMPOS_CASCADA.forEach((campo, i) => {
+    if (!actual) return
+    const { nivel, nombre } = NIVELES_SUMINISTRO[i + 1]
+    const hijos = actual.hijos.filter((h) => h.nivel === nivel)
+    const valor = valores[campo]
+    if (hijos.length || valor) pasos.push({ campo, nivel, etiqueta: nombre, opciones: hijos.map((h) => h.nombre) })
+    const elegido = hijos.find((h) => h.nombre === valor)
+    if (elegido) actual = elegido
+  })
+  return pasos
 }

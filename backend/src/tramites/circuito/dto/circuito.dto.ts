@@ -49,6 +49,15 @@ export class CursoConDeudaDto {
   observaciones: string;
 }
 
+/** La oficina que inició el trámite lo cancela (se cargó por error): el motivo es obligatorio. */
+export class CancelarInicioDto {
+  @Texto()
+  @IsString({ message: 'Explique por qué se cancela el trámite.' })
+  @MinLength(10, { message: 'Explique por qué se cancela el trámite (al menos 10 caracteres).' })
+  @MaxLength(2000)
+  observaciones: string;
+}
+
 /** Distrito y Jurídico: apto, no apto u observado (con observado y no apto, el motivo es obligatorio). */
 export class DictamenDto {
   @IsIn(['APTO', 'NO_APTO', 'OBSERVADO'], { message: 'El resultado debe ser APTO, NO_APTO u OBSERVADO.' })

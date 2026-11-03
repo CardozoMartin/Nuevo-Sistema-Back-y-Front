@@ -105,6 +105,13 @@ export interface ActuacionInput {
   datos?: Record<string, unknown> | null;
 }
 
+/** Un campo corregido: cómo estaba y cómo quedó (null: vacío). */
+export interface CambioCorregido {
+  campo: string;
+  antes: string | null;
+  despues: string | null;
+}
+
 /**
  * El expediente y su circuito, comunes a todos los trámites:
  *
@@ -135,12 +142,13 @@ export class ExpedientesService {
   /**
    * ¿El número de expediente está libre? Se consulta antes de empezar un trámite, para no
    * cargar todo y enterarse al final. Si ya está registrado, devuelve de qué trámite es y
-   * dónde está. Mismo criterio que abrir(): 0123 y 123 son el mismo número.
+   * dónde está. Mismo criterio que abrir(): 0123 y 123 son el mismo número, y un expediente
+   * anulado no lo ocupa.
    */
   async disponibilidad(input: { numero: string; reparticion: string; anio: number }) {
     const numero = String(Number(input.numero));
     const reparticion = String(Number(input.reparticion));
-    const e = await this.dataSource.manager.findOneBy(Expediente, { numero, reparticion, anio: input.anio });
+    const e = await this.dataSource.manager.findOneBy(Expediente, { numero, reparticion, anio: input.anio, estado: Not(EstadoExpediente.ANULADO) });
     return {
       numero: formatearNumeroExpediente(numero, reparticion, input.anio),
       disponible: !e,
@@ -158,7 +166,7 @@ export class ExpedientesService {
 
   /**
    * Registra en el sistema un expediente que ya existe en papel:
-   *   1. Valida que el número no esté usado (409 si ya existe).
+   *   1. Valida que el número no esté usado (409 si ya existe; los anulados no cuentan).
    *   2. Crea el expediente en su etapa inicial, tomado por quien lo registra.
    *   3. Asienta el movimiento de apertura (sin oficina de origen), ya recibido.
    *   4. Auditoría: quién lo inició.
@@ -169,7 +177,7 @@ export class ExpedientesService {
     const textoNumero = formatearNumeroExpediente(numero, reparticion, input.anio);
 
     // Paso 1: validación previa, para devolver un mensaje claro.
-    if (await tx.existsBy(Expediente, { numero, reparticion, anio: input.anio })) {
+    if (await tx.existsBy(Expediente, { numero, reparticion, anio: input.anio, estado: Not(EstadoExpediente.ANULADO) })) {
       throw new ConflictException(`El expediente ${textoNumero} ya está registrado.`);
     }
 
@@ -394,6 +402,23 @@ export class ExpedientesService {
         usuario: a.usuario,
       }),
     );
+  }
+
+  /**
+   * Corrección de datos por fuera del circuito (errores materiales): la actuación con el motivo y
+   * el antes / después de cada campo, y la fila de auditoría. La hace Catastro aunque el
+   * expediente esté en otra oficina, así que no cambia ni de oficina ni de etapa.
+   */
+  async registrarCorreccion(tx: EntityManager, expediente: Expediente, c: { usuario: Usuario; seccion: string; motivo: string; cambios: CambioCorregido[] }): Promise<void> {
+    await this.actuar(tx, expediente, {
+      oficina: Oficina.CATASTRO,
+      tipo: TipoActuacion.CORRECCION_DATOS,
+      resultado: ResultadoActuacion.REGISTRADO,
+      usuario: c.usuario,
+      observaciones: c.motivo,
+      datos: { seccion: c.seccion, cambios: c.cambios },
+    });
+    await this.auditar(tx, expediente, AccionAuditoria.CORRECCION, c.usuario);
   }
 
   /** Última actuación de un tipo (ej: la última observación, para saber a dónde reenviar). */

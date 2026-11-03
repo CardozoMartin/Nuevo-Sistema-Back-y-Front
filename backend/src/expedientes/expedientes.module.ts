@@ -68,6 +68,8 @@ class ExpedientesController {
    * hizo cada oficina solo lo ve esa oficina (y los administradores): ver ExpedientesService.historial.
    */
   @Get(':id/historial')
+  // Las correcciones de titulares guardan el documento y el contacto anteriores y nuevos.
+  @ConDatosSensibles()
   historial(@Param('id', ParseIntPipe) id: number, @SesionActual() sesion: UsuarioSesion) {
     return this.expedientes.historial(String(id), sesion);
   }

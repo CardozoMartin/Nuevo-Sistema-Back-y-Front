@@ -19,6 +19,8 @@ export interface NuevoPoligono {
   publicacion?: PublicacionMapa;
   /** Desde cuándo rige (al reemplazar un polígono que ya tenía resolución, la fecha de esa resolución). */
   desde?: string | null;
+  /** Corrección de un polígono publicado: entra propuesta (no vigente) hasta que se apruebe. */
+  propuesto?: boolean;
   usuarioId: string;
 }
 
@@ -36,6 +38,18 @@ export interface PoligonoVigente {
   desde: Date;
 }
 
+/** Corrección del polígono publicado, esperando que quien publica en el mapa la apruebe. */
+export interface PoligonoPropuesto {
+  id: string;
+  geojson: MultiPolygon;
+  superficieHa: number;
+  archivo: string | null;
+  /** PENDIENTE (a revisar) u OBSERVADO (quien publica pidió corregirlo, con nota). */
+  publicacion: PublicacionMapa;
+  nota: string | null;
+  creadoEn: Date;
+}
+
 /**
  * Escritura y lectura de con_poligono. Va con SQL directo porque la geometría entra en
  * WGS84 y se guarda transformada a POSGAR (ST_Transform), cosa que el ORM no hace solo.
@@ -51,10 +65,10 @@ export class PoligonosService {
       `WITH g AS (SELECT ST_Multi(ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($3), ${SRID_WGS84}), ${SRID_POSGAR})) AS geom)
        INSERT INTO con_poligono
               (concesion_id, expediente_id, geom, superficie_ha, perimetro_m, origen,
-               archivo_nombre, archivo_ruta, archivo_sha256, archivo_bytes, sistema_origen, vigente, creado_usuario_id,
+               archivo_nombre, archivo_ruta, archivo_sha256, archivo_bytes, sistema_origen, vigente, propuesto, creado_usuario_id,
                publicacion, publicacion_en, desde)
        SELECT $1, $2, g.geom, ST_Area(g.geom) / 10000, ST_Perimeter(g.geom), $4,
-              $5, $6, $7, $8, $10, true, $9,
+              $5, $6, $7, $8, $10, NOT $13::boolean, $13::boolean, $9,
               $11::con_publicacion_mapa, CASE WHEN $11::con_publicacion_mapa = 'PUBLICADO' THEN now() END, $12::date
          FROM g
        RETURNING id`,
@@ -71,6 +85,7 @@ export class PoligonosService {
         p.sistemaOrigen ?? null,
         p.publicacion ?? PublicacionMapa.PENDIENTE,
         p.desde ?? null,
+        p.propuesto ?? false,
       ],
     );
     return String(fila.id);
@@ -88,6 +103,38 @@ export class PoligonosService {
   /** Deja el polígono vigente como histórico (vigente = false, hasta = ahora). */
   async cerrarVigente(tx: EntityManager, concesionId: string): Promise<void> {
     await tx.query(`UPDATE con_poligono SET vigente = false, hasta = now() WHERE concesion_id = $1 AND vigente`, [concesionId]);
+  }
+
+  /** La corrección propuesta pendiente pasa al histórico (la reemplaza otra corrección). */
+  async descartarPropuesto(tx: EntityManager, concesionId: string): Promise<void> {
+    await tx.query(`UPDATE con_poligono SET propuesto = false, hasta = now() WHERE concesion_id = $1 AND propuesto`, [concesionId]);
+  }
+
+  /** Estado de publicación del polígono vigente y desde cuándo rige (para decidir cómo corregirlo). */
+  async estadoVigente(tx: EntityManager, concesionId: string): Promise<{ id: string; publicacion: PublicacionMapa; desde: string | null } | null> {
+    const [f] = await tx.query(`SELECT id::text, publicacion, to_char(desde, 'YYYY-MM-DD') AS desde FROM con_poligono WHERE concesion_id = $1 AND vigente`, [concesionId]);
+    return f ?? null;
+  }
+
+  /** La corrección del polígono que espera aprobación (null si no hay). */
+  async propuesto(tx: EntityManager, concesionId: string): Promise<PoligonoPropuesto | null> {
+    const [f] = await tx.query(
+      `SELECT p.id::text, p.superficie_ha, p.archivo_nombre, p.publicacion, p.publicacion_nota, p.creado_en,
+              ST_AsGeoJSON(ST_Transform(p.geom, ${SRID_WGS84}), 7)::json AS geojson
+         FROM con_poligono p
+        WHERE p.concesion_id = $1 AND p.propuesto`,
+      [concesionId],
+    );
+    if (!f) return null;
+    return {
+      id: f.id,
+      geojson: f.geojson,
+      superficieHa: Number(f.superficie_ha),
+      archivo: f.archivo_nombre,
+      publicacion: f.publicacion,
+      nota: f.publicacion_nota,
+      creadoEn: f.creado_en,
+    };
   }
 
   async vigente(tx: EntityManager, concesionId: string): Promise<PoligonoVigente | null> {

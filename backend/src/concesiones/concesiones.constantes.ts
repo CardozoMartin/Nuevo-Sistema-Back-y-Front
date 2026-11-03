@@ -103,9 +103,6 @@ export const RANGO_LONGITUD = { min: -74, max: -53 } as const;
  */
 export { RANGO_POSGAR_FAJA3 as RANGO_POSGAR } from '../comun/validadores/posgar-faja3.js';
 
-/** Canales del suministro después del secundario: terciario, cuarto y quinto. */
-export const MAX_CANALES_ADICIONALES = 3;
-
 /** Circunscripciones y secciones catastrales válidas (mismas listas que el frontend). */
 export const CIRCUNSCRIPCIONES = ['I', 'II', 'III'] as const;
 export const SECCIONES_CATASTRALES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] as const;

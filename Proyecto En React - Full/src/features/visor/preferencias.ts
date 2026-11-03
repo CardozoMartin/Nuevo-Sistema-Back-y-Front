@@ -20,7 +20,7 @@ export const CLAVE_RELLENO_CONCESIONES = 'concesiones:relleno'
 /** Secciones del catálogo que el usuario dejó abiertas (las guarda el panel de capas). */
 export const CLAVE_SECCIONES_ABIERTAS = 'drh_visor_secciones'
 
-/** Relleno de las concesiones de fábrica (el borde siempre es opaco). */
+/** Relleno de fábrica de los polígonos (concesiones y capas del GeoServer; el borde siempre es opaco). */
 export const RELLENO_CONCESIONES = 0.3
 
 export const opacidadDe = (opacidades: Opacidades, clave: string, porDefecto: number) => opacidades[clave] ?? porDefecto

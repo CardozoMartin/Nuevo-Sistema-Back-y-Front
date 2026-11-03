@@ -8,8 +8,8 @@ import { DataSource } from 'typeorm';
 import { AppModule } from './../src/app.module.js';
 import { SuministroCatalogoService } from './../src/catalogos/suministro/suministro-catalogo.service.js';
 
-// ABM del catálogo de suministro de riego (zonas, fuentes/sistemas/desagües, árbol de canales) y
-// de los ríos y canales (sig.cauce). Necesita la base levantada (docker compose up -d).
+// ABM del árbol de suministro de riego por distrito (fuente → sistema → canales → desagüe) y de
+// los ríos y canales (sig.cauce). Necesita la base levantada (docker compose up -d).
 // Como nada se borra físicamente, cada corrida usa nombres propios y deja sus filas dadas de baja.
 describe('ABM del catálogo de suministro y de los cauces (e2e)', () => {
   let app: INestApplication<App>;
@@ -23,9 +23,7 @@ describe('ABM del catálogo de suministro y de los cauces (e2e)', () => {
   const api = () => request.agent(app.getHttpServer()).set('X-Usuario-Id', SISTEMA);
   const MOTIVO = 'Cargado para la prueba automática.';
 
-  let leales: { id: number };
   let distritoIII: { id: number };
-  let localidad: { id: number; nombre: string };
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -34,139 +32,96 @@ describe('ABM del catálogo de suministro y de los cauces (e2e)', () => {
     await app.init();
     catalogo = app.get(SuministroCatalogoService);
     dataSource = app.get(DataSource);
-
-    leales = (await api().get('/catalogos/departamentos?q=leales')).body[0];
     distritoIII = (await api().get('/catalogos/distritos')).body.find((d: { codigo: string }) => d.codigo === 'III');
-    // Una localidad nueva (sin zona de suministro) para armarle la suya.
-    localidad = (
-      await api().post('/catalogos/localidades').set('X-Usuario-Id', CATASTRO).send({ departamentoId: leales.id, nombre: `RIEGO PRUEBA ${sufijo}`, distritoId: distritoIII.id }).expect(201)
-    ).body;
   });
 
   afterAll(async () => {
-    await api().delete(`/catalogos/localidades/${localidad.id}`).set('X-Usuario-Id', CATASTRO).send({ motivo: MOTIVO });
     await app.close();
   });
 
-  /** Lo que el formulario recibe para la localidad de la prueba (null si no hay catálogo). */
-  const ofrecido = async () =>
-    (await api().get('/catalogos/suministro').query({ departamento: 'LEALES', localidad: localidad.nombre, distrito: 'III' }).expect(200)).body;
+  describe('árbol de suministro del distrito', () => {
+    const FUENTE = `RIO PRUEBA ${sufijo}`;
+    const ids: Record<string, number> = {};
+    const ubicacion = () => ({ distrito: { id: distritoIII.id, codigo: 'III' } });
+    const alta = (cuerpo: object, usuario = CATASTRO) => api().post('/catalogos/suministro/nodos').set('X-Usuario-Id', usuario).send({ distritoId: distritoIII.id, ...cuerpo });
+    const crear = async (clave: string, nivel: string, nombre: string, padre: string) => (ids[clave] = (await alta({ nivel, nombre, padreId: ids[padre] }).expect(201)).body.id);
+    /** La fuente de la prueba tal como la recibe el formulario (undefined si no se ofrece). */
+    const ofrecida = async () => ((await api().get('/catalogos/suministro').query({ distrito: 'III' }).expect(200)).body as { nombre: string; hijos: any[] }[]).find((f) => f.nombre === FUENTE);
 
-  describe('zonas, listas y canales', () => {
-    let zonaId: number;
-    const canales: Record<string, number> = {};
-    let fuenteId: number;
+    it('solo Catastro (o un administrador) modifica el árbol', () => alta({ nivel: 'FUENTE', nombre: FUENTE }, RECAUDACION).expect(403));
 
-    it('Catastro crea la zona de la localidad (el nombre de origen sale de la localidad)', async () => {
-      const res = await api().post('/catalogos/suministro/zonas').set('X-Usuario-Id', CATASTRO).send({ departamentoId: leales.id, distritoId: distritoIII.id, localidadId: localidad.id }).expect(201);
-      zonaId = res.body.id;
-      expect(res.body).toMatchObject({ localidadOrigen: localidad.nombre, localidad: { id: localidad.id }, distrito: 'III', activo: true, fuentesAgua: [], canales: [] });
+    it('agrega una fuente (normalizada, sin repetir, sin textos ajenos)', async () => {
+      const res = await alta({ nivel: 'FUENTE', nombre: `  rio   prueba ${sufijo.toLowerCase()} ` }).expect(201);
+      ids.fuente = res.body.id;
+      expect(res.body).toMatchObject({ nivel: 'FUENTE', nombre: FUENTE, padre: null, camino: [FUENTE], activo: true });
+
+      await alta({ nivel: 'FUENTE', nombre: FUENTE }).expect(409);
+      await alta({ nivel: 'FUENTE', nombre: '6. E-MAIL: CATASTRO@DRH' }).expect(400);
+      await alta({ nivel: 'OTRO', nombre: 'X' }).expect(400);
     });
 
-    it('una localidad tiene una sola zona por distrito', () =>
-      api().post('/catalogos/suministro/zonas').set('X-Usuario-Id', CATASTRO).send({ departamentoId: leales.id, distritoId: distritoIII.id, localidadId: localidad.id, localidadOrigen: `OTRA ${sufijo}` }).expect(409));
+    it('arma la rama: cada tramo cuelga de un nivel anterior, aunque no sea el inmediato', async () => {
+      await crear('dique', 'SISTEMA', 'DIQUE PRUEBA', 'fuente');
+      await crear('matriz', 'CANAL_PRINCIPAL', 'MATRIZ', 'dique');
+      await crear('norte', 'CANAL_SECUNDARIO', 'DVDO. NORTE', 'matriz');
+      await crear('ralos', 'CANAL_TERCIARIO', 'LOS RALOS', 'norte');
+      // Un terciario directo del principal (la rama no tiene secundario) y un desagüe del principal.
+      const salteado = await alta({ nivel: 'CANAL_TERCIARIO', nombre: 'PROPIO', padreId: ids.matriz }).expect(201);
+      expect(salteado.body).toMatchObject({ nivelNombre: 'canal terciario', camino: [FUENTE, 'DIQUE PRUEBA', 'MATRIZ', 'PROPIO'] });
+      await crear('desague', 'DESAGUE', 'MISMA PROPIEDAD', 'matriz');
 
-    it('solo Catastro (o un administrador) modifica el catálogo', () =>
-      api().post(`/catalogos/suministro/zonas/${zonaId}/opciones`).set('X-Usuario-Id', RECAUDACION).send({ tipo: 'FUENTE', nombre: 'RIO SALI' }).expect(403));
-
-    it('agrega fuente, sistema y desagüe (normalizados, sin repetir, sin textos ajenos)', async () => {
-      const fuente = await api().post(`/catalogos/suministro/zonas/${zonaId}/opciones`).set('X-Usuario-Id', CATASTRO).send({ tipo: 'FUENTE', nombre: '  rio   sali ' }).expect(201);
-      fuenteId = fuente.body.id;
-      expect(fuente.body).toMatchObject({ tipo: 'FUENTE', nombre: 'RIO SALI', activo: true });
-      await api().post(`/catalogos/suministro/zonas/${zonaId}/opciones`).set('X-Usuario-Id', CATASTRO).send({ tipo: 'SISTEMA', nombre: 'DIQUE NIVELADOR' }).expect(201);
-      await api().post(`/catalogos/suministro/zonas/${zonaId}/opciones`).set('X-Usuario-Id', CATASTRO).send({ tipo: 'DESAGUE', nombre: 'MISMA PROPIEDAD' }).expect(201);
-
-      await api().post(`/catalogos/suministro/zonas/${zonaId}/opciones`).set('X-Usuario-Id', CATASTRO).send({ tipo: 'FUENTE', nombre: 'RIO SALI' }).expect(409);
-      await api().post(`/catalogos/suministro/zonas/${zonaId}/opciones`).set('X-Usuario-Id', CATASTRO).send({ tipo: 'FUENTE', nombre: '6. E-MAIL: CATASTRO@DRH' }).expect(400);
-      await api().post(`/catalogos/suministro/zonas/${zonaId}/opciones`).set('X-Usuario-Id', CATASTRO).send({ tipo: 'OTRO', nombre: 'X' }).expect(400);
+      // No puede colgar de un nivel igual o posterior; una fuente no tiene padre y lo demás sí.
+      await alta({ nivel: 'CANAL_PRINCIPAL', nombre: 'X', padreId: ids.norte }).expect(400);
+      await alta({ nivel: 'FUENTE', nombre: 'X', padreId: ids.fuente }).expect(400);
+      await alta({ nivel: 'SISTEMA', nombre: 'X' }).expect(400);
+      // El nombre no se repite entre los hermanos del mismo nivel.
+      await alta({ nivel: 'CANAL_SECUNDARIO', nombre: 'dvdo.  norte', padreId: ids.matriz }).expect(409);
     });
 
-    it('arma el árbol de canales hasta el quinto; el quinto no admite derivaciones', async () => {
-      const crear = async (nombre: string, padre?: string) =>
-        (canales[nombre] = (
-          await api().post(`/catalogos/suministro/zonas/${zonaId}/canales`).set('X-Usuario-Id', CATASTRO).send({ nombre, padreId: padre ? canales[padre] : undefined }).expect(201)
-        ).body.id);
-
-      await crear('MATRIZ');
-      await crear('DVDO. NORTE', 'MATRIZ');
-      await crear('LOS RALOS', 'DVDO. NORTE');
-      await crear('COMPUERTA 27', 'LOS RALOS');
-      await crear('PROPIO', 'COMPUERTA 27');
-      // «PROPIO» se repite en otra rama: vale.
-      await crear('DVDO. SUR', 'MATRIZ');
-      const otro = await api().post(`/catalogos/suministro/zonas/${zonaId}/canales`).set('X-Usuario-Id', CATASTRO).send({ nombre: 'PROPIO', padreId: canales['DVDO. SUR'] }).expect(201);
-      expect(otro.body).toMatchObject({ nivel: 3, nivelNombre: 'canal terciario', camino: ['MATRIZ', 'DVDO. SUR', 'PROPIO'] });
-
-      await api().post(`/catalogos/suministro/zonas/${zonaId}/canales`).set('X-Usuario-Id', CATASTRO).send({ nombre: 'MAS ABAJO', padreId: canales.PROPIO }).expect(400);
-      await api().post(`/catalogos/suministro/zonas/${zonaId}/canales`).set('X-Usuario-Id', CATASTRO).send({ nombre: 'dvdo.  norte', padreId: canales.MATRIZ }).expect(409);
+    it('el formulario recibe el árbol del distrito', async () => {
+      const fuente = await ofrecida();
+      expect(fuente).toMatchObject({ nivel: 'FUENTE', hijos: [{ nombre: 'DIQUE PRUEBA', hijos: [{ nombre: 'MATRIZ', nivel: 'CANAL_PRINCIPAL' }] }] });
+      const deMatriz = fuente!.hijos[0].hijos[0].hijos.map((h: { nombre: string; nivel: string }) => `${h.nivel} ${h.nombre}`);
+      expect(deMatriz).toEqual(['CANAL_SECUNDARIO DVDO. NORTE', 'DESAGUE MISMA PROPIEDAD', 'CANAL_TERCIARIO PROPIO']);
     });
 
-    it('el formulario recibe la zona en el formato de siempre', async () => {
-      expect(await ofrecido()).toEqual({
-        fuentesAgua: ['RIO SALI'],
-        sistemasDistribucion: ['DIQUE NIVELADOR'],
-        desagues: ['MISMA PROPIEDAD'],
-        canalesPrincipales: { MATRIZ: ['DVDO. NORTE', 'DVDO. SUR'] },
-        cascada: { MATRIZ: { 'DVDO. NORTE': { 'LOS RALOS': { 'COMPUERTA 27': ['PROPIO'] } }, 'DVDO. SUR': { PROPIO: {} } } },
-      });
-    });
-
-    it('la baja de un canal se lleva sus derivaciones, y la reactivación las devuelve', async () => {
-      const baja = await api().delete(`/catalogos/suministro/canales/${canales['DVDO. NORTE']}`).set('X-Usuario-Id', CATASTRO).send({ motivo: MOTIVO }).expect(200);
+    it('la baja de un tramo se lleva lo que cuelga de él, y la reactivación lo devuelve', async () => {
+      const baja = await api().delete(`/catalogos/suministro/nodos/${ids.norte}`).set('X-Usuario-Id', CATASTRO).send({ motivo: MOTIVO }).expect(200);
       expect(baja.body).toMatchObject({ activo: false, baja: { motivo: MOTIVO } });
-      expect((await ofrecido()).canalesPrincipales).toEqual({ MATRIZ: ['DVDO. SUR'] });
 
       // El paso 6 ya no acepta ese camino.
-      const ubicacion = { departamento: { nombre: 'LEALES' }, localidad, distrito: { id: distritoIII.id, codigo: 'III' } };
-      await expect(
-        catalogo.exigirValido(dataSource.manager, ubicacion, { fuentes: ['RIO SALI'], canalPrincipal: 'MATRIZ', canalSecundario: 'DVDO. NORTE' }),
-      ).rejects.toThrow('no está en el catálogo');
+      const camino = { fuentes: [FUENTE], sistemaDistribucion: 'DIQUE PRUEBA', canalPrincipal: 'MATRIZ', canalSecundario: 'DVDO. NORTE', canalTerciario: 'LOS RALOS' };
+      await expect(catalogo.exigirValido(dataSource.manager, ubicacion(), camino)).rejects.toThrow('no sale de «MATRIZ»');
 
-      // Dado de baja no se edita; su derivación tampoco se reactiva sola mientras el padre esté de baja.
-      await api().put(`/catalogos/suministro/canales/${canales['DVDO. NORTE']}`).set('X-Usuario-Id', CATASTRO).send({ nombre: 'OTRO' }).expect(409);
-      await api().post(`/catalogos/suministro/canales/${canales['LOS RALOS']}/reactivar`).set('X-Usuario-Id', CATASTRO).expect(409);
+      // Dado de baja no se edita; lo que cuelga no se reactiva solo mientras el padre esté de baja.
+      await api().put(`/catalogos/suministro/nodos/${ids.norte}`).set('X-Usuario-Id', CATASTRO).send({ nombre: 'OTRO' }).expect(409);
+      await api().post(`/catalogos/suministro/nodos/${ids.ralos}/reactivar`).set('X-Usuario-Id', CATASTRO).expect(409);
 
-      await api().post(`/catalogos/suministro/canales/${canales['DVDO. NORTE']}/reactivar`).set('X-Usuario-Id', CATASTRO).expect(201);
-      expect((await ofrecido()).cascada.MATRIZ['DVDO. NORTE']).toEqual({ 'LOS RALOS': { 'COMPUERTA 27': ['PROPIO'] } });
-      await expect(
-        catalogo.exigirValido(dataSource.manager, ubicacion, { fuentes: ['RIO SALI'], canalPrincipal: 'MATRIZ', canalSecundario: 'DVDO. NORTE', canalesAdicionales: ['LOS RALOS'] }),
-      ).resolves.toBeUndefined();
+      await api().post(`/catalogos/suministro/nodos/${ids.norte}/reactivar`).set('X-Usuario-Id', CATASTRO).expect(201);
+      await expect(catalogo.exigirValido(dataSource.manager, ubicacion(), camino)).resolves.toBeUndefined();
+      // También el camino que saltea el secundario.
+      const salteado = { fuentes: [FUENTE], sistemaDistribucion: 'DIQUE PRUEBA', canalPrincipal: 'MATRIZ', canalTerciario: 'PROPIO' };
+      await expect(catalogo.exigirValido(dataSource.manager, ubicacion(), salteado)).resolves.toBeUndefined();
     });
 
-    it('renombra un canal y una fuente', async () => {
-      const canal = await api().put(`/catalogos/suministro/canales/${canales['DVDO. SUR']}`).set('X-Usuario-Id', CATASTRO).send({ nombre: 'dvdo. sur nuevo' }).expect(200);
-      expect(canal.body).toMatchObject({ nombre: 'DVDO. SUR NUEVO', derivaciones: 1 });
-      await api().put(`/catalogos/suministro/opciones/${fuenteId}`).set('X-Usuario-Id', CATASTRO).send({ nombre: 'RIO SALI (TRAMO NORTE)' }).expect(200);
-      expect((await ofrecido()).fuentesAgua).toEqual(['RIO SALI (TRAMO NORTE)']);
+    it('renombra un tramo', async () => {
+      const res = await api().put(`/catalogos/suministro/nodos/${ids.dique}`).set('X-Usuario-Id', CATASTRO).send({ nombre: 'dique prueba nuevo' }).expect(200);
+      expect(res.body).toMatchObject({ nombre: 'DIQUE PRUEBA NUEVO', derivaciones: 1 });
     });
 
-    it('la baja de una opción deja de ofrecerla; se reactiva', async () => {
-      await api().delete(`/catalogos/suministro/opciones/${fuenteId}`).set('X-Usuario-Id', CATASTRO).send({ motivo: MOTIVO }).expect(200);
-      expect((await ofrecido()).fuentesAgua).toEqual([]);
-      await api().post(`/catalogos/suministro/zonas/${zonaId}/opciones`).set('X-Usuario-Id', CATASTRO).send({ tipo: 'FUENTE', nombre: 'RIO SALI (TRAMO NORTE)' }).expect(409);
-      await api().post(`/catalogos/suministro/opciones/${fuenteId}/reactivar`).set('X-Usuario-Id', CATASTRO).expect(201);
-      expect((await ofrecido()).fuentesAgua).toEqual(['RIO SALI (TRAMO NORTE)']);
+    it('el árbol del ABM trae todo con ids, también lo dado de baja', async () => {
+      await api().delete(`/catalogos/suministro/nodos/${ids.desague}`).set('X-Usuario-Id', CATASTRO).send({ motivo: MOTIVO }).expect(200);
+      const { nodos } = (await api().get(`/catalogos/suministro/distritos/${distritoIII.id}/arbol`).expect(200)).body;
+      const fuente = nodos.find((n: { id: number }) => n.id === ids.fuente);
+      expect(fuente).toMatchObject({ nombre: FUENTE, activo: true, hijos: [{ id: ids.dique, nivel: 'SISTEMA' }] });
+      expect(fuente.hijos[0].hijos[0].hijos.find((n: { id: number }) => n.id === ids.desague)).toMatchObject({ activo: false, baja: { motivo: MOTIVO } });
+      const distritos = (await api().get('/catalogos/suministro/distritos').expect(200)).body;
+      expect(distritos.find((d: { id: number }) => d.id === distritoIII.id).fuentes).toBeGreaterThan(0);
     });
 
-    it('la ficha de la zona trae todo con ids, también lo dado de baja', async () => {
-      const ficha = (await api().get(`/catalogos/suministro/zonas/${zonaId}`).expect(200)).body;
-      expect(ficha.fuentesAgua[0]).toMatchObject({ id: fuenteId, activo: true });
-      expect(ficha.canales[0]).toMatchObject({ nombre: 'MATRIZ', nivel: 1, hijos: expect.any(Array) });
-    });
-
-    it('baja lógica de la zona: la localidad se queda sin catálogo; se reactiva', async () => {
-      await api().delete(`/catalogos/suministro/zonas/${zonaId}`).set('X-Usuario-Id', CATASTRO).send({ motivo: MOTIVO }).expect(200);
-      expect(await ofrecido()).toEqual({});
-      await api().post(`/catalogos/suministro/zonas/${zonaId}/canales`).set('X-Usuario-Id', CATASTRO).send({ nombre: 'NUEVO' }).expect(409);
-      const todas = (await api().get('/catalogos/suministro/zonas?todas=true').expect(200)).body;
-      expect(todas.find((z: { id: number }) => z.id === zonaId)).toMatchObject({ activo: false });
-      expect((await api().get('/catalogos/suministro/zonas').expect(200)).body.find((z: { id: number }) => z.id === zonaId)).toBeUndefined();
-
-      await api().post(`/catalogos/suministro/zonas/${zonaId}/reactivar`).set('X-Usuario-Id', CATASTRO).expect(201);
-      expect((await ofrecido()).fuentesAgua).toEqual(['RIO SALI (TRAMO NORTE)']);
-
-      // Limpieza: la zona queda dada de baja.
-      await api().delete(`/catalogos/suministro/zonas/${zonaId}`).set('X-Usuario-Id', CATASTRO).send({ motivo: MOTIVO }).expect(200);
+    it('limpieza: la fuente queda dada de baja y deja de ofrecerse', async () => {
+      await api().delete(`/catalogos/suministro/nodos/${ids.fuente}`).set('X-Usuario-Id', CATASTRO).send({ motivo: MOTIVO }).expect(200);
+      expect(await ofrecida()).toBeUndefined();
     });
   });
 

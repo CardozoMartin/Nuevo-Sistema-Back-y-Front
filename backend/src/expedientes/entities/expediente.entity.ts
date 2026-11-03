@@ -8,8 +8,9 @@ import { Movimiento } from './movimiento.entity.js';
  * nace como expediente en papel, se registra acá y se mueve entre oficinas.
  */
 @Entity('exp_expediente')
-// El número se reinicia cada año, por eso la clave única es el trío completo.
-@Index('uk_expediente', ['numero', 'reparticion', 'anio'], { unique: true })
+// El número se reinicia cada año, por eso la clave única es el trío completo. Un expediente
+// ANULADO (iniciado por error) no ocupa el número: se puede volver a registrar.
+@Index('uk_expediente', ['numero', 'reparticion', 'anio'], { unique: true, where: `estado <> 'ANULADO'` })
 // Bandeja de entrada de cada oficina: la consulta más frecuente del sistema.
 @Index('idx_exp_bandeja', ['oficinaActual', 'estado'])
 @Index('idx_exp_tipo', ['tipoTramite', 'estado'])

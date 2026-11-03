@@ -24,7 +24,8 @@ export class InmuebleAltaService {
     private readonly alta: AltaConcesionService,
   ) {}
 
-  async guardar(expedienteId: string, datos: DatosInmuebleDto, usuarioId: string): Promise<RespuestaAlta> {
+  /** Con `motivo`: corrección de un error material por fuera del circuito (queda en el historial con el antes y el después). */
+  async guardar(expedienteId: string, datos: DatosInmuebleDto, usuarioId: string, motivo?: string): Promise<RespuestaAlta> {
     const { catastral, registral } = datos;
 
     //1.- Se valida que el año de dominio no sea futuro.
@@ -32,10 +33,11 @@ export class InmuebleAltaService {
 
     await this.dataSource.transaction(async (tx) => {
       //2.- Se valida que Catastro pueda editar: etapa editable y expediente tomado por quien guarda.
-      const editable = await this.alta.exigirEditable(tx, expedienteId, usuarioId);
+      const editable = await this.alta.exigirEditable(tx, expedienteId, usuarioId, !!motivo);
+      const antes = motivo ? await this.alta.instantanea(tx, expedienteId, 'inmueble') : null;
 
       //3.- En el cierre solo se completa lo que falta.
-      if (editable.expediente.etapa === Etapa.CIERRE) {
+      if (editable.expediente.etapa === Etapa.CIERRE && !editable.correccion) {
         const actual = await tx.findOneBy(Inmueble, { concesion: { id: editable.concesion.id }, vigente: true });
         exigirSoloCompletar('el inmueble', [
           { nombre: 'matrícula catastral', actual: actual?.matriculaCatastral, nuevo: catastral.matricula },
@@ -71,9 +73,12 @@ export class InmuebleAltaService {
         serie: registral.serie ?? null,
       });
       await this.alta.marcarModificado(tx, editable);
+
+      //6.- Corrección: el motivo y el antes / después, en el historial y la auditoría.
+      if (motivo && antes) await this.alta.registrarCorreccion(tx, editable, 'inmueble', antes, motivo);
     });
 
-    //6.- Se devuelve el alta actualizada.
+    //7.- Se devuelve el alta actualizada.
     return this.alta.obtener(expedienteId);
   }
 }

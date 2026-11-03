@@ -4,13 +4,14 @@ import { Concesion } from './concesion.entity.js';
 import { FilaVersionada } from './fila-versionada.js';
 
 /**
- * De dónde sale el agua y por dónde llega a la parcela (con_suministro). Es una cascada:
+ * De dónde sale el agua y por dónde llega a la parcela (con_suministro). Es un camino:
  *
- *   fuente → sistema de distribución → canal principal → secundario → terciario → cuarto → quinto
+ *   fuente → sistema de distribución → canal principal → secundario → terciario → cuarto → quinto → desagüe
  *
- * Las opciones de cada nivel dependen de la ubicación de la concesión: salen del catálogo de
- * suministro de la DRH (cat_suministro_zona / _opcion / _canal) y el alta las valida contra él.
- * Si la ubicación no tiene catálogo, solo se cargan la observación y el caudal (sin fuente).
+ * Las opciones salen del árbol de suministro del distrito de la concesión (cat_suministro_nodo)
+ * y el alta las valida contra él; un nivel que la rama no tiene queda NULL. Si el distrito no
+ * tiene árbol, solo se cargan la observación y el caudal (sin fuente). Se guardan los nombres
+ * (texto): las concesiones migradas conservan los del padrón aunque no estén en el árbol.
  *
  * Historial: un solo suministro vigente por concesión; una reubicación puede cambiarlo.
  */

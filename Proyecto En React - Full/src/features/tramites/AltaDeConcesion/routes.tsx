@@ -23,6 +23,15 @@ export const altaDeConcesionRoute: RouteObject = {
       ),
       children: [{ path: ':borradorId/datos', handle: { crumb: 'Pre carga de datos' }, lazy: lazyPage(() => import('./pages/PreCargaDatosPage')) }],
     },
+    // Corrección de errores materiales de un alta que ya salió de la carga (con o sin resolución).
+    {
+      element: (
+        <RutaConPermiso permiso="ALTA_CORREGIR" accion="corregir datos de altas">
+          <Outlet />
+        </RutaConPermiso>
+      ),
+      children: [{ path: ':expedienteId/correccion', handle: { crumb: 'Corrección de datos' }, lazy: lazyPage(() => import('./pages/CorreccionDatosPage')) }],
+    },
     // Circuito en el backend real: dónde está, qué hace cada oficina e historial.
     {
       path: 'circuito/:expedienteId',

@@ -8,6 +8,15 @@ export const ESTADOS: Record<EstadoConcesionGeo, { nombre: string; color: string
   ARCHIVADA: { nombre: 'Archivada', color: '#64748b' },
 }
 
+/** Nombre de la oficina en que está un expediente (la ficha y el criterio «Etapa del expediente»). */
+export const NOMBRE_OFICINA: Record<string, string> = {
+  catastro: 'Catastro',
+  recaudacion: 'Recaudación',
+  distrito: 'Distrito',
+  juridico: 'Jurídico',
+  secretaria_general: 'Secretaría General',
+}
+
 /** Polígono que se está comparando (KML cargado en el visor, todavía no guardado). */
 export const COLOR_COMPARACION = '#dc2626'
 

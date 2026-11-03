@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 import { PublicacionMapa } from '../../concesiones/concesiones.constantes.js';
+import { parecido, plano } from '../../concesiones/consulta-concesiones.service.js';
 import { poligonoDuplicado } from '../../concesiones/duplicados.js';
 import { PoligonosService } from '../../concesiones/poligonos.service.js';
 import { Expediente } from '../../expedientes/entities/expediente.entity.js';
@@ -10,6 +11,7 @@ import { Usuario } from '../../seguridad/entities/usuario.entity.js';
 import { ArchivosService } from '../../sig/archivos.service.js';
 import { avisoLejosDelCauce, GeometriaService } from '../../sig/geometria.service.js';
 import { exigirKml, extensionDe, leerArchivoGeografico, type ArchivoSubido } from '../../sig/kml/archivo-kml.js';
+import type { FiltroPublicacionDto } from './publicacion-mapa.controller.js';
 
 /** Con estos estados el expediente no llega al mapa público (no se otorgó). */
 const SIN_OTORGAR = [EstadoExpediente.RECHAZADO, EstadoExpediente.ANULADO, EstadoExpediente.ARCHIVADO];
@@ -23,6 +25,7 @@ export interface PoligonoParaPublicar {
   expedienteEstado: string | null;
   titular: string | null;
   departamento: string | null;
+  localidad: string | null;
   distrito: string | null;
   superficieHa: number;
   publicacion: PublicacionMapa;
@@ -34,6 +37,19 @@ export interface PoligonoParaPublicar {
   resolucionFecha: string | null;
   /** Se puede publicar: tiene resolución, no está publicado y el trámite no terminó sin otorgarse. */
   listoParaPublicar: boolean;
+  /**
+   * Corrección del polígono publicado (KML mal cargado): al aprobarla reemplaza al publicado, que
+   * mientras tanto sigue en el mapa. `superficieAnteriorHa`: la del publicado, para comparar.
+   */
+  esCorreccion: boolean;
+  superficieAnteriorHa: number | null;
+}
+
+export interface ListaParaPublicar {
+  items: PoligonoParaPublicar[];
+  total: number;
+  pagina: number;
+  porPagina: number;
 }
 
 /**
@@ -59,19 +75,50 @@ export class PublicacionMapaService {
   ) {}
 
   /**
-   * Los polígonos vigentes en un estado de publicación. Por defecto los pendientes y observados
-   * de los trámites (los listos para publicar primero); los publicados, los últimos 300.
+   * Los polígonos vigentes en un estado de publicación, y las correcciones propuestas de polígonos
+   * ya publicados. Por defecto los pendientes y observados de los trámites (los listos para
+   * publicar primero); los publicados, los últimos primero. Se filtra por texto y ubicación, y se pagina.
    */
-  async listar(estado?: PublicacionMapa): Promise<PoligonoParaPublicar[]> {
+  async listar(filtro: FiltroPublicacionDto): Promise<ListaParaPublicar> {
+    const { estado } = filtro;
     const estados = estado ? [estado] : [PublicacionMapa.PENDIENTE, PublicacionMapa.OBSERVADO];
+    const params: unknown[] = [estados, estado !== PublicacionMapa.PUBLICADO];
+    const param = (v: unknown) => `$${params.push(v)}`;
+    const condiciones: string[] = [];
+
+    //1.- Búsqueda general: los datos que identifican a la concesión.
+    if (filtro.texto?.trim()) {
+      const t = param(parecido(filtro.texto.trim()));
+      const campos = ['v.numero', 'v.expediente', 'v.titular', 'v.documento', 'v.padron', `r.numero || '/' || r.anio`];
+      condiciones.push(`(${campos.map((c) => `${plano(c)} ILIKE ${t}`).join(' OR ')})`);
+    }
+
+    //2.- Ubicación del inmueble vigente (ids de los catálogos).
+    const ubicacion = (
+      [
+        ['departamento_id', filtro.departamento],
+        ['distrito_id', filtro.distrito],
+        ['localidad_id', filtro.localidad],
+      ] as const
+    ).filter(([, valor]) => valor !== undefined);
+    if (ubicacion.length) {
+      condiciones.push(
+        `EXISTS (SELECT 1 FROM con_inmueble i WHERE i.concesion_id = v.concesion_id AND i.vigente AND ${ubicacion.map(([col, valor]) => `i.${col} = ${param(valor)}`).join(' AND ')})`,
+      );
+    }
+
+    const limite = param(filtro.porPagina);
+    const desplazamiento = param((filtro.pagina - 1) * filtro.porPagina);
     const filas: Record<string, any>[] = await this.dataSource.query(
-      `SELECT v.poligono_id, v.concesion_id, v.numero, v.expediente, v.titular, v.departamento, v.distrito,
-              v.superficie_ha, p.publicacion, p.publicacion_nota, p.publicacion_en,
+      `SELECT count(*) OVER () AS total, p.id AS poligono_id, v.concesion_id, v.numero, v.expediente, v.titular, v.departamento, v.localidad, v.distrito,
+              p.superficie_ha, p.publicacion, p.publicacion_nota, p.publicacion_en,
+              p.propuesto AS es_correccion, CASE WHEN p.propuesto THEN v.superficie_ha END AS superficie_anterior_ha,
               u.apellido || ', ' || u.nombre AS usuario,
               e.id AS expediente_id, e.estado AS expediente_estado,
               r.numero || '/' || r.anio AS resolucion, to_char(r.fecha, 'YYYY-MM-DD') AS resolucion_fecha
          FROM con_v_mapa_concesion v
-         JOIN con_poligono p ON p.id = v.poligono_id
+         -- El vigente, o la corrección que espera aprobación (la vista trae los datos de la concesión).
+         JOIN con_poligono p ON p.id = v.poligono_id OR (p.concesion_id = v.concesion_id AND p.propuesto)
          JOIN con_concesion c ON c.id = v.concesion_id
          LEFT JOIN exp_expediente e ON e.id = c.expediente_id
          LEFT JOIN seg_usuario u ON u.id = p.publicacion_usuario_id
@@ -80,11 +127,12 @@ export class PublicacionMapaService {
         WHERE p.publicacion::text = ANY($1)
           -- Los migrados ya entraron publicados: en «publicados» se muestran solo si se observan después.
           AND ($2::boolean OR p.expediente_id IS NOT NULL)
-        ORDER BY (r.numero IS NOT NULL AND p.publicacion = 'PENDIENTE') DESC, p.publicacion_en DESC NULLS LAST, v.poligono_id DESC
-        LIMIT 300`,
-      [estados, estado !== PublicacionMapa.PUBLICADO],
+          ${condiciones.map((c) => `AND ${c}`).join('\n          ')}
+        ORDER BY (r.numero IS NOT NULL AND p.publicacion = 'PENDIENTE') DESC, p.publicacion_en DESC NULLS LAST, v.poligono_id DESC, p.id DESC
+        LIMIT ${limite} OFFSET ${desplazamiento}`,
+      params,
     );
-    return filas.map((f) => ({
+    const items = filas.map((f) => ({
       poligonoId: String(f.poligono_id),
       concesionId: String(f.concesion_id),
       numero: f.numero,
@@ -93,6 +141,7 @@ export class PublicacionMapaService {
       expedienteEstado: f.expediente_estado,
       titular: f.titular,
       departamento: f.departamento,
+      localidad: f.localidad,
       distrito: f.distrito,
       superficieHa: Number(f.superficie_ha),
       publicacion: f.publicacion,
@@ -102,7 +151,10 @@ export class PublicacionMapaService {
       resolucion: f.resolucion,
       resolucionFecha: f.resolucion_fecha,
       listoParaPublicar: f.publicacion !== PublicacionMapa.PUBLICADO && !!f.resolucion && !SIN_OTORGAR.includes(f.expediente_estado),
+      esCorreccion: f.es_correccion,
+      superficieAnteriorHa: f.superficie_anterior_ha === null ? null : Number(f.superficie_anterior_ha),
     }));
+    return { items, total: filas.length ? Number(filas[0].total) : 0, pagina: filtro.pagina, porPagina: filtro.porPagina };
   }
 
   async publicar(poligonoId: string, nota: string | undefined, usuarioId: string): Promise<void> {
@@ -114,18 +166,25 @@ export class PublicacionMapaService {
       //2.- Se valida que el trámite haya pasado por todas las oficinas y tenga resolución.
       const expediente = await this.exigirConResolucion(tx, p.expediente_id);
 
-      //3.- Se publica: desde ahora sale en sig.v_concesiones (GeoServer → Argenmap).
+      //3.- Una corrección aprobada reemplaza al publicado (que queda en el histórico).
+      if (p.propuesto) {
+        await this.poligonos.cerrarVigente(tx, p.concesion_id);
+        await tx.query(`UPDATE con_poligono SET propuesto = false, vigente = true WHERE id = $1`, [poligonoId]);
+      }
+
+      //4.- Se publica: desde ahora sale en sig.v_concesiones (GeoServer → Argenmap).
       const usuario = await tx.findOneByOrFail(Usuario, { id: usuarioId });
       await this.cambiar(tx, poligonoId, PublicacionMapa.PUBLICADO, nota ?? null, usuario.id);
 
-      //4.- Queda en el historial del expediente.
+      //5.- Queda en el historial del expediente.
       if (expediente) {
+        const texto = p.propuesto ? 'Se aprobó la corrección del polígono: reemplaza al publicado en el mapa.' : 'Publicado en el mapa.';
         await this.expedientes.actuar(tx, expediente, {
           oficina: Oficina.CATASTRO,
           tipo: TipoActuacion.PUBLICACION_MAPA,
           resultado: ResultadoActuacion.APTO,
           usuario,
-          observaciones: nota ? `Publicado en el mapa. ${nota}` : 'Publicado en el mapa.',
+          observaciones: nota ? `${texto} ${nota}` : texto,
           datos: { poligonoId },
         });
       }
@@ -145,7 +204,11 @@ export class PublicacionMapaService {
       //3.- Queda en el historial del expediente, para que Catastro vea qué corregir.
       const expediente = p.expediente_id ? await tx.findOneByOrFail(Expediente, { id: p.expediente_id }) : null;
       if (expediente) {
-        const texto = p.publicacion === PublicacionMapa.PUBLICADO ? 'Se retiró del mapa público' : 'Polígono observado para el mapa';
+        const texto = p.propuesto
+          ? 'Corrección del polígono observada (sigue publicado el anterior)'
+          : p.publicacion === PublicacionMapa.PUBLICADO
+            ? 'Se retiró del mapa público'
+            : 'Polígono observado para el mapa';
         await this.expedientes.actuar(tx, expediente, {
           oficina: Oficina.CATASTRO,
           tipo: TipoActuacion.PUBLICACION_MAPA,
@@ -180,9 +243,11 @@ export class PublicacionMapaService {
       const analisis = await this.geometria.analizar(normalizada.geometria, p.concesion_id, tx);
       const avisos = [`Coordenadas en ${normalizada.sistemaOrigenNombre}.`, ...normalizada.avisos, ...leido.avisos, avisoLejosDelCauce(analisis)].filter((a): a is string => !!a);
 
-      //4.- Archivo original + polígono nuevo (el anterior pasa al histórico).
+      //4.- Archivo original + polígono nuevo (el anterior pasa al histórico). Si lo observado era una
+      //    corrección propuesta, la nueva también es propuesta: lo publicado sigue hasta que se apruebe.
       const guardado = await this.archivos.guardar('kml', subido.buffer, extensionDe(subido));
-      await this.poligonos.cerrarVigente(tx, p.concesion_id);
+      if (p.propuesto) await this.poligonos.descartarPropuesto(tx, p.concesion_id);
+      else await this.poligonos.cerrarVigente(tx, p.concesion_id);
       const nuevoId = await this.poligonos.insertar(tx, {
         concesionId: p.concesion_id,
         expedienteId: p.expediente_id,
@@ -191,11 +256,12 @@ export class PublicacionMapaService {
         archivo: { nombre: subido.originalname, ...guardado },
         sistemaOrigen: normalizada.sistemaOrigen,
         desde: p.desde,
+        propuesto: p.propuesto,
         usuarioId,
       });
 
       //5.- Concesión duplicada: se rechaza como en la carga.
-      const duplicado = await poligonoDuplicado(tx, p.concesion_id);
+      const duplicado = await poligonoDuplicado(tx, p.concesion_id, nuevoId);
       if (duplicado) throw new ConflictException(duplicado);
 
       //6.- Queda en el historial del expediente.
@@ -217,12 +283,12 @@ export class PublicacionMapaService {
 
   private async bloquear(tx: EntityManager, poligonoId: string) {
     const [p] = await tx.query(
-      `SELECT id, concesion_id::text, expediente_id::text, origen, publicacion, to_char(desde, 'YYYY-MM-DD') AS desde
-         FROM con_poligono WHERE id = $1 AND vigente FOR UPDATE`,
+      `SELECT id, concesion_id::text, expediente_id::text, origen, publicacion, propuesto, to_char(desde, 'YYYY-MM-DD') AS desde
+         FROM con_poligono WHERE id = $1 AND (vigente OR propuesto) FOR UPDATE`,
       [poligonoId],
     );
     if (!p) throw new NotFoundException('El polígono no existe o ya no es el vigente de la concesión.');
-    return p as { id: string; concesion_id: string; expediente_id: string | null; origen: any; publicacion: PublicacionMapa; desde: string | null };
+    return p as { id: string; concesion_id: string; expediente_id: string | null; origen: any; publicacion: PublicacionMapa; propuesto: boolean; desde: string | null };
   }
 
   /** Se publica recién con resolución y si el trámite no terminó sin otorgarse. Los migrados (sin expediente) no tienen esta condición. */

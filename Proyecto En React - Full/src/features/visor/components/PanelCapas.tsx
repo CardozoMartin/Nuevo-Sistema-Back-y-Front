@@ -280,12 +280,6 @@ export function PanelCapas(props: Props) {
             <span className="min-w-0 flex-1 text-xs text-slate-600 dark:text-slate-300">Números de concesión (zoom {ZOOM_ETIQUETAS} o más)</span>
             <Interruptor activo={capas.etiquetas} onCambiar={() => onCapas({ ...capas, etiquetas: !capas.etiquetas })} etiqueta="Números de concesión" />
           </div>
-          <ControlOpacidad
-            etiqueta="Relleno"
-            nombre="las concesiones"
-            valor={opacidadDe(opacidades, CLAVE_RELLENO_CONCESIONES, RELLENO_CONCESIONES)}
-            onCambiar={(v) => onOpacidad(CLAVE_RELLENO_CONCESIONES, v)}
-          />
           <label className="flex items-center gap-2">
             <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">Colorear por</span>
             <select value={filtros.criterio} onChange={(e) => onFiltrar({ ...filtros, criterio: e.target.value as CriterioColor, ocultos: new Set() })} className={cn(claseSelect, 'py-1 text-xs')}>
@@ -494,6 +488,16 @@ export function PanelCapas(props: Props) {
             ))}
           </select>
         </label>
+      </div>
+
+      {/* Relleno de todos los polígonos del mapa (concesiones y capas del GeoServer). */}
+      <div className="rounded-lg border border-slate-200 px-2.5 py-2 dark:border-slate-700">
+        <ControlOpacidad
+          etiqueta="Relleno de polígonos"
+          nombre="todos los polígonos"
+          valor={opacidadDe(opacidades, CLAVE_RELLENO_CONCESIONES, RELLENO_CONCESIONES)}
+          onCambiar={(v) => onOpacidad(CLAVE_RELLENO_CONCESIONES, v)}
+        />
       </div>
 
       <div className="flex items-center justify-between text-xs">

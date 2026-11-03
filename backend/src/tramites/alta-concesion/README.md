@@ -35,7 +35,7 @@ Fuentes: `infotecnica.md` §6.2, `Documentacion/esquema_drh.sql` y lo que contó
 | `con_condicion` | Caudal asignado, carácter, código de servicio y período |
 | `con_uso`, `con_punto`, `con_suministro` | Usos con su caudal, desagüe / punto de entrega y la cascada de suministro |
 | `cat_departamento`, `cat_localidad`, `cat_distrito` | Catálogo de ubicación: el domicilio y la ubicación guardan los ids |
-| `cat_suministro_zona`, `_opcion`, `_canal` | Catálogo de suministro de la DRH: fuentes, sistemas, desagües y el **árbol de canales** de cada ubicación. El paso 6 se valida contra él |
+| `cat_suministro_nodo` | Catálogo de suministro: **un árbol por distrito** (fuente → sistema → canal principal … quinto → desagüe), el que cargaron los jefes de Distrito. El paso 6 se valida contra él |
 
 **Historial de la concesión.** Todas las tablas `con_*` que un trámite posterior puede cambiar guardan
 versiones (`vigente`, `desde`, `hasta`, `expediente_id`): nada se pisa. Mientras el alta está en carga, lo
@@ -66,8 +66,8 @@ El **historial del expediente** es la unión ordenada de pases y actuaciones: `G
 | 3. Ubicación de la concesión | `PUT /:id/ubicacion` (multipart) | Departamento / localidad / distrito **obligatorios y del catálogo**. KML/GeoJSON **optativo en la carga y obligatorio para la verificación final**: si viene, PostGIS lo valida y **409 si el polígono coincide ≥ 90 % con otra concesión** (duplicada). Un GeoJSON que declara su sistema de coordenadas (`crs`) se transforma desde ese sistema (ej: Campo Inchauspe); si declara uno y los números son de otro, 400. Avisos (no rechazan): sistema en que vino, río lejano, número de concesión del archivo distinto, puntos de desagüe/entrega lejos |
 | 4. Inmueble | `PUT /:id/inmueble` | **409 si la matrícula catastral ya tiene otra concesión activa** |
 | 5. Usos | `PUT /:id/usos` | Caudal = magnitud × dotación. Devuelve `avisos` si el desagüe o el punto de entrega quedan a más de 1 km del polígono (suele ser una coordenada mal tipeada) |
-| 6. Suministro | `PUT /:id/suministro` | Necesita la ubicación (paso 3). Cada fuente, el sistema y el desagüe tienen que estar en el **catálogo de suministro de esa ubicación**, y los canales tienen que ser un **camino del árbol** (el secundario deriva del principal elegido, y así hasta el quinto). Si la ubicación no tiene catálogo, solo se cargan observación y caudal |
-| Envío | `POST /:id/enviar` | Todos los pasos completos, el suministro todavía válido para la ubicación (pudo cambiar después) y sin duplicados → **Recaudación** |
+| 6. Suministro | `PUT /:id/suministro` | Necesita la ubicación (paso 3): vale el **árbol de suministro del distrito**. Las fuentes son del distrito y, desde la fuente principal, cada nivel elegido tiene que **colgar del anterior elegido** (un nivel que la rama no tiene queda vacío: ej. terciario sin secundario). Si el distrito no tiene árbol, solo se cargan observación y caudal |
+| Envío | `POST /:id/enviar` | Todos los pasos completos, el suministro todavía válido para el árbol del distrito (pudo cambiar después) y sin duplicados → **Recaudación** |
 
 ### Recaudación (`etapa RECAUDACION`)
 
@@ -178,7 +178,6 @@ tramites/alta-concesion/
 │   ├── titulares.validaciones.ts      exigirDocumentosSinRepetir
 │   ├── inmueble.validaciones.ts       exigirAnioDominioNoFuturo
 │   ├── usos.validaciones.ts           exigirPeriodoValido, exigirUsosSinRepetir, exigirUsosDelCatalogo, exigirPuntoEntregaSiCorresponde
-│   ├── suministro.validaciones.ts     exigirCascadaEnOrden (el árbol: catalogos/suministro/arbol-suministro.ts)
 │   └── cierre.validaciones.ts         exigirSoloCompletar, exigirSinCambios (después de la resolución)
 ├── pasos/                             un service por pestaña de la carga en Catastro
 │   ├── paso1-inicio.service.ts        InicioAltaService

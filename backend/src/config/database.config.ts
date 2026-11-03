@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { DataSource, type DataSourceOptions } from 'typeorm';
+import { AccionAuditoria } from '../expedientes/entities/auditoria.entity.js';
 import { Etapa, Oficina, ResultadoActuacion, TipoActuacion } from '../expedientes/expedientes.constantes.js';
 
 /** Esquemas que tienen que existir antes de crear tablas y vistas. */
@@ -18,7 +19,16 @@ const ENUMS_COMPARTIDOS: Record<string, string[]> = {
   exp_etapa: Object.values(Etapa),
   exp_tipo_actuacion: Object.values(TipoActuacion),
   exp_resultado_actuacion: Object.values(ResultadoActuacion),
+  // Una sola columna, pero así un valor nuevo se agrega sin que el synchronize recree el tipo.
+  exp_accion_auditoria: Object.values(AccionAuditoria),
 };
+
+/**
+ * Índices únicos que pasaron a ser parciales (con WHERE). El synchronize de TypeORM no detecta
+ * el cambio de condición: si el índice existe sin ella, se borra y el synchronize lo recrea.
+ *   uk_expediente  el número de un expediente ANULADO queda libre.
+ */
+const INDICES_PARCIALES = ['uk_expediente'];
 
 /** Conexión a PostgreSQL a partir del .env (ver .env.example). */
 export function databaseConfig(config: ConfigService): TypeOrmModuleOptions {
@@ -56,6 +66,12 @@ export async function crearDataSource(opciones?: DataSourceOptions): Promise<Dat
     if (!existe) continue; // base nueva: lo crea el synchronize
     for (const valor of valores) await dataSource.query(`ALTER TYPE public.${tipo} ADD VALUE IF NOT EXISTS '${valor}'`);
   }
-  if (opciones.synchronize) await dataSource.synchronize();
+  if (opciones.synchronize) {
+    for (const indice of INDICES_PARCIALES) {
+      const [fila] = await dataSource.query(`SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = $1`, [indice]);
+      if (fila && !/ WHERE /i.test(fila.indexdef)) await dataSource.query(`DROP INDEX public.${indice}`);
+    }
+    await dataSource.synchronize();
+  }
   return dataSource;
 }

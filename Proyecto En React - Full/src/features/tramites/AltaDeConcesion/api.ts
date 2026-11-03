@@ -36,7 +36,19 @@ export const altaConcesionApi = {
   guardarUsos: (id: string, dto: unknown) => datos(backend.put<AltaBackend>(`${ALTA}/${id}/usos`, dto)),
   guardarSuministro: (id: string, dto: unknown) => datos(backend.put<AltaBackend>(`${ALTA}/${id}/suministro`, dto)),
 
+  // --- Corrección de errores materiales (con motivo; queda en historial y auditoría) ----
+  corregirTitulares: (id: string, dto: object, motivo: string) => datos(backend.put<AltaBackend>(`${ALTA}/${id}/correccion/titulares`, { ...dto, motivo })),
+  /** El motivo va como campo más del formulario (multipart, con el KML corregido si lo hay). */
+  corregirUbicacion: (id: string, formulario: FormData, motivo: string) => {
+    formulario.append('motivo', motivo)
+    return datos(backend.put<AltaBackend & { avisos: string[] }>(`${ALTA}/${id}/correccion/ubicacion`, formulario, { headers: { 'Content-Type': 'multipart/form-data' } }))
+  },
+  corregirInmueble: (id: string, dto: object, motivo: string) => datos(backend.put<AltaBackend>(`${ALTA}/${id}/correccion/inmueble`, { ...dto, motivo })),
+  corregirSuministro: (id: string, dto: object, motivo: string) => datos(backend.put<AltaBackend>(`${ALTA}/${id}/correccion/suministro`, { ...dto, motivo })),
+
   // --- Circuito ------------------------------------------------------------------
+  /** Catastro cancela un alta iniciada por error (antes de enviarla): queda anulada y el número se libera. */
+  cancelar: (id: string, observaciones: string) => datos(backend.post<AltaBackend>(`${ALTA}/${id}/cancelar`, { observaciones })),
   enviar: (id: string, observaciones?: string) => datos(backend.post<AltaBackend>(`${ALTA}/${id}/enviar`, { observaciones })),
   reenviar: (id: string, observaciones?: string) => datos(backend.post<AltaBackend>(`${ALTA}/${id}/reenviar`, { observaciones })),
   /** Concesiones otorgadas de los titulares y si tienen deuda (lo que verifica Recaudación). */

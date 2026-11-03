@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Etapa, TipoTramite } from '../../expedientes/expedientes.constantes.js';
-import type { CursoConDeudaDto, DictamenDto, NotificarDeudaDto, ObservacionesDto, PadronDto, ResolucionDto, VerificacionDeudaDto } from '../circuito/dto/circuito.dto.js';
+import { DataSource } from 'typeorm';
+import { EstadoConcesion } from '../../concesiones/concesiones.constantes.js';
+import { Concesion } from '../../concesiones/entities/concesion.entity.js';
+import { EstadoExpediente, Etapa, ResultadoActuacion, TipoActuacion, TipoTramite } from '../../expedientes/expedientes.constantes.js';
+import { ExpedientesService } from '../../expedientes/expedientes.service.js';
+import type { CancelarInicioDto, CursoConDeudaDto, DictamenDto, NotificarDeudaDto, ObservacionesDto, PadronDto, ResolucionDto, VerificacionDeudaDto } from '../circuito/dto/circuito.dto.js';
 import { EtapaCierreService } from '../circuito/etapa-cierre.service.js';
 import { EtapaDictamenService } from '../circuito/etapa-dictamen.service.js';
 import { EtapaEnvioService } from '../circuito/etapa-envio.service.js';
@@ -17,6 +21,7 @@ const ALTA = TipoTramite.ALTA_CONCESION;
  * los trámites (tramites/circuito/); lo propio del alta está en AltaCircuitoConfig. Acá solo
  * se llama a cada oficina con el alta y se devuelve el alta actualizada.
  *
+ *   Catastro            cancelar (cargado por error, antes de enviarlo) ► ANULADO, número libre
  *   Catastro            enviar ─────────────────────────────────────► Recaudación
  *   Recaudación         por cada concesión otorgada de los titulares: ¿tiene deuda? (sí / no)
  *                       ninguna ► Distrito  |  alguna ► EN ESPERA hasta que se levante la deuda
@@ -31,6 +36,8 @@ const ALTA = TipoTramite.ALTA_CONCESION;
 @Injectable()
 export class AltaCircuitoService {
   constructor(
+    private readonly dataSource: DataSource,
+    private readonly expedientes: ExpedientesService,
     private readonly alta: AltaConcesionService,
     private readonly envio: EtapaEnvioService,
     private readonly recaudacion: EtapaRecaudacionService,
@@ -39,6 +46,29 @@ export class AltaCircuitoService {
     private readonly resolucion: EtapaResolucionService,
     private readonly cierre: EtapaCierreService,
   ) {}
+
+  /**
+   * Catastro cancela un alta que inició por error, mientras sigue en la carga (todavía no la
+   * envió a ninguna oficina). No se borra nada: el expediente queda ANULADO con el motivo en
+   * su historial y la concesión ANULADA (sale del mapa y de los controles de duplicados).
+   * El número de expediente queda libre para registrarlo de nuevo.
+   */
+  async cancelarInicio(id: string, datos: CancelarInicioDto, usuarioId: string): Promise<RespuestaAlta> {
+    await this.dataSource.transaction(async (tx) => {
+      //1.- Solo en la carga y tomado por quien cancela: después de enviarlo ya circuló por otras oficinas.
+      const { expediente, usuario } = await this.expedientes.bloquearParaActuar(tx, id, ALTA, [Etapa.CARGA], usuarioId);
+
+      //2.- El motivo queda en el historial.
+      await this.expedientes.actuar(tx, expediente, { tipo: TipoActuacion.CANCELACION, resultado: ResultadoActuacion.REGISTRADO, usuario, observaciones: datos.observaciones });
+
+      //3.- La concesión que nació con el alta no se otorga.
+      await tx.update(Concesion, { expediente: { id: expediente.id } }, { estado: EstadoConcesion.ANULADA, modificadoUsuarioId: usuario.id });
+
+      //4.- El expediente deja de circular y libera su número.
+      await this.expedientes.cambiarEstado(tx, expediente, EstadoExpediente.ANULADO, usuario, true);
+    });
+    return this.alta.obtener(id);
+  }
 
   async enviar(id: string, datos: ObservacionesDto, usuarioId: string): Promise<RespuestaAlta> {
     await this.envio.enviar(ALTA, id, datos, usuarioId);

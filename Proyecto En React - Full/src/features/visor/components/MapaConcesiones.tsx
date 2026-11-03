@@ -116,12 +116,16 @@ function htmlObjetoDrh(capa: CapaDrh, p: Record<string, unknown>) {
 const PANEL_DRH = 'capasDrh'
 
 /** Estilo de un objeto de una capa del GeoServer con la opacidad elegida para la capa (1 = la de fábrica). */
-function estiloDrh(def: CapaDrh, opacidad: number, renderer: L.SVG): L.CircleMarkerOptions {
+/**
+ * Estilo de una capa del GeoServer. El relleno de sus polígonos sigue el control global «Relleno de
+ * polígonos» (con el valor de fábrica de las concesiones, 30 %, quedan en el 15 % de siempre).
+ */
+function estiloDrh(def: CapaDrh, opacidad: number, renderer: L.SVG, relleno: number): L.CircleMarkerOptions {
   const base = { renderer, pane: PANEL_DRH, color: def.color, dashArray: def.punteado ? '6 4' : undefined }
   if (def.tipo === 'punto') return { ...base, radius: 5, color: '#fff', weight: 1.5, opacity: opacidad, fillColor: def.color, fillOpacity: opacidad }
   if (def.tipo === 'limite') return { ...base, weight: 2.5, opacity: 0.9 * opacidad, fill: false }
   if (def.tipo === 'linea') return { ...base, weight: 2.5, opacity: 0.9 * opacidad }
-  return { ...base, weight: 1.5, opacity: opacidad, fillColor: def.color, fillOpacity: 0.15 * opacidad }
+  return { ...base, weight: 1.5, opacity: opacidad, fillColor: def.color, fillOpacity: 0.5 * relleno * opacidad }
 }
 
 /** Orden de dibujo: los límites abajo, después polígonos, líneas y, arriba de todo, los puntos. */
@@ -502,8 +506,8 @@ export function MapaConcesiones(props: Props) {
     const geo = L.geoJSON(datos, {
       pane: PANEL_DRH,
       interactive: !limite,
-      pointToLayer: (_, latlng) => L.circleMarker(latlng, estiloDrh(def, opacidad, renderer)),
-      style: () => estiloDrh(def, opacidad, renderer),
+      pointToLayer: (_, latlng) => L.circleMarker(latlng, estiloDrh(def, opacidad, renderer, rellenoActual.current)),
+      style: () => estiloDrh(def, opacidad, renderer, rellenoActual.current),
       onEachFeature: (f, layer) => {
         if (limite) return
         const p = (f.properties ?? {}) as Record<string, unknown>
@@ -544,7 +548,7 @@ export function MapaConcesiones(props: Props) {
     if (renderer) {
       for (const [id, { def, geo, etiquetas }] of dibujadasDrh.current) {
         const opacidad = opacidadDe(opacidades, claveOpacidadDrh(id), 1)
-        geo.setStyle(() => estiloDrh(def, opacidad, renderer))
+        geo.setStyle(() => estiloDrh(def, opacidad, renderer, rellenoActual.current))
         for (const e of etiquetas) e.setOpacity(opacidad)
       }
     }

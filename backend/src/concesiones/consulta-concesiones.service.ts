@@ -10,10 +10,10 @@ import { Concesion } from './entities/concesion.entity.js';
 /** Minúsculas y sin acentos, igual que `plano()` en SQL: «Núñez» se encuentra con «nunez». */
 const ACENTOS = 'áéíóúüàèìòùñ';
 const SIN_ACENTOS = 'aeiouuaeioun';
-const plano = (sql: string) => `translate(lower(${sql}), '${ACENTOS}', '${SIN_ACENTOS}')`;
+export const plano = (sql: string) => `translate(lower(${sql}), '${ACENTOS}', '${SIN_ACENTOS}')`;
 const textoPlano = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 /** Para ILIKE: el texto entre % y sin comodines del usuario. */
-const parecido = (s: string) => `%${textoPlano(s).replace(/[%_\\]/g, '\\$&')}%`;
+export const parecido = (s: string) => `%${textoPlano(s).replace(/[%_\\]/g, '\\$&')}%`;
 
 /** Nombre para mostrar de per_persona (como nombrePersona). */
 export const NOMBRE_PERSONA = `CASE WHEN p.tipo_persona = 'JURIDICA' AND p.razon_social IS NOT NULL THEN p.razon_social
@@ -54,7 +54,14 @@ export class ConsultaConcesionesService {
       q<{ codigo: string; nombre: string }>('SELECT codigo, nombre FROM cat_situacion_legal WHERE activo ORDER BY nombre'),
       q<{ codigo: string; nombre: string; unidad: string }>('SELECT codigo, nombre, unidad FROM cat_tipo_uso WHERE activo ORDER BY orden, nombre'),
       q<{ grupo: string; codigo: string; nombre: string }>('SELECT grupo::text AS grupo, codigo, nombre FROM cat_opcion WHERE activo ORDER BY grupo, orden'),
-      q<{ tipo: string; nombre: string }>('SELECT DISTINCT tipo::text AS tipo, nombre FROM cat_suministro_opcion WHERE activo ORDER BY tipo, nombre'),
+      // Fuentes y sistemas del árbol de suministro y los que tienen las concesiones (las migradas
+      // conservan los nombres del padrón viejo, que no siempre están en el árbol).
+      q<{ tipo: string; nombre: string }>(
+        `SELECT nivel::text AS tipo, nombre FROM cat_suministro_nodo WHERE activo AND nivel IN ('FUENTE', 'SISTEMA')
+         UNION SELECT 'FUENTE', fuente_principal FROM con_suministro WHERE vigente AND fuente_principal IS NOT NULL
+         UNION SELECT 'SISTEMA', sistema_distribucion FROM con_suministro WHERE vigente AND sistema_distribucion IS NOT NULL
+         ORDER BY tipo, nombre`,
+      ),
     ]);
     const opcionesDe = (grupo: string) => opciones.filter((o) => o.grupo === grupo).map(({ codigo, nombre }) => ({ codigo, nombre }));
     const suministroDe = (tipo: string) => suministro.filter((s) => s.tipo === tipo).map((s) => s.nombre);

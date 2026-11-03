@@ -1,4 +1,4 @@
-import type { DataSource } from 'typeorm';
+import { Not, type DataSource } from 'typeorm';
 import type { UsuariosService } from '../seguridad/usuarios.service.js';
 import { Etapa, EstadoExpediente, Oficina, TipoTramite } from './expedientes.constantes.js';
 import { ExpedientesService } from './expedientes.service.js';
@@ -19,7 +19,13 @@ describe('Disponibilidad del número de expediente', () => {
   it('busca sin ceros a la izquierda: 0123 y 123 son el mismo número', async () => {
     const { service, findOneBy } = serviceCon(null);
     await service.disponibilidad({ numero: '000123', reparticion: '0332', anio: 2026 });
-    expect(findOneBy).toHaveBeenCalledWith(expect.anything(), { numero: '123', reparticion: '332', anio: 2026 });
+    expect(findOneBy).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ numero: '123', reparticion: '332', anio: 2026 }));
+  });
+
+  it('un expediente anulado no ocupa el número', async () => {
+    const { service, findOneBy } = serviceCon(null);
+    await service.disponibilidad({ numero: '123', reparticion: '332', anio: 2026 });
+    expect(findOneBy).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ estado: Not(EstadoExpediente.ANULADO) }));
   });
 
   it('si ya está registrado, dice de qué trámite es y dónde está', async () => {

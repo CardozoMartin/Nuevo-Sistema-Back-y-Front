@@ -1,19 +1,14 @@
 import type { ReactNode } from 'react'
-import { Icon } from '@/components/ui/Icon'
+import { LogoInstitucional, NombreCorto } from '@/components/layout/LogoInstitucional'
 
 /** Marco de las pantallas sin menú (login, cambio de contraseña): barra institucional y una tarjeta al centro. */
 export function PantallaAcceso({ titulo, descripcion, children }: { titulo: string; descripcion?: string; children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-col bg-slate-100 dark:bg-background-dark">
-      <header className="border-b-[3px] border-celeste bg-institucional text-white">
+      <header className="border-b-[3px] border-celeste bg-white shadow-sm dark:bg-surface-dark">
         <div className="mx-auto flex h-16 max-w-5xl items-center gap-3 px-4">
-          <span className="flex size-10 items-center justify-center rounded-full bg-white/10 ring-1 ring-white/25">
-            <Icon name="water_drop" filled className="text-2xl! text-celeste" />
-          </span>
-          <span className="flex flex-col leading-tight">
-            <span className="text-xs font-medium tracking-wider text-white/75 uppercase">Gobierno de Tucumán</span>
-            <span className="text-base font-semibold md:text-lg">Dirección de Recursos Hídricos</span>
-          </span>
+          <LogoInstitucional />
+          <NombreCorto />
         </div>
       </header>
       <main className="flex flex-1 items-start justify-center px-4 py-10 md:items-center">

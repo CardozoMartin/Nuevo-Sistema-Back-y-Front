@@ -1,5 +1,5 @@
 import { Icon } from '@/components/ui/Icon'
-import { COLOR_POZO_A_REVISAR, colorEstado, colorPozo, formatoHa, formatoNumero, nombreEstado, nombreEstadoPozo, SERVICIOS, tituloConcesion } from '../estilos'
+import { COLOR_POZO_A_REVISAR, colorEstado, colorPozo, formatoHa, formatoNumero, NOMBRE_OFICINA, nombreEstado, nombreEstadoPozo, SERVICIOS, tituloConcesion } from '../estilos'
 import type { ConcesionGeo, PozoGeo } from '../types'
 
 interface Props {
@@ -7,14 +7,6 @@ interface Props {
   /** Pozos que abastecen a la concesión. */
   pozos?: PozoGeo[]
   onCerrar: () => void
-}
-
-const NOMBRE_OFICINA: Record<string, string> = {
-  catastro: 'Catastro',
-  recaudacion: 'Recaudación',
-  distrito: 'Distrito',
-  juridico: 'Jurídico',
-  secretaria_general: 'Secretaría General',
 }
 
 function Dato({ etiqueta, valor, ancho }: { etiqueta: string; valor: string | number | null | undefined; ancho?: boolean }) {

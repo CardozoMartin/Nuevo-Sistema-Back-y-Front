@@ -21,8 +21,6 @@ const CAMPOS_PADRON = ['apellido', 'nombre', 'fechaNacimiento', 'razonSocial', '
 /** Los que identifican a la persona: si vinieron del padrón quedan bloqueados, para no escribirla distinto. */
 type CampoIdentidad = 'apellido' | 'nombre' | 'fechaNacimiento' | 'razonSocial' | 'fechaConstitucion'
 
-const pesos = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
-
 interface Props {
   /** Path del titular dentro del formulario (ej: 'titulares.0'). */
   prefix: string
@@ -35,48 +33,14 @@ function documentoDe({ persona: p }: ResultadoPersona) {
   return documentoConFormato({ tipoPersona: juridica ? 'juridica' : 'fisica', tipoDocumento: (p.tipoDocumento ?? 'DNI').toLowerCase() as TipoDocumento, documento: p.documento })
 }
 
-/** Concesiones y deudas de la persona encontrada (lo que conviene saber antes de cargarla). */
-function Antecedentes({ resultado }: { resultado: ResultadoPersona }) {
-  const { concesiones, deudasPendientes } = resultado
-  const totalDeuda = deudasPendientes.reduce((acc, d) => acc + (d.monto ?? 0), 0)
-  return (
-    <ul className="mt-2 flex flex-col gap-1 text-slate-600 dark:text-slate-300">
-      <li className="flex gap-1.5">
-        <Icon name="water_drop" className="text-[16px]! text-slate-400" />
-        {concesiones.length ? (
-          <span>
-            Titular de {concesiones.length === 1 ? 'una concesión' : `${concesiones.length} concesiones`}:{' '}
-            {concesiones
-              .slice(0, 3)
-              .map((c) => `${c.numero ? `N° ${c.numero}` : `en trámite (exp. ${c.expediente ?? 's/n'})`}${c.localidad ? ` · ${c.localidad}` : ''}`)
-              .join(' — ')}
-            {concesiones.length > 3 && ` y ${concesiones.length - 3} más`}.
-          </span>
-        ) : (
-          <span>No es titular de ninguna concesión.</span>
-        )}
-      </li>
-      {deudasPendientes.length > 0 && (
-        <li className="flex gap-1.5 font-medium text-red-700 dark:text-red-300">
-          <Icon name="error" className="text-[16px]!" />
-          <span>
-            Tiene {deudasPendientes.length === 1 ? 'una deuda pendiente' : `${deudasPendientes.length} deudas pendientes`}
-            {totalDeuda > 0 && ` por ${pesos.format(totalDeuda)}`}. Recaudación la revisa antes de seguir con el trámite.
-          </span>
-        </li>
-      )}
-    </ul>
-  )
-}
-
 /**
  * Campos de un titular. Cambian según sea persona física o jurídica.
  *
  * Al escribir un documento válido (DNI, CUIL o CUIT) se lo busca en el padrón de personas. Una
  * persona física se encuentra también por el documento equivalente (su DNI si está con CUIL y
  * al revés):
- *   - Si ya está cargada, se muestra quién es (concesiones y deudas) y se pregunta si se cargan
- *     sus datos. Mientras no se responda, los datos que la identifican quedan bloqueados: no se
+ *   - Si ya está cargada, se muestran solo sus datos (sin concesiones ni deudas: eso lo revisa
+ *     Recaudación) y se pregunta si se cargan. Mientras no se responda, los datos que la identifican quedan bloqueados: no se
  *     puede cargar un documento existente con otro nombre.
  *   - Si no está, se avisa que se va a cargar como persona nueva.
  *   - Si ya figura como otro titular de este mismo trámite, se avisa enseguida.
@@ -202,7 +166,6 @@ export function TitularFields({ prefix }: Props) {
                 <strong>{nombreDePersona(propuesta.resultado.persona)}</strong> · {documentoDe(propuesta.resultado)}
                 {propuesta.resultado.persona.tipoPersona === 'JURIDICA' ? ' · persona jurídica' : ''}
               </p>
-              <Antecedentes resultado={propuesta.resultado} />
               <p className="mt-3 font-medium text-slate-800 dark:text-slate-100">¿Desea cargar sus datos en este titular?</p>
             </div>
           </div>
@@ -234,7 +197,6 @@ export function TitularFields({ prefix }: Props) {
               )}
               {corrigiendo && 'Los cambios actualizan la ficha de la persona en todos sus trámites.'}
             </p>
-            <Antecedentes resultado={encontrada} />
           </div>
           {!corrigiendo && (
             <Button size="sm" variant="secondary" iconLeft="edit" onClick={() => setCorrigiendo(true)}>

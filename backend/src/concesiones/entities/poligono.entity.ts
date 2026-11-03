@@ -13,10 +13,14 @@ import { Concesion } from './concesion.entity.js';
  *   o reubicación lo cambia, el anterior queda con vigente = false y fecha `hasta`, y se
  *   inserta el nuevo. Así se puede reconstruir cómo era la concesión en cualquier fecha.
  * - Se conserva el KML original (ruta + hash) como respaldo de lo que presentó el titular.
+ * - Corrección de un polígono ya publicado: el corregido entra como PROPUESTO (vigente = false)
+ *   y el publicado sigue en el mapa hasta que quien publica lo apruebe; recién ahí se reemplazan.
  */
 @Entity('con_poligono')
 // Un solo polígono vigente por concesión (índice único parcial).
 @Index('uk_poligono_vigente', ['concesion'], { unique: true, where: 'vigente' })
+// Y a lo sumo una corrección propuesta esperando aprobación.
+@Index('uk_poligono_propuesto', ['concesion'], { unique: true, where: 'propuesto' })
 // Los datos del archivo van todos juntos o ninguno.
 @Check('chk_poligono_archivo', '(archivo_ruta IS NULL) = (archivo_sha256 IS NULL)')
 export class Poligono {
@@ -79,6 +83,14 @@ export class Poligono {
 
   @Column({ default: true })
   vigente: boolean;
+
+  /**
+   * Corrección de un polígono publicado que espera la aprobación de quien publica en el mapa.
+   * No es vigente: el visor y Argenmap siguen mostrando el anterior. Al aprobarse pasa a vigente;
+   * si se reemplaza por otra corrección, queda como histórico (propuesto = false, con `hasta`).
+   */
+  @Column({ default: false })
+  propuesto: boolean;
 
   /**
    * Desde cuándo rige: la fecha de la resolución que lo aprobó (se completa al otorgarse, como

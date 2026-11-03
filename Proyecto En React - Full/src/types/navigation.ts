@@ -13,6 +13,8 @@ export interface NavItem {
   oficina?: string
   /** Solo lo ven los administradores (ej: Informática). */
   soloAdministrador?: boolean
+  /** Solo lo ven quienes tienen ese permiso (y los administradores). */
+  permiso?: string
   /** Si el ítem es la bandeja de una oficina, muestra el contador de pendientes y el aviso de nuevos. */
   bandejaDe?: Oficina
   children?: NavItem[]

@@ -1,6 +1,6 @@
 // Pruebas de las reglas del circuito y del texto del aviso de deuda (sin base: npm test).
 import { armarAvisoDeuda } from '../aviso-deuda.js';
-import { destinoTrasVerificarDeuda, exigirFechaDelAnio, exigirMotivoSiNoEsApto, normalizarNumerosConcesion, personasSinVerificar, respuestasDeDeuda, validarDecisionDeuda } from './circuito.validaciones.js';
+import { destinoTrasVerificarDeuda, exigirFechaDelAnio, vistosBuenosRequeridos, exigirMotivoSiNoEsApto, normalizarNumerosConcesion, personasSinVerificar, respuestasDeDeuda, validarDecisionDeuda } from './circuito.validaciones.js';
 
 describe('Distrito y Jurídico', () => {
   it('observado y no apto llevan motivo; apto no', () => {
@@ -15,6 +15,20 @@ describe('Secretaría General', () => {
   it('la fecha de la resolución es de su año', () => {
     expect(() => exigirFechaDelAnio('2026-10-02', 2026)).not.toThrow();
     expect(() => exigirFechaDelAnio('2025-12-30', 2026)).toThrow('La fecha de la resolución no coincide con el año.');
+  });
+});
+
+describe('Vistos buenos para finalizar', () => {
+  const nombres = (pide: boolean) => vistosBuenosRequeridos(pide).map(([, , nombre]) => nombre);
+
+  it('el alta exige el número de concesión', () => {
+    expect(nombres(true)).toContain('Catastro (número de concesión)');
+    expect(nombres(true)).toHaveLength(6);
+  });
+
+  it('un trámite sin número (cambio de titularidad) no lo exige, y el resto sí', () => {
+    expect(nombres(false)).not.toContain('Catastro (número de concesión)');
+    expect(nombres(false)).toEqual(['Recaudación (sin deuda o con curso autorizado)', 'Distrito (apto)', 'Jurídico (apto)', 'Secretaría General (resolución)', 'Catastro (verificación final)']);
   });
 });
 

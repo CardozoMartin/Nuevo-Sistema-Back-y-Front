@@ -11,8 +11,9 @@ import { exigirFechaDelAnio } from './validaciones/circuito.validaciones.js';
 
 /**
  * Secretaría General: con el visto bueno del director, carga la resolución (número que lleva
- * Secretaría, año y fecha). Necesita el número de concesión ya cargado por Catastro: así, cuando
- * el expediente vuelve a Catastro para el cierre, ya tiene número de concesión y resolución.
+ * Secretaría, año y fecha). En los trámites que piden número de concesión (alta) lo necesita ya
+ * cargado por Catastro: así, cuando el expediente vuelve a Catastro para el cierre, ya tiene
+ * número de concesión y resolución.
  */
 @Injectable()
 export class EtapaResolucionService {
@@ -31,9 +32,10 @@ export class EtapaResolucionService {
       //2.- Secretaría tiene que tener tomado el expediente, en su etapa.
       const { expediente, usuario } = await this.expedientes.bloquearParaActuar(tx, expedienteId, tipo, [Etapa.SECRETARIA_GENERAL], usuarioId);
 
-      //3.- Se valida que Catastro ya haya cargado el número de concesión (va en la resolución).
+      //3.- Si el trámite pide número de concesión (alta), Catastro ya lo tiene que haber cargado:
+      //    va en la resolución. Un cambio de titularidad no lo pide (la concesión ya lo tiene).
       const numeros = await this.numeros.asignadosA(tx, expediente.id);
-      if (!numeros.length) {
+      if (this.registro.de(tipo).pideNumeroConcesion && !numeros.length) {
         throw new ConflictException('Primero pida el número de concesión y espere a que Catastro lo cargue: va en la resolución.');
       }
 
@@ -58,7 +60,7 @@ export class EtapaResolucionService {
         resultado: ResultadoActuacion.REGISTRADO,
         usuario,
         observaciones: datos.observaciones,
-        datos: { resolucion: `${resolucion.numero}/${resolucion.anio}`, fecha: datos.fecha, numerosConcesion: numeros },
+        datos: { resolucion: `${resolucion.numero}/${resolucion.anio}`, fecha: datos.fecha, ...(numeros.length ? { numerosConcesion: numeros } : {}) },
       });
       await this.expedientes.pasar(tx, expediente, { etapa: SIGUIENTE_ETAPA[Etapa.SECRETARIA_GENERAL]!, usuario, dictamen: Dictamen.APTO, observaciones: texto });
     });

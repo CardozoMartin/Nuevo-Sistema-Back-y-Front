@@ -1,5 +1,26 @@
 // Reglas del circuito por las oficinas. Funciones puras: reciben datos y lanzan un 400/409.
 import { BadRequestException, ConflictException } from '@nestjs/common';
+import { DEUDA_VERIFICADA, ResultadoActuacion, TipoActuacion } from '../../../expedientes/expedientes.constantes.js';
+
+/** Un visto bueno: la última actuación de ese tipo tiene que tener uno de esos resultados. */
+export type VistoBueno = [TipoActuacion, ResultadoActuacion[], string];
+
+/**
+ * Los vistos buenos que tiene que tener el expediente para finalizar. Cuenta la ÚLTIMA
+ * actuación de cada tipo (si Distrito observó y después aprobó, vale el apto). El número de
+ * concesión, solo en los trámites que lo piden (el alta sí; un cambio de titularidad no).
+ */
+export function vistosBuenosRequeridos(pideNumeroConcesion: boolean): VistoBueno[] {
+  return [
+    // Con deuda también vale si Recaudación le dio curso con su nota (CURSO_CON_DEUDA).
+    [TipoActuacion.VERIFICACION_DEUDA, DEUDA_VERIFICADA, 'Recaudación (sin deuda o con curso autorizado)'],
+    [TipoActuacion.INFORME_TECNICO, [ResultadoActuacion.APTO], 'Distrito (apto)'],
+    [TipoActuacion.DICTAMEN_JURIDICO, [ResultadoActuacion.APTO], 'Jurídico (apto)'],
+    ...(pideNumeroConcesion ? [[TipoActuacion.NUMERO_CONCESION, [ResultadoActuacion.REGISTRADO], 'Catastro (número de concesión)'] as VistoBueno] : []),
+    [TipoActuacion.RESOLUCION, [ResultadoActuacion.REGISTRADO], 'Secretaría General (resolución)'],
+    [TipoActuacion.VERIFICACION_FINAL, [ResultadoActuacion.APTO], 'Catastro (verificación final)'],
+  ];
+}
 
 /** Distrito y Jurídico: «observado» y «no apto» llevan el motivo (qué corregir / por qué no). */
 export function exigirMotivoSiNoEsApto(resultado: 'APTO' | 'OBSERVADO' | 'NO_APTO', observaciones?: string): void {

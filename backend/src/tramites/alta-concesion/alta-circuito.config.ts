@@ -34,6 +34,10 @@ const NOMBRE_PASO: Record<string, string> = {
 @Injectable()
 export class AltaCircuitoConfig implements ConfigTramite, OnModuleInit {
   readonly tipoTramite = TipoTramite.ALTA_CONCESION;
+  /** La concesión nace sin número: Secretaría lo pide a Catastro antes de la resolución. */
+  readonly pideNumeroConcesion = true;
+  /** Finaliza cuando llega el padrón de Rentas. */
+  readonly esperaPadron = true;
 
   constructor(
     private readonly alta: AltaConcesionService,
@@ -120,7 +124,8 @@ export class AltaCircuitoConfig implements ConfigTramite, OnModuleInit {
    *   2. Se guarda en el inmueble vigente.
    *   3. La concesión queda VIGENTE y todo lo cargado rige desde la fecha de la resolución.
    */
-  async alFinalizar(tx: EntityManager, expediente: Expediente, padron: string, usuario: Usuario): Promise<Record<string, unknown>> {
+  async alFinalizar(tx: EntityManager, expediente: Expediente, padron: string | null, usuario: Usuario): Promise<Record<string, unknown>> {
+    if (!padron) throw new BadRequestException('El alta finaliza con el padrón de Rentas.');
     const concesion = await tx.findOneByOrFail(Concesion, { expediente: { id: expediente.id } });
 
     //1.- El padrón no puede estar en otra concesión.

@@ -32,6 +32,9 @@ export class NumeroConcesionService {
       //1.- Secretaría tiene que tener tomado el expediente, en su etapa.
       const { expediente, usuario } = await this.expedientes.bloquearParaActuar(tx, expedienteId, tipo, [Etapa.SECRETARIA_GENERAL], usuarioId);
 
+      //1.1.- Solo los trámites que lo piden (un cambio de titularidad no: la concesión ya tiene número).
+      if (!this.registro.de(tipo).pideNumeroConcesion) throw new ConflictException('Este trámite no lleva número de concesión: la concesión ya lo tiene.');
+
       //2.- Si ya lo pidió (o ya lo tiene), no se crea otro pedido.
       if (await tx.existsBy(SolicitudNumero, { expediente: { id: expediente.id } })) return;
 

@@ -16,6 +16,18 @@ import type { Usuario } from '../../seguridad/entities/usuario.entity.js';
 export interface ConfigTramite {
   tipoTramite: TipoTramite;
 
+  /**
+   * Secretaría pide a Catastro el número de concesión antes de la resolución. El alta sí (la
+   * concesión nace sin número); un cambio de titularidad no (la concesión ya lo tiene).
+   */
+  readonly pideNumeroConcesion: boolean;
+
+  /**
+   * Después de la verificación final se espera el padrón de Rentas para finalizar. El alta sí;
+   * en un cambio de titularidad el padrón no cambia (es del inmueble) y finaliza en la verificación final.
+   */
+  readonly esperaPadron: boolean;
+
   /** Recaudación: las personas a las que se les verifica la deuda (alta: los titulares). */
   personasAVerificar(tx: EntityManager, expediente: Expediente): Promise<Persona[]>;
 
@@ -37,6 +49,9 @@ export interface ConfigTramite {
   /** Secretaría registró la resolución: se enlaza. Devuelve el texto para el pase («Concesión N° …»). */
   alRegistrarResolucion(tx: EntityManager, expediente: Expediente, resolucion: Resolucion, usuario: Usuario): Promise<string>;
 
-  /** Llegó el padrón de Rentas y se cumplieron todos los vistos buenos: el trámite surte efecto. Devuelve datos para el historial. */
-  alFinalizar(tx: EntityManager, expediente: Expediente, padron: string, usuario: Usuario): Promise<Record<string, unknown>>;
+  /**
+   * Se cumplieron todos los vistos buenos: el trámite surte efecto. Devuelve datos para el historial.
+   * `padron` es el de Rentas si el trámite lo espera (esperaPadron); si no, null.
+   */
+  alFinalizar(tx: EntityManager, expediente: Expediente, padron: string | null, usuario: Usuario): Promise<Record<string, unknown>>;
 }

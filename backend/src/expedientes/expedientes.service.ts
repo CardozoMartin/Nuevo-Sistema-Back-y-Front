@@ -275,17 +275,23 @@ export class ExpedientesService {
 
   /**
    * Distrito de cada expediente: el de la ubicación vigente de su concesión (cat_distrito.id).
-   * Sin ubicación cargada (o trámites sin concesión, como los de pozos) no tiene distrito.
+   * La concesión del expediente es la que nació con él (alta) o sobre la que se tramita (cambio
+   * de titularidad, con_cambio_titularidad). Sin ubicación cargada (o trámites sin concesión,
+   * como los de pozos) no tiene distrito.
    */
   async distritosDe(tx: EntityManager, expedienteIds: string[]): Promise<Map<string, { id: number; nombre: string }>> {
     if (!expedienteIds.length) return new Map();
     const filas: { expediente_id: string; id: number; nombre: string }[] = await tx.query(
-      `SELECT DISTINCT ON (c.expediente_id) c.expediente_id, d.id, d.nombre
-         FROM con_concesion c
-         JOIN con_inmueble i ON i.concesion_id = c.id AND i.vigente
+      `WITH tramite AS (
+         SELECT c.expediente_id, c.id AS concesion_id FROM con_concesion c WHERE c.expediente_id = ANY($1::bigint[])
+         UNION ALL
+         SELECT ct.expediente_id, ct.concesion_id FROM con_cambio_titularidad ct WHERE ct.expediente_id = ANY($1::bigint[])
+       )
+       SELECT DISTINCT ON (t.expediente_id) t.expediente_id, d.id, d.nombre
+         FROM tramite t
+         JOIN con_inmueble i ON i.concesion_id = t.concesion_id AND i.vigente
          JOIN cat_distrito d ON d.id = i.distrito_id
-        WHERE c.expediente_id = ANY($1::bigint[])
-        ORDER BY c.expediente_id, c.id`,
+        ORDER BY t.expediente_id, t.concesion_id`,
       [expedienteIds],
     );
     return new Map(filas.map((f) => [String(f.expediente_id), { id: Number(f.id), nombre: f.nombre }]));

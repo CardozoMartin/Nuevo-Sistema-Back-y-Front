@@ -16,6 +16,7 @@ export enum Permiso {
   ALTA_CERRAR = 'ALTA_CERRAR',
   MAPA_PUBLICAR = 'MAPA_PUBLICAR',
   NUMERO_ASIGNAR = 'NUMERO_ASIGNAR',
+  TITULARIDAD_GESTIONAR = 'TITULARIDAD_GESTIONAR',
   CATALOGOS_ADMINISTRAR = 'CATALOGOS_ADMINISTRAR',
   // Recaudación
   DEUDA_VERIFICAR = 'DEUDA_VERIFICAR',
@@ -69,6 +70,12 @@ export const PERMISOS_INICIALES: Record<Permiso, DefinicionPermiso> = {
     descripcion: 'Corregir errores materiales de un alta que ya salió de la carga (con o sin resolución), con motivo. Para el polígono hace falta además «Cargar o reemplazar el KML».',
   },
   [Permiso.NUMERO_ASIGNAR]: { oficina: Oficina.CATASTRO, grupo: 'Alta de concesión', nombre: 'Asignar N° de concesión', descripcion: 'Cargar el número de concesión que pidió Secretaría General.' },
+  [Permiso.TITULARIDAD_GESTIONAR]: {
+    oficina: Oficina.CATASTRO,
+    grupo: 'Cambio de titularidad',
+    nombre: 'Gestionar cambios de titularidad',
+    descripcion: 'Iniciar el cambio sobre una concesión vigente, cargar el nuevo titular, enviarlo al circuito y hacer la verificación final.',
+  },
   [Permiso.CATALOGOS_ADMINISTRAR]: { oficina: Oficina.CATASTRO, grupo: 'Catálogos', nombre: 'Administrar catálogos', descripcion: 'Altas, cambios y bajas de ubicaciones, suministro y cauces.' },
   [Permiso.DEUDA_VERIFICAR]: { oficina: Oficina.RECAUDACION, grupo: 'Recaudación', nombre: 'Verificar deudas', descripcion: 'Verificar la deuda de los titulares, avisar y registrar pagos.' },
   [Permiso.DISTRITO_DICTAMINAR]: { oficina: Oficina.DISTRITO, grupo: 'Distrito', nombre: 'Informe técnico de Distrito', descripcion: 'Dictaminar apto / no apto / observado y tomar conocimiento de bajas.' },
@@ -107,7 +114,7 @@ export const ROLES_INICIALES: Record<Rol, { nombre: string; descripcion: string 
 
 /** Plantilla de Jefe y Operador de cada oficina (además de tomar expedientes). */
 const DE_OFICINA: Record<Oficina, Permiso[]> = {
-  [Oficina.CATASTRO]: [Permiso.DATOS_SENSIBLES_VER, Permiso.ALTA_INICIAR, Permiso.ALTA_CARGAR, Permiso.ALTA_CERRAR, Permiso.NUMERO_ASIGNAR],
+  [Oficina.CATASTRO]: [Permiso.DATOS_SENSIBLES_VER, Permiso.ALTA_INICIAR, Permiso.ALTA_CARGAR, Permiso.ALTA_CERRAR, Permiso.NUMERO_ASIGNAR, Permiso.TITULARIDAD_GESTIONAR],
   [Oficina.RECAUDACION]: [Permiso.DATOS_SENSIBLES_VER, Permiso.DEUDA_VERIFICAR],
   [Oficina.DISTRITO]: [Permiso.DISTRITO_DICTAMINAR],
   [Oficina.JURIDICO]: [Permiso.DATOS_SENSIBLES_VER, Permiso.JURIDICO_DICTAMINAR],

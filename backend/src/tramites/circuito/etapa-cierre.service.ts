@@ -1,29 +1,19 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 import type { Expediente } from '../../expedientes/entities/expediente.entity.js';
-import { DEUDA_VERIFICADA, EstadoExpediente, Etapa, ResultadoActuacion, SIGUIENTE_ETAPA, TipoActuacion, type TipoTramite } from '../../expedientes/expedientes.constantes.js';
+import { EstadoExpediente, Etapa, ResultadoActuacion, SIGUIENTE_ETAPA, TipoActuacion, type TipoTramite } from '../../expedientes/expedientes.constantes.js';
 import { ExpedientesService } from '../../expedientes/expedientes.service.js';
+import type { Usuario } from '../../seguridad/entities/usuario.entity.js';
 import type { ObservacionesDto, PadronDto } from './dto/circuito.dto.js';
+import type { ConfigTramite } from './config-tramite.js';
 import { RegistroTramitesService } from './registro-tramites.service.js';
-
-/**
- * Los vistos buenos que tiene que tener el expediente para finalizar. Cuenta la ÚLTIMA
- * actuación de cada tipo (si Distrito observó y después aprobó, vale el apto). Si alguna
- * oficina dijo «no apto», el expediente ya está rechazado y no llega hasta acá.
- */
-const VISTOS_BUENOS: [TipoActuacion, ResultadoActuacion[], string][] = [
-  // Con deuda también vale si Recaudación le dio curso con su nota (CURSO_CON_DEUDA).
-  [TipoActuacion.VERIFICACION_DEUDA, DEUDA_VERIFICADA, 'Recaudación (sin deuda o con curso autorizado)'],
-  [TipoActuacion.INFORME_TECNICO, [ResultadoActuacion.APTO], 'Distrito (apto)'],
-  [TipoActuacion.DICTAMEN_JURIDICO, [ResultadoActuacion.APTO], 'Jurídico (apto)'],
-  [TipoActuacion.NUMERO_CONCESION, [ResultadoActuacion.REGISTRADO], 'Catastro (número de concesión)'],
-  [TipoActuacion.RESOLUCION, [ResultadoActuacion.REGISTRADO], 'Secretaría General (resolución)'],
-  [TipoActuacion.VERIFICACION_FINAL, [ResultadoActuacion.APTO], 'Catastro (verificación final)'],
-];
+import { vistosBuenosRequeridos } from './validaciones/circuito.validaciones.js';
 
 /**
  * Catastro cierra el trámite:
- *   verificacionFinal  completó los datos que faltaban → queda esperando el padrón de Rentas (30 a 60 días).
+ *   verificacionFinal  completó los datos que faltaban →
+ *                        - si el trámite espera el padrón (alta): queda esperándolo (30 a 60 días);
+ *                        - si no (cambio de titularidad): con TODOS los vistos buenos, FINALIZA ahí.
  *   registrarPadron    llegó el padrón → con TODOS los vistos buenos, el trámite FINALIZA y surte efecto.
  */
 @Injectable()
@@ -38,13 +28,23 @@ export class EtapaCierreService {
     await this.dataSource.transaction(async (tx) => {
       //1.- Catastro tiene que tener tomado el expediente, en el cierre.
       const { expediente, usuario } = await this.expedientes.bloquearParaActuar(tx, expedienteId, tipo, [Etapa.CIERRE], usuarioId);
+      const config = this.registro.de(tipo);
 
       //2.- Se valida de nuevo que la carga esté completa (Catastro pudo completar datos en el cierre).
-      await this.registro.de(tipo).validarCarga(tx, expediente);
+      await config.validarCarga(tx, expediente);
 
-      //3.- Queda la verificación final y pasa a la espera del padrón (sigue en Catastro).
-      await this.expedientes.actuar(tx, expediente, { tipo: TipoActuacion.VERIFICACION_FINAL, resultado: ResultadoActuacion.APTO, usuario, observaciones: datos.observaciones });
-      await this.expedientes.cambiarEtapa(tx, expediente, SIGUIENTE_ETAPA[Etapa.CIERRE]!, usuario);
+      //3.- Queda la verificación final.
+      const verificacion = await this.expedientes.actuar(tx, expediente, { tipo: TipoActuacion.VERIFICACION_FINAL, resultado: ResultadoActuacion.APTO, usuario, observaciones: datos.observaciones });
+
+      //4.- Con padrón: pasa a la espera (sigue en Catastro). Sin padrón: finaliza ahora.
+      if (config.esperaPadron) {
+        await this.expedientes.cambiarEtapa(tx, expediente, SIGUIENTE_ETAPA[Etapa.CIERRE]!, usuario);
+        return;
+      }
+      //    El efecto (ej: titulares anteriores y nuevos) queda en los datos de la verificación final.
+      verificacion.datos = await this.surtirEfecto(tx, config, expediente, null, usuario);
+      await tx.save(verificacion);
+      await this.expedientes.cambiarEstado(tx, expediente, EstadoExpediente.FINALIZADO, usuario, true);
     });
   }
 
@@ -53,13 +53,10 @@ export class EtapaCierreService {
       //1.- Catastro tiene que tener tomado el expediente, esperando el padrón.
       const { expediente, usuario } = await this.expedientes.bloquearParaActuar(tx, expedienteId, tipo, [Etapa.ESPERA_PADRON], usuarioId);
 
-      //2.- Se valida que tenga el visto bueno de TODAS las oficinas.
-      await this.exigirVistosBuenos(tx, expediente);
+      //2.- Finaliza con el padrón (alta: padrón en el inmueble, concesión VIGENTE).
+      const resultado = await this.surtirEfecto(tx, this.registro.de(tipo), expediente, datos.padron, usuario);
 
-      //3.- El trámite surte efecto (alta: padrón en el inmueble, concesión VIGENTE).
-      const resultado = await this.registro.de(tipo).alFinalizar(tx, expediente, datos.padron, usuario);
-
-      //4.- Queda en el historial y el expediente se FINALIZA.
+      //3.- Queda en el historial y el expediente se FINALIZA.
       await this.expedientes.actuar(tx, expediente, {
         tipo: TipoActuacion.PADRON,
         resultado: ResultadoActuacion.REGISTRADO,
@@ -72,12 +69,23 @@ export class EtapaCierreService {
   }
 
   /**
+   * El trámite surte efecto:
+   *   1. Se valida que tenga el visto bueno de TODAS las oficinas.
+   *   2. El trámite aplica su efecto (lo define cada ConfigTramite).
+   * Devuelve los datos del efecto, para el historial. Quien llama FINALIZA el expediente.
+   */
+  private async surtirEfecto(tx: EntityManager, config: ConfigTramite, expediente: Expediente, padron: string | null, usuario: Usuario): Promise<Record<string, unknown>> {
+    await this.exigirVistosBuenos(tx, expediente, config.pideNumeroConcesion);
+    return config.alFinalizar(tx, expediente, padron, usuario);
+  }
+
+  /**
    * El trámite solo finaliza con el visto bueno de todas las oficinas. Lo garantiza el orden
    * de las etapas, pero se verifica igual en el historial (defensa en profundidad).
    */
-  async exigirVistosBuenos(tx: EntityManager, expediente: Expediente): Promise<void> {
+  async exigirVistosBuenos(tx: EntityManager, expediente: Expediente, pideNumeroConcesion = true): Promise<void> {
     const faltan: string[] = [];
-    for (const [tipo, resultados, nombre] of VISTOS_BUENOS) {
+    for (const [tipo, resultados, nombre] of vistosBuenosRequeridos(pideNumeroConcesion)) {
       const ultima = await this.expedientes.ultimaActuacion(tx, expediente.id, [tipo]);
       if (!ultima || !resultados.includes(ultima.resultado)) faltan.push(nombre);
     }
